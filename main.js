@@ -45,10 +45,63 @@ const STANDART_EVRAK_LISTESI = [
 const DURUM_ETIKET = {
   evrak_bekliyor: { label: "Evrak Bekliyor", cls: "st-evrak" },
   sgk_bekliyor: { label: "SGK Bekliyor", cls: "st-sgk" },
-  ise_basladi: { label: "İşe Başladı", cls: "st-basladi" },
+  ise_basladi: { label: "İşe Başladı (Deneme Süresi)", cls: "st-basladi" },
   tamamlandi: { label: "Tamamlandı", cls: "st-tamam" },
   vazgecti: { label: "Vazgeçildi", cls: "st-vazgecti" }
 };
+
+// ---------------------------------------------------------------
+// Oryantasyon — unvana göre şablon (v1: birkaç yaygın unvan + genel liste)
+// ---------------------------------------------------------------
+const ORYANTASYON_GENEL = [
+  "Şirket Tanıtımı ve Kurumsal Kültür",
+  "İş Sağlığı ve Güvenliği Eğitimi",
+  "Departman ve Ekip Tanıtımı",
+  "Görev Tanımı ve Sorumlulukların Açıklanması",
+  "Sistem / Yazılım Erişimlerinin Tanımlanması",
+  "Çalışma Saatleri ve Kurumsal Kurallar",
+  "Bordro ve Özlük İşlemleri Bilgilendirmesi",
+  "Şirket İçi İletişim Kanalları",
+  "Acil Durum ve Yangın Tatbikatı Bilgilendirmesi",
+  "İlk Hafta Değerlendirme Görüşmesi"
+];
+const ORYANTASYON_SABLONLARI = {
+  "satış danışmanı": ["CRM / Showroom Sistemi Eğitimi", "Ürün ve Model Eğitimi", "Test Sürüşü Prosedürü", "Fiyatlandırma ve Teklif Hazırlama Eğitimi"],
+  "servis danışmanı": ["Servis Randevu Sistemi Eğitimi", "Garanti İşlemleri Eğitimi", "Yedek Parça Sipariş Süreci"],
+  "yedek parça danışmanı": ["Yedek Parça Stok Sistemi Eğitimi", "Sipariş ve Tedarik Süreci"]
+};
+function oryantasyonSablonSec(unvan) {
+  const key = String(unvan || "").trim().toLocaleLowerCase("tr");
+  for (const k in ORYANTASYON_SABLONLARI) {
+    if (key.indexOf(k) >= 0) return { sablonAdi: k, maddeler: [...ORYANTASYON_GENEL, ...ORYANTASYON_SABLONLARI[k]] };
+  }
+  return { sablonAdi: "Genel", maddeler: [...ORYANTASYON_GENEL] };
+}
+
+// ---------------------------------------------------------------
+// Deneme Süresi Değerlendirmesi (Google Form'un yerini alan bölüm)
+// ---------------------------------------------------------------
+const DENEME_KRITERLERI = [
+  { key: "uyum", ad: "İşe Uyum ve Adaptasyon" },
+  { key: "disiplin", ad: "İş Disiplini (Devamlılık / Dakiklik)" },
+  { key: "gorev", ad: "Görev ve Sorumlulukları Yerine Getirme" },
+  { key: "ogrenme", ad: "Öğrenme ve Gelişim Hızı" },
+  { key: "ekip", ad: "Ekip Çalışması ve İletişim" },
+  { key: "genel", ad: "Genel Performans" }
+];
+const DENEME_PUAN_OPT = ["Yetersiz", "Geliştirilmeli", "Yeterli", "İyi", "Çok İyi"];
+const DENEME_SONUC_OPT = ["İşe Devam Etsin", "Süre Uzatılsın", "İşe Son Verilsin"];
+function denemeSuresiBitisHesapla(baslangicISO) {
+  const d = new Date(baslangicISO + "T00:00:00");
+  if (isNaN(d)) return null;
+  d.setMonth(d.getMonth() + 2); // Türkiye'de yasal standart deneme süresi
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function gunFarki(iso) {
+  if (!iso) return null;
+  const a = new Date(bugunISO() + "T00:00:00"), b = new Date(iso + "T00:00:00");
+  return Math.round((b - a) / 86400000);
+}
 
 const AVATAR_COLORS = ["#117a63", "#8a5a2b", "#3d5a80", "#7c5cbf", "#a13030", "#4a5568"];
 function avatarHtml(name, size) {
@@ -266,19 +319,22 @@ function renderAdaylarPage(list, isAdmin) {
   const total = list.length;
   const evrakBekleyen = list.filter((a) => a.durum === "evrak_bekliyor").length;
   const sgkBekleyen = list.filter((a) => a.durum === "sgk_bekliyor").length;
-  const iseBasladi = list.filter((a) => a.durum === "ise_basladi" || a.durum === "tamamlandi").length;
+  const denemeSuresinde = list.filter((a) => a.durum === "ise_basladi").length;
+  const tamamlandi = list.filter((a) => a.durum === "tamamlandi").length;
 
   const yarin = yarinISO();
   const yarinBaslayanlar = list.filter((a) => a.iseBaslamaTarihi === yarin && a.durum !== "vazgecti" && !a.sgkGirisYapildi);
   const bugun = bugunISO();
   const gecikenSgk = list.filter((a) => a.iseBaslamaTarihi && a.iseBaslamaTarihi <= bugun && !a.sgkGirisYapildi && a.durum !== "vazgecti" && a.durum !== "tamamlandi");
+  const denemeYaklasan = list.filter((a) => a.durum === "ise_basladi" && a.denemeSuresi && !a.denemeSuresi.degerlendirmeYapildiMi && gunFarki(a.denemeSuresi.bitisTarihi) !== null && gunFarki(a.denemeSuresi.bitisTarihi) <= 7);
 
-  const banner = (yarinBaslayanlar.length || gecikenSgk.length) ? `
+  const banner = (yarinBaslayanlar.length || gecikenSgk.length || denemeYaklasan.length) ? `
     <div class="banner">
       <div class="ic">🔔</div>
       <div>
         ${yarinBaslayanlar.length ? `<div><b>Yarın işe başlayacak ${yarinBaslayanlar.length} kişi var</b> — SGK girişini unutmayın: ${yarinBaslayanlar.map((a) => esc(a.ad + " " + a.soyad)).join(", ")}</div>` : ""}
-        ${gecikenSgk.length ? `<div style="margin-top:${yarinBaslayanlar.length ? "6px" : "0"}">⚠ <b>${gecikenSgk.length} kişinin</b> işe başlama tarihi geçti ama SGK girişi hâlâ yapılmamış: ${gecikenSgk.map((a) => esc(a.ad + " " + a.soyad)).join(", ")}</div>` : ""}
+        ${gecikenSgk.length ? `<div style="margin-top:6px">⚠ <b>${gecikenSgk.length} kişinin</b> işe başlama tarihi geçti ama SGK girişi hâlâ yapılmamış: ${gecikenSgk.map((a) => esc(a.ad + " " + a.soyad)).join(", ")}</div>` : ""}
+        ${denemeYaklasan.length ? `<div style="margin-top:6px">📋 <b>${denemeYaklasan.length} kişinin</b> deneme süresi yakında doluyor, değerlendirme formunu doldurmayı unutmayın: ${denemeYaklasan.map((a) => esc(a.ad + " " + a.soyad) + " (" + fmtTarih(a.denemeSuresi.bitisTarihi) + ")").join(", ")}</div>` : ""}
       </div>
     </div>` : "";
 
@@ -286,7 +342,7 @@ function renderAdaylarPage(list, isAdmin) {
     <div class="page-head">
       <div>
         <h1>Aday Takibi</h1>
-        <p>İşe alım öncesi evrak ve SGK süreçlerini buradan yönetin.</p>
+        <p>İşe alım öncesi evrak, SGK, oryantasyon ve deneme süresi süreçlerini buradan yönetin.</p>
       </div>
       ${isAdmin ? `<button class="btn btn-teal" id="yeniAdayBtn">+ Yeni Aday Ekle</button>` : ""}
     </div>
@@ -295,7 +351,8 @@ function renderAdaylarPage(list, isAdmin) {
       <div class="stat-card"><div class="n">${total}</div><div class="l">Toplam Aday</div></div>
       <div class="stat-card"><div class="n">${evrakBekleyen}</div><div class="l">Evrak Bekliyor</div></div>
       <div class="stat-card"><div class="n">${sgkBekleyen}</div><div class="l">SGK Bekliyor</div></div>
-      <div class="stat-card"><div class="n">${iseBasladi}</div><div class="l">İşe Başladı</div></div>
+      <div class="stat-card"><div class="n">${denemeSuresinde}</div><div class="l">Deneme Süresinde</div></div>
+      <div class="stat-card"><div class="n">${tamamlandi}</div><div class="l">Tamamlandı</div></div>
     </div>
     <div class="toolbar">
       <input type="text" id="searchBox" placeholder="İsimle ara…" style="min-width:200px">
@@ -424,9 +481,13 @@ function openAdayForm() {
 function openAdayDetay(aday, isAdmin) {
   const overlay = document.createElement("div");
   overlay.className = "overlay";
+  // Yalnızca admin genel bilgi/evrak/SGK düzenleyebilir; ama oryantasyon ve
+  // deneme süresi değerlendirmesi müdür tarafından da işlenebilir olmalı —
+  // zaten bir müdür yalnızca KENDİ departmanındaki adayları açabiliyor
+  // (bkz. render()), o yüzden burada ekstra bir departman kontrolüne gerek yok.
+  const canEditSurec = true; // admin veya ilgili müdür — ikisi de bu ekranı açabildiyse yetkilidir
 
   function bodyHtml(a) {
-    const st = DURUM_ETIKET[a.durum] || DURUM_ETIKET.evrak_bekliyor;
     const oran = evrakOrani(a);
     return `
     <div class="section-title" style="margin-top:0">Genel Bilgiler</div>
@@ -456,6 +517,9 @@ function openAdayDetay(aday, isAdmin) {
       ${(a.evraklar || []).map((e, i) => evrakRowHtml(e, i)).join("")}
     </div>
 
+    ${a.oryantasyon ? oryantasyonHtml(a) : ""}
+    ${a.denemeSuresi ? denemeSuresiHtml(a) : ""}
+
     <div class="section-title">Not</div>
     <textarea id="dNot" rows="3" ${isAdmin ? "" : "disabled"}>${esc(a.notlar || "")}</textarea>`;
   }
@@ -468,6 +532,60 @@ function openAdayDetay(aday, isAdmin) {
         ${esc(e.ad)}
       </label>
     </div>`;
+  }
+
+  function oryantasyonHtml(a) {
+    const maddeler = a.oryantasyon.maddeler || [];
+    const tamam = maddeler.length ? maddeler.filter((m) => m.tamamlandi).length : 0;
+    const oran = maddeler.length ? Math.round((tamam / maddeler.length) * 100) : 0;
+    return `
+    <div class="section-title">Oryantasyon (${esc(a.oryantasyon.sablonAdi || "Genel")}) — %${oran} tamamlandı</div>
+    <div class="progress-track" style="margin-bottom:12px"><div class="progress-fill" style="width:${oran}%"></div></div>
+    <div id="oryantasyonListesi">
+      ${maddeler.map((m, i) => `
+        <div class="evrak-row ${m.tamamlandi ? "done" : ""}" data-idx="${i}">
+          <label style="display:flex;align-items:center;gap:8px;" class="name">
+            <input type="checkbox" data-oryantasyon-check="${i}" ${m.tamamlandi ? "checked" : ""} ${canEditSurec ? "" : "disabled"}>
+            ${esc(m.ad)}
+          </label>
+          <span style="font-size:11px;color:var(--ink-soft)">${m.tarih ? fmtTarih(m.tarih) : ""}</span>
+        </div>`).join("")}
+    </div>`;
+  }
+
+  function denemeSuresiHtml(a) {
+    const ds = a.denemeSuresi;
+    const deg = ds.degerlendirme || {};
+    const kilitli = !!ds.degerlendirmeYapildiMi;
+    const kalanGun = gunFarki(ds.bitisTarihi);
+    return `
+    <div class="section-title">Deneme Süresi Değerlendirmesi</div>
+    <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:10px">
+      Başlangıç: ${fmtTarih(a.iseBaslamaTarihi)} · Bitiş: ${fmtTarih(ds.bitisTarihi)}
+      ${kilitli ? ` · <span style="color:var(--good);font-weight:600">✓ Değerlendirme kesinleşti (${esc(deg.sonuc || "")})</span>` : (kalanGun !== null ? ` · ${kalanGun >= 0 ? kalanGun + " gün kaldı" : "süresi doldu"}` : "")}
+    </div>
+    <div id="denemeKriterListesi">
+      ${DENEME_KRITERLERI.map((k) => `
+        <div class="evrak-row" style="align-items:flex-start;">
+          <div class="name" style="padding-top:4px">${esc(k.ad)}</div>
+          <select data-deneme-kriter="${k.key}" ${kilitli || !canEditSurec ? "disabled" : ""} style="min-width:150px">
+            <option value="">Seçiniz</option>
+            ${DENEME_PUAN_OPT.map((p) => `<option value="${p}" ${deg[k.key] === p ? "selected" : ""}>${p}</option>`).join("")}
+          </select>
+        </div>`).join("")}
+    </div>
+    <div class="field" style="margin-top:10px">
+      <label>Yönetici Görüşü</label>
+      <textarea id="dDenemeYorum" rows="3" ${kilitli || !canEditSurec ? "disabled" : ""}>${esc(deg.yorum || "")}</textarea>
+    </div>
+    <div class="field">
+      <label>Sonuç</label>
+      <select id="dDenemeSonuc" ${kilitli || !canEditSurec ? "disabled" : ""}>
+        <option value="">Seçiniz</option>
+        ${DENEME_SONUC_OPT.map((s) => `<option value="${s}" ${deg.sonuc === s ? "selected" : ""}>${s}</option>`).join("")}
+      </select>
+    </div>
+    ${!kilitli && canEditSurec ? `<button class="btn btn-teal btn-sm" id="denemeKesinlestirBtn" type="button">Değerlendirmeyi Kesinleştir</button>` : ""}`;
   }
 
   overlay.innerHTML = `
@@ -485,7 +603,7 @@ function openAdayDetay(aday, isAdmin) {
       <div class="drawer-body" id="drawerBody">${bodyHtml(aday)}</div>
       <div class="drawer-foot">
         ${isAdmin ? `<button class="btn btn-ghost" id="silBtn" style="color:var(--bad)">Adayı Sil</button>` : ""}
-        <button class="btn btn-teal" id="guncelleBtn">${isAdmin ? "Kaydet" : "Kapat"}</button>
+        <button class="btn btn-teal" id="guncelleBtn">Kaydet</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
@@ -494,7 +612,7 @@ function openAdayDetay(aday, isAdmin) {
 
   let workingCopy = JSON.parse(JSON.stringify(aday));
 
-  function wireEvrakEvents() {
+  function wireDynamicEvents() {
     document.querySelectorAll("[data-evrak-check]").forEach((cb) => {
       cb.addEventListener("change", () => {
         const i = +cb.dataset.evrakCheck;
@@ -502,29 +620,88 @@ function openAdayDetay(aday, isAdmin) {
         cb.closest(".evrak-row").classList.toggle("done", cb.checked);
       });
     });
+    document.querySelectorAll("[data-oryantasyon-check]").forEach((cb) => {
+      cb.addEventListener("change", () => {
+        const i = +cb.dataset.oryantasyonCheck;
+        workingCopy.oryantasyon.maddeler[i].tamamlandi = cb.checked;
+        workingCopy.oryantasyon.maddeler[i].tarih = cb.checked ? bugunISO() : null;
+        cb.closest(".evrak-row").classList.toggle("done", cb.checked);
+      });
+    });
+    document.querySelectorAll("[data-deneme-kriter]").forEach((sel) => {
+      sel.addEventListener("change", () => {
+        if (!workingCopy.denemeSuresi.degerlendirme) workingCopy.denemeSuresi.degerlendirme = {};
+        workingCopy.denemeSuresi.degerlendirme[sel.dataset.denemeKriter] = sel.value;
+      });
+    });
+    const denemeKesinlestirBtn = document.getElementById("denemeKesinlestirBtn");
+    if (denemeKesinlestirBtn) {
+      denemeKesinlestirBtn.addEventListener("click", async () => {
+        const yorum = document.getElementById("dDenemeYorum").value.trim();
+        const sonuc = document.getElementById("dDenemeSonuc").value;
+        const eksikKriter = DENEME_KRITERLERI.some((k) => !(workingCopy.denemeSuresi.degerlendirme || {})[k.key]);
+        if (eksikKriter || !sonuc) { toast("Tüm kriterler ve sonuç seçilmelidir."); return; }
+        denemeKesinlestirBtn.disabled = true; denemeKesinlestirBtn.textContent = "Kaydediliyor…";
+        const yeniDurum = sonuc === "İşe Devam Etsin" ? "tamamlandi" : sonuc === "İşe Son Verilsin" ? "vazgecti" : "ise_basladi";
+        const patch = {
+          // Aynı oturumda oryantasyon kutucuklarında da değişiklik yapılmış
+          // olabilir — Kesinleştir'e basınca bunlar kaybolmasın diye dahil edilir.
+          oryantasyon: workingCopy.oryantasyon,
+          denemeSuresi: {
+            ...workingCopy.denemeSuresi,
+            degerlendirmeYapildiMi: true,
+            degerlendirme: { ...workingCopy.denemeSuresi.degerlendirme, yorum, sonuc, degerlendirenKullanici: currentProfile.adSoyad, tarih: bugunISO() },
+            bitisTarihi: sonuc === "Süre Uzatılsın" ? denemeSuresiBitisHesapla(bugunISO()) : workingCopy.denemeSuresi.bitisTarihi
+          },
+          durum: yeniDurum
+        };
+        try {
+          await persist(patch);
+          toast("✓ Deneme süresi değerlendirmesi kesinleşti.");
+          overlay.remove();
+        } catch (e) {
+          toast("Kaydedilemedi: " + e.message);
+          denemeKesinlestirBtn.disabled = false; denemeKesinlestirBtn.textContent = "Değerlendirmeyi Kesinleştir";
+        }
+      });
+    }
   }
-  wireEvrakEvents();
+  wireDynamicEvents();
 
   async function persist(patch) {
     await setDoc(doc(db, "iseAlimAday", aday.id), { ...patch, guncellemeTarihi: serverTimestamp() }, { merge: true });
   }
 
   el("#guncelleBtn").onclick = async () => {
-    if (!isAdmin) { overlay.remove(); return; }
     const btn = el("#guncelleBtn");
     btn.disabled = true; btn.textContent = "Kaydediliyor…";
     const sgkChecked = el("#dSgk").checked;
+    const yeniDurum = el("#dDurum").value;
+    const patch = {
+      telefon: el("#dTelefon").value.trim(),
+      email: el("#dEmail").value.trim(),
+      iseBaslamaTarihi: el("#dTarih").value,
+      durum: yeniDurum,
+      sgkGirisYapildi: sgkChecked,
+      sgkGirisTarihi: sgkChecked ? (aday.sgkGirisTarihi || bugunISO()) : null,
+      notlar: el("#dNot").value.trim(),
+      evraklar: workingCopy.evraklar
+    };
+    // İşe Başladı durumuna ilk kez geçiliyorsa oryantasyon şablonunu ve
+    // deneme süresi bitiş tarihini otomatik oluştur.
+    if (yeniDurum === "ise_basladi" && !aday.oryantasyon) {
+      const sablon = oryantasyonSablonSec(aday.unvan);
+      patch.oryantasyon = { sablonAdi: sablon.sablonAdi, maddeler: sablon.maddeler.map((ad2) => ({ ad: ad2, tamamlandi: false, tarih: null })) };
+    } else if (workingCopy.oryantasyon) {
+      patch.oryantasyon = workingCopy.oryantasyon;
+    }
+    if (yeniDurum === "ise_basladi" && !aday.denemeSuresi) {
+      patch.denemeSuresi = { bitisTarihi: denemeSuresiBitisHesapla(patch.iseBaslamaTarihi || aday.iseBaslamaTarihi), degerlendirmeYapildiMi: false, degerlendirme: {} };
+    } else if (workingCopy.denemeSuresi) {
+      patch.denemeSuresi = workingCopy.denemeSuresi;
+    }
     try {
-      await persist({
-        telefon: el("#dTelefon").value.trim(),
-        email: el("#dEmail").value.trim(),
-        iseBaslamaTarihi: el("#dTarih").value,
-        durum: el("#dDurum").value,
-        sgkGirisYapildi: sgkChecked,
-        sgkGirisTarihi: sgkChecked ? (aday.sgkGirisTarihi || bugunISO()) : null,
-        notlar: el("#dNot").value.trim(),
-        evraklar: workingCopy.evraklar
-      });
+      await persist(patch);
       toast("✓ Kaydedildi.");
       overlay.remove();
     } catch (e) {
