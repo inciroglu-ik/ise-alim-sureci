@@ -1,6 +1,7 @@
 import { app, LOGIN_DOMAIN } from "./firebase-config.js";
 import {
-  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
+  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
+  EmailAuthProvider, reauthenticateWithCredential, updatePassword
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, collection, onSnapshot,
@@ -181,12 +182,64 @@ function topbar() {
     <div class="who">
       <span class="pill">${currentProfile.role === "admin" ? "İK / Admin" : "Müdür"}</span>
       <span><b>${esc(currentProfile.adSoyad)}</b></span>
+      <button class="btn btn-ghost btn-sm" id="pwBtn">Şifre Değiştir</button>
       <button class="btn btn-ghost btn-sm" id="logoutBtn">Çıkış</button>
     </div>
   </div>`;
 }
 function wireTopbar() {
   el("#logoutBtn").addEventListener("click", () => signOut(auth));
+  el("#pwBtn").addEventListener("click", () => openPasswordModal());
+}
+
+// ---------------------------------------------------------------
+// ŞİFRE DEĞİŞTİR (Firebase Auth üzerinden — Yetenek Havuzu ile aynı hesaplar,
+// aynı mantık). Sahte e-posta alan adı yüzünden "şifremi unuttum" e-postası
+// çalışmaz; unutulan şifre için tek yol Firebase konsolundan admin sıfırlaması.
+// ---------------------------------------------------------------
+function openPasswordModal() {
+  const overlay = document.createElement("div");
+  overlay.className = "overlay";
+  overlay.innerHTML = `
+    <div class="drawer" style="width:min(420px,100%)">
+      <div class="drawer-head">
+        <div><h2>Şifre Değiştir</h2><div class="meta">${esc(currentProfile.adSoyad)}</div></div>
+        <button class="close-x" id="closePwModal">✕</button>
+      </div>
+      <div class="drawer-body">
+        <div class="field"><label>Mevcut Şifre</label><input type="password" id="pwCur"></div>
+        <div class="field"><label>Yeni Şifre</label><input type="password" id="pwNew1" placeholder="en az 6 karakter"></div>
+        <div class="field"><label>Yeni Şifre (Tekrar)</label><input type="password" id="pwNew2"></div>
+        <div id="pwMsg" style="font-size:12.5px;margin-top:6px"></div>
+      </div>
+      <div class="drawer-foot">
+        <button class="btn btn-ghost" id="pwVazgec">Vazgeç</button>
+        <button class="btn btn-teal" id="pwKaydet">Kaydet</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+  el("#closePwModal").onclick = () => overlay.remove();
+  el("#pwVazgec").onclick = () => overlay.remove();
+  el("#pwKaydet").onclick = async () => {
+    const cur = el("#pwCur").value, n1 = el("#pwNew1").value, n2 = el("#pwNew2").value;
+    const msg = el("#pwMsg");
+    if (!cur) { msg.innerHTML = '<span style="color:var(--bad)">Mevcut şifrenizi girin.</span>'; return; }
+    if (!n1 || n1.length < 6) { msg.innerHTML = '<span style="color:var(--bad)">Yeni şifre en az 6 karakter olmalı.</span>'; return; }
+    if (n1 !== n2) { msg.innerHTML = '<span style="color:var(--bad)">Yeni şifreler birbiriyle uyuşmuyor.</span>'; return; }
+    const btn = el("#pwKaydet");
+    btn.disabled = true; btn.textContent = "Kaydediliyor…";
+    try {
+      const cred = EmailAuthProvider.credential(auth.currentUser.email, cur);
+      await reauthenticateWithCredential(auth.currentUser, cred);
+      await updatePassword(auth.currentUser, n1);
+      msg.innerHTML = '<span style="color:var(--good)">✓ Şifre güncellendi.</span>';
+      setTimeout(() => overlay.remove(), 1200);
+    } catch (e) {
+      msg.innerHTML = '<span style="color:var(--bad)">' + (e.code === "auth/wrong-password" || e.code === "auth/invalid-credential" ? "Mevcut şifre hatalı." : "Hata: " + e.message) + '</span>';
+      btn.disabled = false; btn.textContent = "Kaydet";
+    }
+  };
 }
 
 let TAB = "adaylar";
