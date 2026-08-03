@@ -102,6 +102,20 @@ const UNVAN_LISTESI = [
 ];
 
 // ---------------------------------------------------------------
+// Departman (marka/birim) ve Bölüm listeleri — Ağustos 2026 Çalışan
+// Listesi'ndeki aktif departmanlardan derlenmiştir. Açılır liste olarak
+// sunulur ki "Fiat" / "FIAT" gibi büyük-küçük harf farkları yüzünden
+// müdür-departman eşleşmesi (Firestore kuralları dahil) hiç bozulmasın.
+// ---------------------------------------------------------------
+const DEPARTMAN_LISTESI = [
+  "FIAT", "PSA", "BMW", "HASAR", "HONDA", "2. EL", "PEUGEOT", "CITROEN", "JAECOO", "OPEL",
+  "BPS", "FİLO", "MINI", "ARJ", "EK SATIŞ DEPARTMANI",
+  "İCRA KURULU", "MALİ İŞLER", "İNSAN KAYNAKLARI", "YIKAMA BİRİMİ", "SATIN ALMA",
+  "PAZARLAMA", "FİNANS", "DENETİM", "YÖNETİM KURULU", "D-EXPERT", "BİLGİ İŞLEM"
+];
+const BOLUM_LISTESI = ["Satış", "Servis", "İdari"];
+
+// ---------------------------------------------------------------
 // Oryantasyon — 4 unvan için şirketin gerçek/detaylı oryantasyon formları
 // birebir işlenmiştir (kategori/sıra/kapsam/sorumlu alanlarıyla). Diğer tüm
 // unvanlar için genel bir liste kullanılır (kapsamlı unvan-bazlı şablonlar
@@ -902,23 +916,37 @@ function renderAdaylarPage(list, isAdmin) {
 // ---------------------------------------------------------------
 // YENİ ADAY FORMU
 // ---------------------------------------------------------------
-function unvanSelectHtml(id, secili) {
-  const varMi = UNVAN_LISTESI.some((u) => u.toLocaleLowerCase("tr") === String(secili || "").trim().toLocaleLowerCase("tr"));
+// Genel amaçlı "açılır liste + Diğer (elle yaz)" bileşeni — unvan, departman
+// gibi büyük/küçük harf farkına duyarlı eşleşmesi gereken tüm alanlarda
+// kullanılır (bkz. satış panosundaki aynı prensip: marka adları listeden
+// seçilince Firestore kural eşleşmesi asla bozulmaz).
+function dropdownDigerHtml(id, secili, liste, placeholder, disabled) {
+  const varMi = liste.some((u) => u.toLocaleLowerCase("tr") === String(secili || "").trim().toLocaleLowerCase("tr"));
+  const dis = disabled ? "disabled" : "";
   return `
-    <select id="${id}">
+    <select id="${id}" ${dis}>
       <option value="">Seçiniz…</option>
-      ${UNVAN_LISTESI.map((u) => `<option value="${esc(u)}" ${secili === u ? "selected" : ""}>${esc(u)}</option>`).join("")}
+      ${liste.map((u) => `<option value="${esc(u)}" ${secili === u ? "selected" : ""}>${esc(u)}</option>`).join("")}
       <option value="__diger__" ${secili && !varMi ? "selected" : ""}>Diğer (elle yaz)</option>
     </select>
-    <input type="text" id="${id}Diger" placeholder="Unvanı yazın" style="margin-top:6px;${secili && !varMi ? "" : "display:none"}" value="${secili && !varMi ? esc(secili) : ""}">`;
+    <input type="text" id="${id}Diger" placeholder="${esc(placeholder || "Elle yazın")}" ${dis} style="margin-top:6px;${secili && !varMi ? "" : "display:none"}" value="${secili && !varMi ? esc(secili) : ""}">`;
 }
-function wireUnvanSelect(id) {
+function wireDropdownDiger(id) {
   const sel = el("#" + id), diger = el("#" + id + "Diger");
   sel.addEventListener("change", () => { diger.style.display = sel.value === "__diger__" ? "" : "none"; });
 }
-function unvanDegeriOku(id) {
+function dropdownDigerDegeriOku(id) {
   const sel = el("#" + id), diger = el("#" + id + "Diger");
   return sel.value === "__diger__" ? diger.value.trim() : sel.value;
+}
+function unvanSelectHtml(id, secili, disabled) { return dropdownDigerHtml(id, secili, UNVAN_LISTESI, "Unvanı yazın", disabled); }
+function wireUnvanSelect(id) { return wireDropdownDiger(id); }
+function unvanDegeriOku(id) { return dropdownDigerDegeriOku(id); }
+function departmanSelectHtml(id, secili, disabled) { return dropdownDigerHtml(id, secili, DEPARTMAN_LISTESI, "Departmanı yazın", disabled); }
+function wireDepartmanSelect(id) { return wireDropdownDiger(id); }
+function departmanDegeriOku(id) { return dropdownDigerDegeriOku(id); }
+function bolumSelectHtml(id, secili, disabled) {
+  return `<select id="${id}" ${disabled ? "disabled" : ""}><option value="">Seçiniz…</option>${BOLUM_LISTESI.map((b) => `<option value="${esc(b)}" ${secili === b ? "selected" : ""}>${esc(b)}</option>`).join("")}</select>`;
 }
 
 function openAdayForm() {
@@ -937,7 +965,10 @@ function openAdayForm() {
         </div>
         <div class="two-col">
           <div class="field"><label>Unvan (görüşülen pozisyon)</label>${unvanSelectHtml("fUnvan", "")}</div>
-          <div class="field"><label>Departman</label><input type="text" id="fDepartman" placeholder="Örn: Peugeot"></div>
+          <div class="field"><label>Departman</label>${departmanSelectHtml("fDepartman", "")}</div>
+        </div>
+        <div class="two-col">
+          <div class="field"><label>Bölüm</label>${bolumSelectHtml("fBolum", "")}</div>
         </div>
         <div class="two-col">
           <div class="field"><label>Telefon</label><input type="text" id="fTelefon" placeholder="05xx xxx xx xx"></div>
@@ -958,6 +989,7 @@ function openAdayForm() {
   el("#closeDrawer").onclick = () => overlay.remove();
   el("#vazgecBtn").onclick = () => overlay.remove();
   wireUnvanSelect("fUnvan");
+  wireDepartmanSelect("fDepartman");
   el("#kaydetBtn").onclick = async () => {
     const ad = el("#fAd").value.trim(), soyad = el("#fSoyad").value.trim(), gorusmeTarihi = el("#fGorusmeTarihi").value;
     if (!ad || !soyad || !gorusmeTarihi) { toast("Ad, soyad ve görüşme tarihi zorunludur."); return; }
@@ -968,7 +1000,8 @@ function openAdayForm() {
       await addDoc(collection(db, "iseAlimAday"), {
         ad, soyad,
         unvan: unvanDegeriOku("fUnvan"),
-        departman: el("#fDepartman").value.trim(),
+        departman: departmanDegeriOku("fDepartman"),
+        bolum: el("#fBolum").value,
         telefon: el("#fTelefon").value.trim(),
         email: el("#fEmail").value.trim(),
         gorusmeTarihi,
@@ -1013,10 +1046,11 @@ function openAdayDetay(aday, isAdmin) {
     return `
     <div class="section-title" style="margin-top:0">Genel Bilgiler</div>
     <div class="two-col">
-      <div class="field"><label>Unvan</label>${unvanSelectHtml("dUnvan", a.unvan || "")}</div>
-      <div class="field"><label>Departman</label><input type="text" id="dDepartman" value="${esc(a.departman || "")}" ${isAdmin ? "" : "disabled"}></div>
+      <div class="field"><label>Unvan</label>${unvanSelectHtml("dUnvan", a.unvan || "", !isAdmin)}</div>
+      <div class="field"><label>Departman</label>${departmanSelectHtml("dDepartman", a.departman || "", !isAdmin)}</div>
     </div>
     <div class="two-col">
+      <div class="field"><label>Bölüm</label>${bolumSelectHtml("dBolum", a.bolum || "", !isAdmin)}</div>
       <div class="field"><label>Telefon</label><input type="text" id="dTelefon" value="${esc(a.telefon || "")}" ${isAdmin ? "" : "disabled"}></div>
       <div class="field"><label>E-posta</label><input type="email" id="dEmail" value="${esc(a.email || "")}" ${isAdmin ? "" : "disabled"}></div>
     </div>
@@ -1239,6 +1273,8 @@ function openAdayDetay(aday, isAdmin) {
     });
     const unvanSel = document.getElementById("dUnvan");
     if (unvanSel) wireUnvanSelect("dUnvan");
+    const departmanSel = document.getElementById("dDepartman");
+    if (departmanSel) wireDepartmanSelect("dDepartman");
     const olumluBtn = document.getElementById("olumluBtn"), olumsuzBtn = document.getElementById("olumsuzBtn");
     if (olumluBtn) olumluBtn.addEventListener("click", () => {
       document.getElementById("olumluForm").style.display = "";
@@ -1343,7 +1379,8 @@ function openAdayDetay(aday, isAdmin) {
     btn.disabled = true; btn.textContent = "Kaydediliyor…";
     const ortakPatch = {
       unvan: unvanDegeriOku("dUnvan"),
-      departman: el("#dDepartman").value.trim(),
+      departman: departmanDegeriOku("dDepartman"),
+      bolum: el("#dBolum").value,
       telefon: el("#dTelefon").value.trim(),
       email: el("#dEmail").value.trim(),
       notlar: el("#dNot").value.trim()
