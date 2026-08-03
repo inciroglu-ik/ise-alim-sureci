@@ -646,12 +646,16 @@ function subscribeAdaylar() {
   // filtresiz bir collection() dinleyicisi, resource.data'ya bakan bir kural
   // altında müdürler için TAMAMEN reddedilir (Yetenek Havuzu'ndaki
   // "evaluations" koleksiyonu da aynı nedenle where() ile sorgulanıyor).
-  // Admin filtresiz okur, müdür ise sorgunun kendisi departman/durum ile
-  // kısıtlanır ki Firestore kuralı sağlanabilir olduğunu kanıtlayabilsin.
+  // Admin filtresiz okur, müdür ise sorgunun kendisi TEK bir eşitlik
+  // koşuluyla (departman) kısıtlanır — "durum" için ayrıca bir where()
+  // eklemek Firestore'da bileşik bir index gerektirir ve elle
+  // oluşturulmadığı sürece sorguyu tamamen başarısız kılar; "olumsuz"
+  // adayların müdürden gizlenmesi zaten render()'daki client-taraflı
+  // filtreyle sağlanıyor, bu yüzden burada tek koşul yeterli ve sağlamdır.
   const isAdminHesap = currentProfile.role === "admin";
   const ref = isAdminHesap
     ? collection(db, "iseAlimAday")
-    : query(collection(db, "iseAlimAday"), where("departman", "==", currentProfile.muduluk), where("durum", "!=", "olumsuz"));
+    : query(collection(db, "iseAlimAday"), where("departman", "==", currentProfile.muduluk));
   unsubAday = onSnapshot(ref, (qs) => {
     adaylar = [];
     qs.forEach((d) => adaylar.push({ id: d.id, ...d.data() }));
