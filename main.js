@@ -5,7 +5,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, collection, onSnapshot,
-  serverTimestamp
+  query, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 /* Not: Dosya yükleme (Firebase Storage) bilinçli olarak kullanılmıyor —
    Storage artık ücretli "Blaze" planı gerektiriyor. Evrak takibi şimdilik
@@ -641,7 +641,18 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 function subscribeAdaylar() {
-  unsubAday = onSnapshot(collection(db, "iseAlimAday"), (qs) => {
+  // Firestore, koleksiyon ("list") sorgularında güvenlik kuralını SORGUNUN
+  // KENDİSİNE göre değerlendirir, dönen belgelere göre değil — bu yüzden
+  // filtresiz bir collection() dinleyicisi, resource.data'ya bakan bir kural
+  // altında müdürler için TAMAMEN reddedilir (Yetenek Havuzu'ndaki
+  // "evaluations" koleksiyonu da aynı nedenle where() ile sorgulanıyor).
+  // Admin filtresiz okur, müdür ise sorgunun kendisi departman/durum ile
+  // kısıtlanır ki Firestore kuralı sağlanabilir olduğunu kanıtlayabilsin.
+  const isAdminHesap = currentProfile.role === "admin";
+  const ref = isAdminHesap
+    ? collection(db, "iseAlimAday")
+    : query(collection(db, "iseAlimAday"), where("departman", "==", currentProfile.muduluk), where("durum", "!=", "olumsuz"));
+  unsubAday = onSnapshot(ref, (qs) => {
     adaylar = [];
     qs.forEach((d) => adaylar.push({ id: d.id, ...d.data() }));
     render();
