@@ -43,39 +43,496 @@ const STANDART_EVRAK_LISTESI = [
 ];
 
 const DURUM_ETIKET = {
+  gorusme_bekliyor: { label: "Görüşme / Karar Bekliyor", cls: "st-gorusme" },
+  olumsuz: { label: "Olumsuz (Reddedildi)", cls: "st-olumsuz" },
   evrak_bekliyor: { label: "Evrak Bekliyor", cls: "st-evrak" },
   sgk_bekliyor: { label: "SGK Bekliyor", cls: "st-sgk" },
   ise_basladi: { label: "İşe Başladı (Deneme Süresi)", cls: "st-basladi" },
   tamamlandi: { label: "Tamamlandı", cls: "st-tamam" },
   vazgecti: { label: "Vazgeçildi", cls: "st-vazgecti" }
 };
+// Aday havuzunda ("gorusme_bekliyor" ve öncesi/karar aşaması) gösterilen
+// gruplar sıralı bir akış izler; onboarding tarafı (evrak -> ... -> tamamlandı)
+// önceki sürümle aynı kalır.
+const AKIS_GRUPLARI = [
+  { key: "gorusme_bekliyor", baslik: "Görüşme / Karar Bekliyor", ic: "🗓️" },
+  { key: "evrak_bekliyor", baslik: "Evrak Bekliyor", ic: "📄" },
+  { key: "sgk_bekliyor", baslik: "SGK Bekliyor", ic: "🏥" },
+  { key: "ise_basladi", baslik: "Deneme Süresinde", ic: "⏳" },
+  { key: "tamamlandi", baslik: "Tamamlandı", ic: "✅" },
+  { key: "vazgecti", baslik: "Vazgeçildi", ic: "🚫" },
+  { key: "olumsuz", baslik: "Olumsuz (Reddedildi) — yalnız İK görür", ic: "✗", sadeceAdmin: true }
+];
+const RED_NEDENLERI = [
+  "Deneyim / yetkinlik yetersiz",
+  "Maaş beklentisi uyuşmadı",
+  "Kurum kültürüne / ekibe uyum endişesi",
+  "Başka bir aday tercih edildi",
+  "Aday kendi vazgeçti",
+  "Evrak / referans sorunu",
+  "Diğer"
+];
 
 // ---------------------------------------------------------------
-// Oryantasyon — unvana göre şablon (v1: birkaç yaygın unvan + genel liste)
+// Unvan listesi — Ağustos 2026 Çalışan Listesi'ndeki aktif unvanlardan
+// derlenmiştir. Listede olmayan bir unvan çıkarsa "Diğer (elle yaz)"
+// seçeneğiyle serbest metin girilebilir.
 // ---------------------------------------------------------------
-const ORYANTASYON_GENEL = [
-  "Şirket Tanıtımı ve Kurumsal Kültür",
-  "İş Sağlığı ve Güvenliği Eğitimi",
-  "Departman ve Ekip Tanıtımı",
-  "Görev Tanımı ve Sorumlulukların Açıklanması",
-  "Sistem / Yazılım Erişimlerinin Tanımlanması",
-  "Çalışma Saatleri ve Kurumsal Kurallar",
-  "Bordro ve Özlük İşlemleri Bilgilendirmesi",
-  "Şirket İçi İletişim Kanalları",
-  "Acil Durum ve Yangın Tatbikatı Bilgilendirmesi",
-  "İlk Hafta Değerlendirme Görüşmesi"
+const UNVAN_LISTESI = [
+  "Satış Danışmanı", "Kıdemli Satış Danışmanı", "Aktif Satış Danışmanı", "Satış Müdürü", "Satış Şefi",
+  "Servis Danışmanı", "Kıdemli Servis Danışmanı", "Servis Müdürü", "Hasar Servis Danışmanı", "Hasar Servis Müdürü",
+  "Servis Resepsiyonist", "Servis Teknik Danışman", "Randevu Planlama Sorumlusu",
+  "Otomotiv Mekanikçisi", "Otomotiv Mekanik Formeni", "Otomotiv Kaporta Teknisyeni", "Otomotiv Elektrik Teknisyeni",
+  "Otomotiv Boya Teknisyeni", "Otomotiv Boya Elemanı", "Otomotiv Boya Formeni", "Trim Teknisyeni",
+  "Lpg Bakım Teknisyeni", "Kalite Kontrol Teknisyeni", "Ön Düzen ve Balans Ayarcısı", "Atölye Şefi", "Atölye Takip Uzmanı",
+  "Yedek Parça Danışmanı", "Yedek Parça Yöneticisi", "Garanti Uzmanı", "Garanti Uzman Yardımcısı", "Expertiz Uzmanı",
+  "Lojistik Uzmanı", "Müşteri İlişkileri Sorumlusu", "Showrom Elemanı", "Resepsiyon Elemanı", "Resepsiyonst",
+  "Teslimat Sorumlusu", "Araç Alım Uzmanı", "Araç Alım Yöneticisi", "Araç Hazırlama Uzmanı", "Kredi Görevlisi",
+  "Kredi Tahsis Uzmanı", "Ek Satışlardan Sorumlu Müdür", "FİLO SATIŞ MÜDÜRÜ", "Genius", "Vale", "Oto Yıkama Elemanı", "Oto Yıkama Yöneticisi",
+  "İkram Görevlisi", "SERVİS MÜHENDİSİ",
+  "Direktör", "MARKA DİREKTÖRÜ", "Ceo", "Ceo Teknik Asistanı", "Yönetim Kurulu Başkanı",
+  "DİJİTAL DÖNÜŞÜM & PAZARLAMA & STRATEJİ GENEL MÜDÜR YARDIMCISI", "MALİ İŞLER GENEL MÜDÜR YARDIMCISI",
+  "Pazarlama Müdürü", "Pazarlama Uzmanı", "Pazarlama Uzman Yardımcısı", "Sosyal Medya Uzmanı", "İş Geliştirme Uzmanı",
+  "Marka Muhasebe Sorumlusu", "Marka Muhasebe Uzman Yardımcısı", "Muhasebe Yöneticisi", "Finans Yöneticisi", "Finans Uzmanı", "Vezne",
+  "Satın Alma Yöneticisi", "İc Denetim Uzmanı", "Bordro Ve Özlük İşleri Uzmanı",
+  "İnsan Kaynakları Uzman Yardımcısı", "Bilgi İşlem Yöneticisi", "Bilgi İşlem Yardımcısı", "Plaka Tescil Sorumlusu",
+  "Şoför", "Bahçivan", "Ev Temizlik Görevlisi", "Yat Hostesi", "Gemi", "Engelli",
+  "BİNA-ELEKTRİK BAKIM TEKNİSYENİ", "Plaza Bakım Teknisyeni",
+  "Stajyer", "Analist Öğrenci"
 ];
-const ORYANTASYON_SABLONLARI = {
-  "satış danışmanı": ["CRM / Showroom Sistemi Eğitimi", "Ürün ve Model Eğitimi", "Test Sürüşü Prosedürü", "Fiyatlandırma ve Teklif Hazırlama Eğitimi"],
-  "servis danışmanı": ["Servis Randevu Sistemi Eğitimi", "Garanti İşlemleri Eğitimi", "Yedek Parça Sipariş Süreci"],
-  "yedek parça danışmanı": ["Yedek Parça Stok Sistemi Eğitimi", "Sipariş ve Tedarik Süreci"]
+
+// ---------------------------------------------------------------
+// Oryantasyon — 4 unvan için şirketin gerçek/detaylı oryantasyon formları
+// birebir işlenmiştir (kategori/sıra/kapsam/sorumlu alanlarıyla). Diğer tüm
+// unvanlar için genel bir liste kullanılır (kapsamlı unvan-bazlı şablonlar
+// zamanla eklenebilir).
+// ---------------------------------------------------------------
+function _oExpand(satirlar) {
+  // satirlar: [kategoriYaKiBosBirak, baslik, kapsam, sorumlu][]
+  let sonKategori = "";
+  return satirlar.map(([kategori, baslik, kapsam, sorumlu], i) => {
+    if (kategori) sonKategori = kategori;
+    return { kategori: sonKategori, sira: i + 1, baslik, kapsam: kapsam || "", sorumlu: sorumlu || "", tamamlandi: false, tamamlanmaTarihi: null };
+  });
+}
+const IK_SURECLERI_ORTAK = [
+  ["İK Süreçleri", "İşe girişinin ve özlük dosyasının hazırlanması", "Özlük dosyalarının kontrolü, sözleşme imzaları, yüz tanıtma, sicil açma vb.", "İnsan Kaynakları"],
+  [null, "İK tanışma", "İK ekibi ile tanışma, iletişim kuracağı kişilerin bilgilerinin verilmesi.", "İnsan Kaynakları"],
+  [null, "Hoş Geldin maili paylaşımı", "Şirket çalışanlarına işe başlama duyurusunun yapılması", "İnsan Kaynakları"],
+  [null, "Ekibi hakkında genel bilgilendirme", "Ekip listesinin verilmesi", "İnsan Kaynakları"],
+  [null, "Şirketin organizasyonel yapısının anlatılması", "Organizasyon şeması üzerinden şirketin genel yapısının ve birim liderlerinin anlatılması", "İnsan Kaynakları"],
+  [null, "İşe alım süreçleri bilgilendirme", "İşe alım iş akışı, süreçleri ve uygulamaları hakkında bilgilendirme", "İnsan Kaynakları"],
+  [null, "Zimmetlerinin teslim edilmesinin sağlanması", "Mail açılması, telefon, bilgisayar gibi zimmetlerin tesliminin IT birimi ile organize edilmesi", "IT"],
+  [null, "Tesis yapısının fiziki anlatımı", "Servis saatleri, durakları, çalışma saatleri, yemekhane, tesislerin yerleri vb. bilgilendirilmesi", "İnsan Kaynakları"]
+];
+const ORYANTASYON_SABLONLARI_DETAYLI = {
+  "satış müdürü": _oExpand([
+    ...IK_SURECLERI_ORTAK,
+    [null, "Ceo ile tanıştırma", "", "İnsan Kaynakları"],
+    [null, "Yönetim Kurulu Başkanı ile tanıştırma", "", "İnsan Kaynakları"],
+    ["Kurumsal ve Operasyonel Entegrasyon", "Satış süreçleri, oryantasyon", "Satış danışmanları başta olmak üzere kendisine bağlı olan personel ile tanıştırma", ""],
+    [null, "Satış müdürleri / Şirket müdürleri ile tanıştırma", "", ""],
+    [null, "Bölge Müdürü ile tanıştırma", "Online toplantı aracılığıyla bölge müdürü ile tanışma", ""],
+    [null, "İn Grup Sistemleri Eğitimi", "Copilot, Rapor, Föy, Satın Alma, IT sistemlerinin tanıtımı ve kullanımı", ""],
+    [null, "Takas Sistemi", "İkinci el takas süreci ve işleyişinin anlatılması", ""],
+    [null, "Föy Detayları", "Tahsilat, fatura ve ek satış süreçlerinin tanıtımı", ""],
+    [null, "Showroom Düzeni", "Alanların kuralları, düzeni ve müşteri karşılama alanlarının yönetimi", ""],
+    [null, "Araç Alım ve Vadeler", "Araç tahsis süreçleri ve vade planlaması", ""],
+    [null, "Lojistik Süreçleri", "Faturalama süreçleri, araç giriş–çıkış ve teslim organizasyonu", ""],
+    [null, "PDI", "Sisteme giriş ve süreç akışının anlatımı", ""],
+    [null, "Filo Kanalı", "Talep ve faturalama süreçlerinin tanıtımı", ""],
+    [null, "ÖTV Kanunu ve Araç ÖTV Dilimleri", "Araç ÖTV matrahları ve katılım oranlarının açıklanması", ""],
+    [null, "Kredi Dilimleri", "Araç bedeline göre kredi kullandırım limitlerinin anlatılması", ""],
+    [null, "Şirket Kültürü", "Şirketin temel değerleri, olmazsa olmaz ilkeleri ve olaylara yaklaşım biçimi", ""],
+    [null, "Estetik Şirketi Çalışma Prensipleri", "Araç estetik işlemleri ve satış politikaları hakkında bilgilendirme", ""],
+    [null, "Oryantasyon gidişat toplantısı", "Oryantasyon konularının tamamlanma durumu hakkında İK ile görüşme", "İnsan Kaynakları"],
+    ["Satış Yönetimi ve Performans Süreçleri", "Satış Danışmanı Süreçleri", "Müşteri ile ilişkilerin kuralları, danışman davranış standartları", ""],
+    [null, "Müşteri Yönetimi", "Müşteri karşılama ve uğurlama süreçleri", ""],
+    [null, "Müşteri İlişkileri", "Müşteri şikayetleri ve cevaplama süreçleri", ""],
+    [null, "Prim Dönemleri", "Araç prim dönemleri ve ödeme tarihleri", ""],
+    [null, "Tahsilat Kuralları", "Tahsilatlar ve danışmanların para ile olan ilişkilerinin kuralları", ""],
+    [null, "Satış Danışmanı Performans Süreçleri", "Günlük, haftalık ve aylık hedef planlaması", ""],
+    [null, "Stok Yaşı Yüksek Araç Hedefi", "Stoktaki araçlara göre prim hedefi verilmesi", ""],
+    [null, "Satış Müdürü Satış Verme Politikası", "Satış müdürünün araç sattığında hangi mantıkla satış vereceği", ""],
+    [null, "Prim Sisteminin Anlatılması", "Prim sisteminin genel yapısının ve kriterlerinin açıklanması", ""],
+    [null, "Takip Edilen Satış KPI'ları", "Satış performansında izlenen temel göstergeler (adet, brüt kâr, müşteri memnuniyeti vb.)", ""],
+    [null, "Veri Odaklı Yönetim", "Satış KPI'ları, stok yaş analizi, raporlama araçları (Power BI, Copilot entegrasyonları) konusunda uygulamalı eğitim", ""],
+    [null, "2. El ile toplantı", "Süreç ve bilgi aktarımı", "2. El Birimi"],
+    [null, "Mali İşler departmanı ile tanışma ve iş akışı bilgilendirmesi", "Süreç ve bilgi aktarımı", "Mali İşler Birimi"],
+    [null, "Pazarlama ekibi ile işbirliği ve birlikte çalışma konularının aktarımı", "Süreç ve bilgi aktarımı", "Pazarlama Birimi"],
+    ["Marka ve Stratejik Yönetim", "Marka Sistemine Kayıt", "e-Link, Salesforce, Efes sistemlerine kayıt ve temel kullanım eğitimi", ""],
+    [null, "Marka Dinamikleri", "Markaların pazar payı, hedefleri ve rekabet pozisyonlarının anlatılması", ""],
+    [null, "Marka Yöneticileri", "Her markaya bağlı sorumlu alanlardaki kişilerle tanışma", ""],
+    [null, "Marka Eğitim", "Marka özelinde verilen eğitimlerin kapsamı ve sorumlulukları", ""],
+    [null, "Raporlamalar", "Satış kayıtları, veri detayları ve rapor formatlarının tanıtımı", ""],
+    [null, "Danışman Toplantıları", "Toplantı konuları, sıklığı ve zamanlama düzeni", ""],
+    [null, "Marka Farklılıkları Workshopu", "Markaların farklı müşteri profilleri, satış döngüleri ve fiyatlandırma stratejileri arasındaki farkların vurgulanması", ""],
+    [null, "Saha Uygulama Günü", "Satış müdürünün bir gününü showroomda danışmanlarla birlikte geçirmesi, müşteri sürecini sahada deneyimlemesi", ""],
+    [null, "Oryantasyon final toplantısı", "Oryantasyon konularının tamamlanma durumu hakkında CEO ile görüşme", "İlgili Direktör"]
+  ]),
+  "servis müdürü": _oExpand([
+    ...IK_SURECLERI_ORTAK,
+    [null, "Ceo ile tanıştırma", "", "İnsan Kaynakları"],
+    [null, "Yönetim Kurulu Başkanı ile tanıştırma", "", "İnsan Kaynakları"],
+    ["Servis Müdürlüğü Sorumlulukları", "Veri Odaklı Yönetim", "Bayi organizasyonu içindeki diğer birimlerle koordinasyonu sağlamak, hasar toplantılarına katılmak, distribütör ile bilgi alışverişi ve raporlamaları yürütmek, atölye iş akış organizasyonunu kurmak, servis müşterilerine ait açık hesapları kontrol etmek.", ""],
+    [null, "İş Akışı ve Verimlilik Takibi", "Çalışma ortamını gözlemleyerek öncelikleri belirlemek, atölye iş akışlarının verimli yürütülmesini sağlamak.", ""],
+    [null, "Teknik Yönetim ve Denetim", "Teşhis konmamış, parça bekleyen araçların durumlarını takip etmek, atölye donanımlarını kontrol etmek, bakım ve yenileme planları yapmak.", ""],
+    [null, "Kalite ve Teşhis Süreçleri", "Teşhis ve onarım kalitesini artırmak, iş gecikmeleri ve plan değişikliklerine yönelik önlem almak.", ""],
+    [null, "Envanter ve Ekipman Yönetimi", "Servisin tüm alet, edevat, ekipman ve demirbaşlarının güvenliğini, bakım/onarımını sağlamak.", ""],
+    [null, "Tesis Yönetimi", "Tesis içi ve dışı düzenin, temizliğin sağlanması, yasal belge ve süreçlerin yönetilmesi, atık yönetim planının uygulanması.", ""],
+    [null, "Müşteri İlişkileri Yönetimi", "Müşteri İlişkileri Sorumlusu'ndan gelen kritik müşteri bilgilerini takip etmek, şikayetleri çözüm odaklı yönetmek.", ""],
+    [null, "Müşteri Sadakati ve Pazarlama", "Mevcut müşterilerle ilişkileri güçlendirmek, filo müşterilerini düzenli ziyaret etmek, servis pazarlama faaliyetlerini planlamak.", ""],
+    [null, "Mali Yönetim", "Servisin ciro ve karlılığını yönetmek, işçilik ücretlerini belirlemek, parça stokları ve tahsilat süreçlerini izlemek.", ""],
+    [null, "Bütçe ve Finansal Takip", "Servis departmanı bütçesini planlamak, bütçe sapmalarını analiz etmek, karlılığı artıracak eylem planları oluşturmak.", ""],
+    [null, "İnsan Kaynakları Yönetimi", "Ekip katılımını kontrol etmek, çalışan verimliliğini izlemek, yeni işe alınan personelin oryantasyonunu yürütmek.", ""],
+    [null, "Ekip Motivasyonu ve Disiplin", "İnsan Kaynakları ile iş birliği içinde ekip moralini yüksek tutmak, disiplin süreçlerini yönetmek.", "İnsan Kaynakları"],
+    [null, "İzin ve Devamlılık Takibi", "Ekip yıllık izin planlamasını yapmak, hastalık/doğum/vefat gibi durumlarda İnsan Kaynakları'nı bilgilendirmek.", "İnsan Kaynakları"],
+    [null, "Görev Dağılımı ve Kapasite Yönetimi", "Çalışanların görev dağılımlarını yapmak, beceri ve yeteneklerine göre iş planlamak.", ""],
+    ["Değerlendirme", "Oryantasyon gidişat toplantısı", "Oryantasyon konularının tamamlanma durumu hakkında İK ile görüşme", "İnsan Kaynakları"],
+    [null, "Oryantasyon final toplantısı", "Oryantasyon konularının tamamlanma durumu hakkında CEO ile görüşme", "İlgili Direktör"]
+  ]),
+  "satış danışmanı": _oExpand([
+    ...IK_SURECLERI_ORTAK,
+    [null, "Servis direktörü ile tanışma", "Mevcut süreçler, hiyerarşi, iş akışı hakkında bilgilendirme", "İnsan Kaynakları"],
+    ["Oryantasyon Süreçleri", "Satış Ekibi ve İş Ortakları ile Tanışma", "Showroom ekibi ve iş ortaklarıyla tanışma, ekip içi iletişim ve görev tanımlarının anlatılması.", "Satış Müdürü / İnsan Kaynakları"],
+    [null, "Şirket Kültürü ve Kurallarının Aktarımı", "Şirket politikaları, çalışma saatleri, izin prosedürleri, kılık-kıyafet kuralları, marka vizyonu ve misyonunun aktarılması.", "Satış Müdürü"],
+    [null, "Organizasyon Şeması ve Yönetici Görüşmesi", "Organizasyon şemasının tanıtılması, yöneticilerle tanışma, hedef ve beklentilerin paylaşılması.", "Satış Müdürü"],
+    [null, "Body (Eşlikçi) Ataması ve Gölgeleme Süreci", "Yeni danışmana body atanır, showroom süreci, araç tanıtımı, teklif hazırlığı ve teslimat gözlemi yapılır.", "Body Danışman / Satış Müdürü"],
+    [null, "Sistemsel Tanımlamalar ve Talep Süreçleri", "Yaka kartı, kartvizit, e-posta, sistem erişimi, kullanıcı yetkileri ve talep süreçlerinin tamamlanması.", "IT / Satış Destek"],
+    [null, "Süreç ve Ürün Bilgilendirmesi", "Genel satış süreci, showroom işleyişi, müşteri karşılamaya dair bilgilendirme.", "Satış Müdürü / Body Danışman"],
+    [null, "Ürün Bilgisi Eğitimi", "Ürün gamı, donanım seviyeleri, teknik özellikler ve fiyatlandırma detaylarının aktarılması.", "Satış Müdürü / Body Danışman"],
+    [null, "Hizmet Bilgisi Eğitimi", "Müşteri karşılama, ihtiyaç analizi, sunum, teklif hazırlama, kredi bilgilendirme, test sürüşü, zaman yönetimi eğitimi.", "Satış Müdürü / Body Danışman"],
+    [null, "Mevzuat Bilgilendirmesi", "ÖTV, KDV, kredi ve yasal mevzuat hakkında bilgi.", "Satış Müdürü / Finans"],
+    [null, "Araç / Hizmet Satışı Sürecine Giriş", "Showroom'a gelen müşterinin karşılanması, ihtiyaç analizi, uygun aracın sunulması, gizli müşteri kriterlerinin öğrenilmesi.", "Satış Müdürü / Eğitim Departmanı"],
+    [null, "Showroom Düzeni ve Teşhir Kontrolü", "Showroom içi ve dışı araçların temizliği, teşhir düzeni, görsel bütünlüğün korunması.", "Showroom Sorumlusu / Satış Müdürü"],
+    [null, "Müşteri Takip Programı Kullanımı", "DMS, Efes vb. müşteri takip sistemlerinin doğru kullanımı, sistem kayıtlarının güncel tutulması.", "Satış Destek / MİS"],
+    [null, "Sistem Kullanımı Oryantasyonu", "Markaya özel sistemler (Copilot, Takas Takip vb.) hakkında eğitim verilmesi.", "Satış Müdürü / Body Danışman"],
+    [null, "Stok Kontrolü ve Yönetimi", "Araç stoklarının düzenli kontrolü, doğru tahsis ve stok hareket takibi.", "Satış Müdürü"],
+    [null, "Satış Süreci ve Akışı", "Müşteri ihtiyacı belirleme, tekliflendirme, satış kapama, sözleşme hazırlığı, kredi ve sigorta süreçleri, plaka ve teslimat işlemleri.", "Satış Müdürü / Kredi Tahsis Uzmanı"],
+    [null, "Takas Süreçleri", "Takas araçların değerlemesi, 2. El Sorumlusu ile koordinasyon, prosedürlere uygun teslim alma.", "2. El Sorumlusu / Satış Müdürü"],
+    [null, "Finansal İşlemler", "Müşterilerin kredi yönlendirmeleri, bankalarla koordinasyon, kasko ve sigorta işlemlerinin yürütülmesi.", "Kredi Tahsis Uzmanı / Satış Müdürü"],
+    [null, "Garanti ve Teslimat Süreçleri", "Garanti belgelerinin düzenlenmesi, araç tesliminde belgelerin eksiksiz sunulması.", "Satış Destek / Teslimat Sorumlusu"],
+    [null, "Araç Teslimi ve Memnuniyet Araması", "Teslimatın marka standartlarına uygun yapılması, teslim sonrası müşteri memnuniyet araması.", "Satış Danışmanı / MİS"],
+    [null, "Artı Garanti Satışı", "Ek garanti seçeneklerinin müşteriye sunulması ve satış sonrası süreçlere dâhil edilmesi.", "Satış Danışmanı"],
+    [null, "Kalite ve Müşteri Takip Süreçleri", "Müşteri aramaları, anket ve gizli müşteri takibi, teklif adetlerinin kontrolü.", "Satış Müdürü / MİS"],
+    [null, "Müşteri Şikayet Yönetimi", "Şikayetlerin çözülmesi, çözülemeyen durumların yönlendirilmesi, sonuç takibi.", "Satış Müdürü / MİS"],
+    [null, "Kampanyalar ve Promosyonlar", "Güncel kampanyaların öğrenilmesi, müşterilere doğru aktarılması.", "Pazarlama / Satış Müdürü"],
+    [null, "Satış Hedefleri ve Fiyat Politikası", "Satış hedeflerinin belirlenmesi, fiyat ve indirim politikalarına uyum sağlanması.", "Satış Müdürü"],
+    [null, "Satış Hedef Planlaması", "Hedeflere ulaşmak için strateji oluşturulması, kişisel satış planının hazırlanması.", "Satış Müdürü"],
+    [null, "Yeni Müşteri Kazanımı", "Distribütör ve yerel pazarlama faaliyetleriyle müşteri portföyünün geliştirilmesi.", "Satış Danışmanı / Pazarlama"],
+    [null, "Referans Yönetimi ve Aday Takibi", "Mevcut müşterilerden referans alınması, potansiyel müşterilerin takibi.", "Satış Danışmanı / MİS"],
+    [null, "Yeniden Satış Çalışmaları", "Mevcut müşterilerle yeniden iletişim kurularak yeni satış fırsatlarının yaratılması.", "Satış Danışmanı"],
+    [null, "Ürün Bilgisi Geliştirme", "Araçların teknik ve rekabet avantajları hakkında sürekli bilgi güncellemesi.", "Satış Müdürü / Body Danışman"],
+    [null, "Yasal Sorumluluk ve Finansal Bilgi", "Satışın yasal sonuçları, garanti ve finansman süreçleri hakkında bilgi sahibi olunması.", "Satış Müdürü / Finans"],
+    [null, "Distribütör Yazılım ve Eğitimleri", "Distribütör sistemlerinin (Efes, DMS, Jato vb.) etkin kullanımı, eğitimlere katılım.", "Satış Müdürü / Body Danışman"],
+    [null, "Filo ve Özel Satış İşlemleri", "Filo veya özel satış müşteri evraklarının eksiksiz hazırlanması ve teslimi.", "Filo Satış / Satış Müdürü"],
+    [null, "Satış Sonrası Müşteri Takibi", "Kredi talebi ve tahsilat süreçlerinin takibi, muhasebeye iletilmesi.", "Satış Danışmanı / Muhasebe"]
+  ]),
+  "servis danışmanı": _oExpand([
+    ...IK_SURECLERI_ORTAK,
+    [null, "Servis direktörü ile tanışma", "Mevcut süreçler, hiyerarşi, iş akışı hakkında bilgilendirme", "İnsan Kaynakları"],
+    ["Oryantasyon Süreçleri", "Satış Ekibi ve İş Ortakları ile Tanışma", "Showroom ekibi ve iş ortaklarıyla tanışma, ekip içi iletişim ve görev tanımlarının anlatılması.", "Servis Müdürü / İnsan Kaynakları"],
+    [null, "Şirket Kültürü ve Kurallarının Aktarımı", "Şirket politikaları, çalışma saatleri, izin prosedürleri, kılık-kıyafet kuralları, marka vizyonu ve misyonunun aktarılması.", "Servis Müdürü"],
+    [null, "Organizasyon Şeması ve Yönetici Görüşmesi", "Organizasyon şemasının tanıtılması, yöneticilerle tanışma, hedef ve beklentilerin paylaşılması.", "Servis Müdürü"],
+    [null, "Body (Eşlikçi) Ataması ve Gölgeleme Süreci", "Yeni danışmana body atanır, showroom süreci, iş süreci, teklif hazırlığı ve teslimat gözlemi yapılır.", "Body Danışman / Servis Müdürü"],
+    [null, "Sistemsel Tanımlamalar ve Talep Süreçleri", "Yaka kartı, kartvizit, e-posta, sistem erişimi, kullanıcı yetkileri ve talep süreçlerinin tamamlanması.", "IT / Satış Destek"],
+    [null, "Süreç ve Ürün Bilgilendirmesi", "Genel servis süreci, showroom işleyişi, müşteri karşılamaya dair bilgilendirme.", "Servis Müdürü / Body Danışman"],
+    [null, "Müşteri taleplerinin kabulü sürecine giriş", "Telefonla veya yüz yüze başvuran müşterilerin karşılanması, araç ve müşteri bilgilerinin alınması, taleplerin değerlendirilmesi.", ""],
+    [null, "Randevu öncesi hazırlık", "Randevu gününden önce gerekli yedek parçaların kontrol edilmesi ve hazır bulundurulması.", ""],
+    [null, "Araç kabul süreci", "Müşteri servise geldiğinde aracın teslim alınması, mevcut hasar ve eksiklerin kayıt altına alınması (5 Nokta Kontrolü), müşteri onayının alınması.", ""],
+    [null, "İş Emri oluşturma", "Araç için İş Emri Formu'nun eksiksiz doldurulması, yapılacak işlemler ve tahmini maliyetlerin müşteriye açıklanması, onay alınması.", ""],
+    [null, "Kampanya ve parça kontrolü", "Aracın geri çağırma kampanyalarına dahil olup olmadığının ve kullanılacak parçaların stok durumunun kontrol edilmesi.", ""],
+    [null, "Araç takibi ve bilgilendirme", "Atölye sürecinde aracın ilerleyişinin takip edilmesi, yapılan işlemler hakkında müşteriye düzenli bilgi verilmesi.", ""],
+    [null, "Servis satışı sürecine giriş", "Araç kabulü sırasında yapılan araç turunda ek bakım, onarım veya aksesuar ihtiyaçlarının tespiti, müşteriye sunumu ve onayı.", ""],
+    [null, "Ek satış ve hizmet bilgilendirmesi", "Marka tarafından sunulan hizmetlerin, kampanyaların ve önerilen bakım işlemlerinin müşteriye anlatılması.", ""],
+    [null, "Ek işlemler ve onay süreci", "Servis sürecinde ortaya çıkan ek işlemler için müşterinin bilgilendirilmesi, tahmini maliyetlerin paylaşılması.", ""],
+    [null, "Tahsilat ve hesap takibi", "Haftalık olarak açık müşteri hesaplarının kontrol edilmesi, tahsilatların zamanında gerçekleşmesinin sağlanması.", ""],
+    [null, "Araç teslim öncesi kontrol", "Onarımı tamamlanan araçların kontrol edilmesi, eksik/hatalı uygulamaların tespiti, aracın teslim öncesi temizlenmesi.", ""],
+    [null, "Müşteriye araç teslimi", "Aracın teslimi sırasında yapılan işlemlerin, değişen parçaların ve fatura detaylarının müşteriye açıklanması.", ""],
+    [null, "Faturalandırma ve ödeme işlemleri", "Tahsilat sürecinde giriş verilerinin doğruluğunun kontrolü, kredi kartı veya nakit ödeme alınması, fatura kesimi.", ""],
+    [null, "Garanti dışı parça süreci", "Garanti kapsamı dışındaki değişen parçaların müşteriye gösterilmesi, isterse teslim edilmesi, iş emrine not edilip imzalanması.", ""],
+    [null, "Sonraki bakım ve bilgilendirme", "Müşteriye bir sonraki bakım tarihi ve kilometre bilgisinin verilmesi, memnuniyet anketi hakkında bilgilendirme yapılması.", ""],
+    [null, "Yasal bilgilendirme ve müşteri onayı", "Şirketin zorunlu gördüğü bakım/onarım işlemlerinin müşteriye açıklanması, reddetmesi durumunda imza alınması.", ""],
+    [null, "Müşteri ve araç verilerinin güncellenmesi", "Her araç girişinde müşteri ve araç bilgilerinin kontrol edilmesi, sigorta, kasko, egzoz muayenesi gibi eksiklerin belirlenmesi.", ""],
+    [null, "Servis sonrası süreç bilgilendirmesi", "Müşterinin araç tesliminden sonra memnuniyet anketi hakkında bilgilendirilmesi.", ""]
+  ])
+};
+const ORYANTASYON_GENEL = _oExpand([
+  ["Genel Oryantasyon", "Şirket Tanıtımı ve Kurumsal Kültür", "Şirketin tarihçesi, değerleri ve kurumsal kültürünün anlatılması", "İnsan Kaynakları"],
+  [null, "İş Sağlığı ve Güvenliği Eğitimi", "Temel İSG kuralları, acil durum prosedürleri", "İnsan Kaynakları"],
+  [null, "Departman ve Ekip Tanıtımı", "Bağlı olduğu departman ve ekip üyeleriyle tanıştırma", "İlgili Yönetici"],
+  [null, "Görev Tanımı ve Sorumlulukların Açıklanması", "Pozisyonun görev tanımı ve beklentilerin netleştirilmesi", "İlgili Yönetici"],
+  [null, "Sistem / Yazılım Erişimlerinin Tanımlanması", "Görevi için gerekli sistem ve yazılımlara erişim tanımlanması", "IT"],
+  [null, "Çalışma Saatleri ve Kurumsal Kurallar", "Çalışma saatleri, izin prosedürleri, kılık-kıyafet kuralları", "İnsan Kaynakları"],
+  [null, "Bordro ve Özlük İşlemleri Bilgilendirmesi", "Maaş, bordro ve özlük süreçleri hakkında bilgilendirme", "İnsan Kaynakları"],
+  [null, "Şirket İçi İletişim Kanalları", "Kullanılan iletişim araçları ve bilgi akış kanalları", "İlgili Yönetici"],
+  [null, "Acil Durum ve Yangın Tatbikatı Bilgilendirmesi", "Acil çıkış yolları, toplanma alanı ve yangın prosedürü", "İnsan Kaynakları"],
+  [null, "İlk Hafta Değerlendirme Görüşmesi", "İlk hafta izlenimleri ve varsa sorunların görüşülmesi", "İlgili Yönetici / İnsan Kaynakları"]
+]);
+const UNVAN_GENEL_SABLON_ESLESME = {
+  "Otomotiv Mekanikçisi": "servis_teknisyeni_genel",
+  "Stajyer": "stajyer_ogrenci",
+  "Otomotiv Kaporta Teknisyeni": "servis_teknisyeni_genel",
+  "Oto Yıkama Elemanı": "destek_hizmetleri",
+  "Yedek Parça Danışmanı": "depo_lojistik_yedek_parca",
+  "Lojistik Uzmanı": "depo_lojistik_yedek_parca",
+  "Müşteri İlişkileri Sorumlusu": "satis_destek_showroom",
+  "İkram Görevlisi": "destek_hizmetleri",
+  "Showrom Elemanı": "satis_destek_showroom",
+  "Resepsiyon Elemanı": "satis_destek_showroom",
+  "Analist Öğrenci": "stajyer_ogrenci",
+  "Hasar Servis Danışmanı": "servis_danismanlik_destek",
+  "Otomotiv Elektrik Teknisyeni": "servis_teknisyeni_genel",
+  "Engelli": "idari_ofis_personeli",
+  "Otomotiv Boya Teknisyeni": "servis_teknisyeni_genel",
+  "Direktör": "yonetici_direktor_genel",
+  "Resepsiyonst": "satis_destek_showroom",
+  "Teslimat Sorumlusu": "satis_destek_showroom",
+  "Marka Muhasebe Uzman Yardımcısı": "idari_ofis_personeli",
+  "MARKA DİREKTÖRÜ": "yonetici_direktor_genel",
+  "Otomotiv Mekanik Formeni": "servis_teknisyeni_genel",
+  "Otomotiv Boya Elemanı": "servis_teknisyeni_genel",
+  "Marka Muhasebe Sorumlusu": "idari_ofis_personeli",
+  "Ön Düzen ve Balans Ayarcısı": "servis_teknisyeni_genel",
+  "Bahçivan": "destek_hizmetleri",
+  "Satın Alma Yöneticisi": "yonetici_direktor_genel",
+  "Araç Alım Uzmanı": "satis_destek_showroom",
+  "İnsan Kaynakları Uzman Yardımcısı": "idari_ofis_personeli",
+  "Satış Şefi": "satis_destek_showroom",
+  "Pazarlama Uzman Yardımcısı": "idari_ofis_personeli",
+  "Expertiz Uzmanı": "servis_danismanlik_destek",
+  "Pazarlama Uzmanı": "idari_ofis_personeli",
+  "Garanti Uzman Yardımcısı": "servis_danismanlik_destek",
+  "Finans Uzmanı": "idari_ofis_personeli",
+  "Vezne": "idari_ofis_personeli",
+  "İc Denetim Uzmanı": "idari_ofis_personeli",
+  "Hasar Servis Müdürü": "yonetici_direktor_genel",
+  "Araç Alım Yöneticisi": "yonetici_direktor_genel",
+  "Lpg Bakım Teknisyeni": "servis_teknisyeni_genel",
+  "Trim Teknisyeni": "servis_teknisyeni_genel",
+  "Servis Teknik Danışman": "servis_danismanlik_destek",
+  "Ev Temizlik Görevlisi": "destek_hizmetleri",
+  "Ceo": "yonetici_direktor_genel",
+  "Şoför": "destek_hizmetleri",
+  "Gemi": "destek_hizmetleri",
+  "Randevu Planlama Sorumlusu": "servis_danismanlik_destek",
+  "Otomotiv Boya Formeni": "servis_teknisyeni_genel",
+  "Oto Yıkama Yöneticisi": "yonetici_direktor_genel",
+  "Kıdemli Servis Danışmanı": "servis_danismanlik_destek",
+  "Servis Resepsiyonist": "servis_danismanlik_destek",
+  "Atölye Takip Uzmanı": "servis_danismanlik_destek",
+  "Kredi Görevlisi": "satis_destek_showroom",
+  "FİLO SATIŞ MÜDÜRÜ": "yonetici_direktor_genel",
+  "SERVİS MÜHENDİSİ": "servis_danismanlik_destek",
+  "Bilgi İşlem Yardımcısı": "idari_ofis_personeli",
+  "İş Geliştirme Uzmanı": "idari_ofis_personeli",
+  "Ceo Teknik Asistanı": "idari_ofis_personeli",
+  "DİJİTAL DÖNÜŞÜM & PAZARLAMA & STRATEJİ GENEL MÜDÜR YARDIMCISI": "yonetici_direktor_genel",
+  "Atölye Şefi": "servis_teknisyeni_genel",
+  "Araç Hazırlama Uzmanı": "satis_destek_showroom",
+  "Vale": "destek_hizmetleri",
+  "Genius": "satis_destek_showroom",
+  "Finans Yöneticisi": "yonetici_direktor_genel",
+  "Sosyal Medya Uzmanı": "idari_ofis_personeli",
+  "Kıdemli Satış Danışmanı": "satis_destek_showroom",
+  "Bilgi İşlem Yöneticisi": "yonetici_direktor_genel",
+  "Bordro Ve Özlük İşleri Uzmanı": "idari_ofis_personeli",
+  "Kalite Kontrol Teknisyeni": "servis_teknisyeni_genel",
+  "Pazarlama Müdürü": "yonetici_direktor_genel",
+  "MALİ İŞLER GENEL MÜDÜR YARDIMCISI": "yonetici_direktor_genel",
+  "Yat Hostesi": "destek_hizmetleri",
+  "Ek Satışlardan Sorumlu Müdür": "yonetici_direktor_genel",
+  "BİNA-ELEKTRİK BAKIM TEKNİSYENİ": "destek_hizmetleri",
+  "Yedek Parça Yöneticisi": "yonetici_direktor_genel",
+  "Plaza Bakım Teknisyeni": "destek_hizmetleri",
+  "Muhasebe Yöneticisi": "yonetici_direktor_genel",
+  "Yönetim Kurulu Başkanı": "yonetici_direktor_genel",
+  "Plaka Tescil Sorumlusu": "satis_destek_showroom",
+  "Garanti Uzmanı": "servis_danismanlik_destek",
+  "Kredi Tahsis Uzmanı": "satis_destek_showroom",
+  "Aktif Satış Danışmanı": "satis_destek_showroom"
+};
+
+const ORYANTASYON_SABLONLARI_GENEL_GRUPLAR = {
+  "servis_teknisyeni_genel": {
+    adi: "Servis Teknisyeni / Atölye Personeli Genel Oryantasyonu",
+    maddeler: [
+      { kategori: "İK SÜREÇLERİ", sira: 1, baslik: "Özlük Dosyası ve İşe Giriş Evrakları", kapsam: "İşe giriş evraklarının (kimlik fotokopisi, sağlık raporu, adli sicil kaydı, ikametgah, banka hesap bilgileri) eksiksiz teslim alınması ve özlük dosyasının oluşturulması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "İK SÜREÇLERİ", sira: 2, baslik: "SGK İşe Giriş Bildirgesi ve Bordro Bilgilendirmesi", kapsam: "Sigorta girişinin yapılması, ücret/prim/mesai politikalarının ve bordro kesim tarihlerinin çalışana anlatılması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "İş Sağlığı ve Güvenliği", sira: 3, baslik: "İSG Temel Eğitimi ve Kişisel Koruyucu Donanım (KKD) Teslimi", kapsam: "Atölye ortamında iş güvenliği kurallarının, acil durum prosedürlerinin anlatılması; iş ayakkabısı, eldiven, gözlük, tulum gibi KKD'lerin zimmetle teslim edilmesi.", sorumlu: "İş Sağlığı ve Güvenliği Uzmanı" },
+      { kategori: "İş Sağlığı ve Güvenliği", sira: 4, baslik: "Yangın, Kaza ve Acil Durum Tatbikat Bilgilendirmesi", kapsam: "Atölyedeki yangın söndürme ekipmanlarının yerleri, acil çıkış noktaları, iş kazası bildirim prosedürünün aktarılması.", sorumlu: "İş Sağlığı ve Güvenliği Uzmanı / Servis Müdürü" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 5, baslik: "Atölye ve Tesis Tanıtımı", kapsam: "Atölye bölümlerinin (mekanik, kaporta-boya, elektrik, yıkama, yedek parça deposu) gezdirilmesi, dinlenme/soyunma alanlarının gösterilmesi.", sorumlu: "Formen / Servis Müdürü" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 6, baslik: "Ekip ve Yönetim ile Tanışma", kapsam: "Servis Müdürü, formen, servis danışmanları ve diğer teknisyenlerle tanıştırılması, raporlama hattının netleştirilmesi.", sorumlu: "Servis Müdürü" },
+      { kategori: "Teknik Sistemler ve Ekipman", sira: 7, baslik: "İş Emri Takip Sistemi Kullanım Eğitimi", kapsam: "Servis iş emri/DMS sisteminde iş emri açma, parça talep etme, işçilik girişi yapma adımlarının uygulamalı anlatılması.", sorumlu: "IT / Servis Müdürü" },
+      { kategori: "Teknik Sistemler ve Ekipman", sira: 8, baslik: "Marka Teknik Bilgi Sistemlerine (WIS/EPC vb.) Erişim Tanımlama", kapsam: "Aracın markasına özgü teknik döküman, arıza kodu ve parça kataloğu sistemlerine kullanıcı erişiminin açılması ve temel kullanımın gösterilmesi.", sorumlu: "IT / Teknik Şef" },
+      { kategori: "Teknik Sistemler ve Ekipman", sira: 9, baslik: "Kişisel Takım Çantası ve Ortak Ekipman Zimmeti", kapsam: "Kişisel el aletlerinin, teşhis cihazlarının ve kaldırma ekipmanlarının teslim/zimmet kaydının yapılması, kullanım kurallarının anlatılması.", sorumlu: "Formen / Atölye Şefi" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 10, baslik: "Kalite Standartları ve Marka Servis Prosedürleri", kapsam: "Markanın onaylı işçilik standartları, garanti kapsamındaki işlemlerde izlenmesi gereken prosedürler ve kalite kontrol adımlarının aktarılması.", sorumlu: "Servis Müdürü / Kalite Kontrol" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 11, baslik: "Müşteri Aracına Müdahale ve Hasar Önleme Kuralları", kapsam: "Müşteri araçlarının teslim alınması, iç/dış kontrol formu doldurulması, araç içi eşyaların korunması ve ek hasar oluşumunun önlenmesine dair kuralların anlatılması.", sorumlu: "Servis Danışmanı / Formen" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 12, baslik: "Ustalık/Yeterlilik Belgeleri ve Marka Sertifikasyon Takvimi", kapsam: "Mesleki yeterlilik belgesi (MYK) durumunun kontrolü, markanın zorunlu teknik eğitim/sertifikasyon takviminin çalışana bildirilmesi.", sorumlu: "İnsan Kaynakları / Servis Müdürü" },
+      { kategori: "İK SÜREÇLERİ", sira: 13, baslik: "Performans Değerlendirme ve Prim Sistemi Bilgilendirmesi", kapsam: "Verimlilik/işçilik saatleri bazlı prim sisteminin, dönemsel performans değerlendirme kriterlerinin anlatılması.", sorumlu: "Servis Müdürü / İnsan Kaynakları" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 14, baslik: "Mesai, İzin ve Vardiya Planlama Kuralları", kapsam: "Vardiya sistemi, mesai/fazla mesai onay süreci, yıllık izin ve rapor bildirim prosedürünün aktarılması.", sorumlu: "Servis Müdürü / İnsan Kaynakları" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 15, baslik: "Atık Yönetimi ve Çevre Mevzuatı Bilgilendirmesi", kapsam: "Atık yağ, akü, lastik gibi atölye atıklarının mevzuata uygun ayrıştırılması ve bertaraf süreçlerinin anlatılması.", sorumlu: "Servis Müdürü / İSG Uzmanı" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 16, baslik: "30 Günlük Deneme Süresi Değerlendirme Görüşmesi", kapsam: "İlk ay sonunda teknik uyum, güvenlik kurallarına riayet ve ekip entegrasyonu konularında geri bildirim görüşmesi yapılması.", sorumlu: "Servis Müdürü / İnsan Kaynakları" },
+    ]
+  },
+  "servis_danismanlik_destek": {
+    adi: "Servis Danışmanlık ve Müşteri Destek Personeli Oryantasyonu",
+    maddeler: [
+      { kategori: "İK SÜREÇLERİ", sira: 1, baslik: "Özlük Dosyası ve İşe Giriş Evrakları", kapsam: "Kimlik, adli sicil, sağlık raporu, banka hesap bilgileri gibi işe giriş evraklarının teslim alınıp özlük dosyasının oluşturulması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "İK SÜREÇLERİ", sira: 2, baslik: "SGK Girişi ve Bordro/Ücret Bilgilendirmesi", kapsam: "Sigorta girişi işlemleri, maaş ödeme günü, prim ve varsa hedef bazlı ek ödeme sisteminin anlatılması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 3, baslik: "Servis Danışma Alanı ve Tesis Tanıtımı", kapsam: "Servis karşılama, danışma masası, bekleme salonu, atölye giriş noktaları ve ilgili birimlerin gezdirilmesi.", sorumlu: "Servis Müdürü" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 4, baslik: "Servis Ekibi ve Raporlama Hattı ile Tanışma", kapsam: "Servis Müdürü, servis danışmanları, formen ve teknisyenlerle tanıştırılması; günlük raporlama ve iletişim akışının anlatılması.", sorumlu: "Servis Müdürü" },
+      { kategori: "Sistem ve Araç Erişimleri", sira: 5, baslik: "DMS / Servis Randevu Sistemi Kullanım Eğitimi", kapsam: "Randevu oluşturma, iş emri açma, müşteri kaydı ve araç geçmişi sorgulama işlemlerinin uygulamalı gösterilmesi.", sorumlu: "IT / Servis Müdürü" },
+      { kategori: "Sistem ve Araç Erişimleri", sira: 6, baslik: "Garanti / Ekspertiz Talep Sistemine Erişim Tanımlama", kapsam: "Marka garanti başvuru portalı veya ekspertiz raporlama sistemine kullanıcı tanımının açılması ve temel işlem adımlarının anlatılması.", sorumlu: "IT / Garanti Sorumlusu" },
+      { kategori: "Müşteri Hizmetleri Süreçleri", sira: 7, baslik: "Araç Teslim Alma ve Check-in Prosedürü", kapsam: "Müşteri aracının hasar/km/yakıt kontrolü ile teslim alınması, dijital check-in formunun doldurulması ve müşteriye bilgi verilmesinin standartlarının anlatılması.", sorumlu: "Kıdemli Servis Danışmanı" },
+      { kategori: "Müşteri Hizmetleri Süreçleri", sira: 8, baslik: "Fiyat Teklifi Sunumu ve Onay Süreci", kapsam: "İş emri kapsamının, ek işlemler için müşteri onayı alma sürecinin ve fiyatlandırma limitlerinin anlatılması.", sorumlu: "Servis Müdürü" },
+      { kategori: "Müşteri Hizmetleri Süreçleri", sira: 9, baslik: "Müşteri Şikayeti ve Memnuniyet Yönetimi", kapsam: "Şikayet kayıt sistemine giriş, eskalasyon süreci ve müşteri memnuniyeti anketi (CSI) sonuçlarının takibine dair bilgilendirme.", sorumlu: "Servis Müdürü / Müşteri İlişkileri" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 10, baslik: "Garanti ve Ekspertiz Mevzuatı / Marka Prosedürleri", kapsam: "Garanti kapsamı, tüketici hakları mevzuatı ve markanın ekspertiz/hasar değerlendirme standartlarının aktarılması.", sorumlu: "Servis Müdürü / Hukuk Danışmanı" },
+      { kategori: "İş Sağlığı ve Güvenliği", sira: 11, baslik: "Atölye Alanında Temel Güvenlik Bilgilendirmesi", kapsam: "Müşteri danışmanlarının atölye içinde bulunacağı durumlarda uyması gereken güvenlik kurallarının ve KKD kullanım alanlarının anlatılması.", sorumlu: "İş Sağlığı ve Güvenliği Uzmanı" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 12, baslik: "Randevu Planlama ve Kapasite Yönetimi", kapsam: "Atölye kapasitesine göre randevu dağılımı, iş yükü dengeleme ve gecikme yönetimi prensiplerinin anlatılması.", sorumlu: "Randevu Planlama Sorumlusu / Servis Müdürü" },
+      { kategori: "Satış Yönetimi ve Performans Süreçleri", sira: 13, baslik: "Servis Performans Göstergeleri (KPI) Bilgilendirmesi", kapsam: "Müşteri memnuniyeti (CSI), randevu doluluk oranı, ek satış (upsell) hedefleri gibi performans göstergelerinin tanıtılması.", sorumlu: "Servis Müdürü" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 14, baslik: "Telefon ve CRM İletişim Standartları Eğitimi", kapsam: "Müşteri aramalarında kullanılacak karşılama cümleleri, CRM üzerinden takip notu girme ve randevu hatırlatma süreçlerinin anlatılması.", sorumlu: "Müşteri İlişkileri / Servis Müdürü" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 15, baslik: "30 Günlük Deneme Süresi Değerlendirme Görüşmesi", kapsam: "İlk ay sonunda süreç uyumu, sistem kullanım becerisi ve müşteri iletişimi konularında geri bildirim görüşmesi yapılması.", sorumlu: "Servis Müdürü / İnsan Kaynakları" },
+    ]
+  },
+  "satis_destek_showroom": {
+    adi: "Satış Destek ve Showroom Personeli Oryantasyonu",
+    maddeler: [
+      { kategori: "İK SÜREÇLERİ", sira: 1, baslik: "Özlük Dosyası ve İşe Giriş Evrakları", kapsam: "İşe giriş için gerekli kimlik, sağlık raporu, adli sicil kaydı ve banka bilgilerinin teslim alınarak özlük dosyasının oluşturulması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "İK SÜREÇLERİ", sira: 2, baslik: "SGK Girişi, Bordro ve Prim Sistemi Bilgilendirmesi", kapsam: "Sigorta girişi, maaş ödeme takvimi ve satış/teslimat bazlı prim hesaplama sisteminin anlatılması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 3, baslik: "Showroom, Teslimat Alanı ve Genel Tesis Tanıtımı", kapsam: "Showroom teşhir alanı, teslimat bölümü, müşteri bekleme alanları ve ilgili departmanların gezdirilmesi.", sorumlu: "Satış Müdürü" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 4, baslik: "Satış Ekibi ile Tanışma ve Raporlama Hattı", kapsam: "Satış Müdürü, satış danışmanları ve destek birimleriyle tanıştırılması; günlük iş akışı ve raporlama düzeninin anlatılması.", sorumlu: "Satış Müdürü" },
+      { kategori: "Sistem ve Araç Erişimleri", sira: 5, baslik: "CRM / DMS Müşteri Kayıt Sistemi Eğitimi", kapsam: "Müşteri adayı (lead) kaydı oluşturma, randevu/teslimat takibi ve satış sonrası takip notlarının sisteme işlenmesinin uygulamalı gösterilmesi.", sorumlu: "IT / Satış Destek" },
+      { kategori: "Sistem ve Araç Erişimleri", sira: 6, baslik: "Showroom Teşhir ve Demo Araç Kullanım Kuralları", kapsam: "Teşhir araçlarının anahtar teslim prosedürü, test sürüşü kuralları ve demo araç bakım/temizlik sorumluluklarının anlatılması.", sorumlu: "Showroom Sorumlusu / Satış Müdürü" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 7, baslik: "Marka Showroom Görsel Standartları (Corporate Identity)", kapsam: "Araç teşhir düzeni, fiyat etiketleme, tanıtım materyalleri ve showroom temizlik/düzen standartlarının anlatılması.", sorumlu: "Satış Müdürü" },
+      { kategori: "Müşteri Hizmetleri Süreçleri", sira: 8, baslik: "Müşteri Karşılama ve Yönlendirme Standartları", kapsam: "Showroom'a gelen müşterinin karşılanması, ilgili satış danışmanına yönlendirilmesi ve bekleme sürecinde ikram/bilgilendirme standartlarının anlatılması.", sorumlu: "Müşteri İlişkileri Sorumlusu / Satış Müdürü" },
+      { kategori: "Satış Yönetimi ve Performans Süreçleri", sira: 9, baslik: "Araç Teslimat Süreci ve Evrak Yönetimi", kapsam: "Fatura, ruhsat, ÖTV/KDV belgeleri, sigorta poliçesi ve trafik tescil işlemlerinin teslimat öncesi eksiksiz hazırlanmasına dair sürecin anlatılması.", sorumlu: "Teslimat Sorumlusu / Satış Müdürü" },
+      { kategori: "Satış Yönetimi ve Performans Süreçleri", sira: 10, baslik: "Trafik Tescil ve Plaka İşlemleri Süreci", kapsam: "Noter, trafik tescil bürosu ve sigorta şirketleriyle yürütülen araç tescil/plaka işlemlerinin adımlarının ve kullanılan belgelerin anlatılması.", sorumlu: "Plaka Tescil Sorumlusu / Satış Müdürü" },
+      { kategori: "Satış Yönetimi ve Performans Süreçleri", sira: 11, baslik: "Kredi ve Finansman Süreçleri", kapsam: "Banka/finans kurumu kredi başvuru sistemleri, gerekli evraklar ve kredi onay/tahsis sürecinin adım adım anlatılması.", sorumlu: "Kredi Tahsis Uzmanı / Satış Müdürü" },
+      { kategori: "Satış Yönetimi ve Performans Süreçleri", sira: 12, baslik: "İkinci El Araç Alım ve Ekspertiz Değerleme Süreci", kapsam: "Takas/ikinci el araç kabul kriterleri, ekspertiz raporu değerlendirme ve fiyatlandırma sürecinin anlatılması.", sorumlu: "Araç Alım Uzmanı / Satış Müdürü" },
+      { kategori: "Satış Yönetimi ve Performans Süreçleri", sira: 13, baslik: "Araç Hazırlama (PDI) ve Teslimat Öncesi Kontrol Standartları", kapsam: "Yeni araçların teslimat öncesi temizlik, aksesuar montajı ve PDI (Pre-Delivery Inspection) kontrol listesinin uygulanmasının anlatılması.", sorumlu: "Araç Hazırlama Uzmanı / Servis Müdürü" },
+      { kategori: "Marka ve Stratejik Yönetim", sira: 14, baslik: "Marka Ürün ve Teknoloji Bilgisi Eğitimi", kapsam: "Satılan araç modellerinin teknik özellikleri, teknoloji donanımları ve rakip karşılaştırmalarına yönelik ürün eğitiminin planlanması.", sorumlu: "Satış Müdürü / Marka Eğitim Birimi" },
+      { kategori: "Satış Yönetimi ve Performans Süreçleri", sira: 15, baslik: "Satış Hedefleri ve Prim Sistemi Bilgilendirmesi", kapsam: "Aylık/yıllık satış ve teslimat hedeflerinin, prim hesaplama kriterlerinin ve performans takip sisteminin anlatılması.", sorumlu: "Satış Müdürü" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 16, baslik: "30 Günlük Deneme Süresi Değerlendirme Görüşmesi", kapsam: "İlk ay sonunda sistem kullanımı, müşteri iletişimi ve ekip uyumu konularında geri bildirim görüşmesi yapılması.", sorumlu: "Satış Müdürü / İnsan Kaynakları" },
+    ]
+  },
+  "idari_ofis_personeli": {
+    adi: "İdari / Ofis Personeli Oryantasyonu",
+    maddeler: [
+      { kategori: "İK SÜREÇLERİ", sira: 1, baslik: "Özlük Dosyası ve İşe Giriş Evrakları", kapsam: "Kimlik, sağlık raporu, adli sicil kaydı, diploma ve banka hesap bilgileri gibi işe giriş evraklarının teslim alınıp özlük dosyasının oluşturulması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "İK SÜREÇLERİ", sira: 2, baslik: "SGK Girişi ve Bordro/Ücret Bilgilendirmesi", kapsam: "Sigorta girişi, maaş ödeme günü, yan haklar (yemek/yol vb.) ve bordro erişim sisteminin anlatılması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 3, baslik: "Genel Merkez / Ofis Tesis Tanıtımı", kapsam: "Ofis yerleşimi, toplantı odaları, arşiv, mutfak ve ilgili departmanların gezdirilmesi.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 4, baslik: "Departman Yöneticisi ve Ekip ile Tanışma", kapsam: "Bağlı olunan yönetici ve departman çalışanlarıyla tanıştırılması, raporlama hattının ve iletişim akışının netleştirilmesi.", sorumlu: "İlgili Departman Yöneticisi" },
+      { kategori: "Sistem ve Araç Erişimleri", sira: 5, baslik: "Bilgisayar, E-posta ve Kurumsal Hesap Tanımlamaları", kapsam: "Şirket bilgisayarı, kurumsal e-posta adresi, dahili telefon hattı ve gerekli yazılım lisanslarının tanımlanması.", sorumlu: "IT / Bilgi İşlem" },
+      { kategori: "Sistem ve Araç Erişimleri", sira: 6, baslik: "ERP / Muhasebe / Departman Yazılımlarına Erişim Tanımlama", kapsam: "Görev alanına uygun ERP, muhasebe, İK veya pazarlama otomasyon sistemlerine kullanıcı yetkisinin açılması ve temel kullanımın gösterilmesi.", sorumlu: "IT / İlgili Departman Yöneticisi" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 7, baslik: "Şirket Organizasyon Şeması ve İletişim Politikaları", kapsam: "Genel organizasyon yapısının, departmanlar arası iletişim kurallarının ve kurumsal iletişim kanallarının (intranet, duyuru panosu vb.) tanıtılması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 8, baslik: "Evrak/İmza Yetki Matrisi ve Onay Süreçleri", kapsam: "Harcama, sözleşme ve evrak onay süreçlerinde yetki sınırlarının ve imza sirkülerinin anlatılması.", sorumlu: "İlgili Departman Yöneticisi" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 9, baslik: "KVKK, Bilgi Güvenliği ve Gizlilik Politikaları Eğitimi", kapsam: "Kişisel verilerin korunması mevzuatı, şirket bilgi güvenliği politikaları ve gizlilik taahhütnamesinin imzalatılması.", sorumlu: "İnsan Kaynakları / Hukuk Danışmanı" },
+      { kategori: "İK SÜREÇLERİ", sira: 10, baslik: "İzin, Mesai ve Rapor Bildirim Prosedürleri", kapsam: "Yıllık izin talep sistemi, mesai onay süreci ve sağlık raporu bildirim prosedürünün anlatılması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 11, baslik: "Görev Alanına Özgü Temel Süreç Eğitimi", kapsam: "Çalışanın görev tanımına uygun temel iş süreçlerinin (muhasebe kayıt akışı, pazarlama kampanya süreci, İK işe alım süreci vb.) departman yöneticisi tarafından uygulamalı anlatılması.", sorumlu: "İlgili Departman Yöneticisi" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 12, baslik: "Şirket İçi Toplantı ve Raporlama Takvimi", kapsam: "Departman içi periyodik toplantılar, aylık raporlama beklentileri ve kullanılan raporlama şablonlarının tanıtılması.", sorumlu: "İlgili Departman Yöneticisi" },
+      { kategori: "İK SÜREÇLERİ", sira: 13, baslik: "Performans Değerlendirme Sistemi Bilgilendirmesi", kapsam: "Dönemsel hedef belirleme, performans değerlendirme kriterleri ve kariyer gelişim sürecinin anlatılması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 14, baslik: "Çalışma Ortamı Uyum ve Erişilebilirlik Değerlendirmesi", kapsam: "Gerekli hallerde çalışma ortamının, ekipmanların ve iş akışının çalışanın ihtiyaçlarına göre uyarlanması için İK ve İSG ile birlikte değerlendirme yapılması.", sorumlu: "İnsan Kaynakları / İş Sağlığı ve Güvenliği Uzmanı" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 15, baslik: "30 Günlük Deneme Süresi Değerlendirme Görüşmesi", kapsam: "İlk ay sonunda görev uyumu, sistem kullanım becerisi ve ekip entegrasyonu hakkında geri bildirim görüşmesi yapılması.", sorumlu: "İlgili Departman Yöneticisi / İnsan Kaynakları" },
+    ]
+  },
+  "yonetici_direktor_genel": {
+    adi: "Yönetici / Direktör Genel Oryantasyonu",
+    maddeler: [
+      { kategori: "İK SÜREÇLERİ", sira: 1, baslik: "Özlük Dosyası ve İş Sözleşmesi İmzası", kapsam: "Yönetici düzeyi iş sözleşmesinin, gizlilik/rekabet yasağı maddelerinin ve özlük evraklarının eksiksiz teslim alınması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "İK SÜREÇLERİ", sira: 2, baslik: "Ücret Paketi ve Yan Haklar Bilgilendirmesi", kapsam: "Maaş, prim/bonus sistemi, şirket aracı, özel sağlık sigortası gibi yönetici yan haklarının detaylı olarak anlatılması.", sorumlu: "İnsan Kaynakları / Genel Müdürlük" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 3, baslik: "Şirket Geneli Tesis ve Lokasyon Tanıtım Turu", kapsam: "Sorumlu olunan şube(ler) ve varsa diğer grup şirketi lokasyonlarının üst düzey tanıtım turu ile gezdirilmesi.", sorumlu: "İnsan Kaynakları / Genel Müdürlük" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 4, baslik: "Üst Yönetim ve Yönetim Kurulu ile Tanışma", kapsam: "Yönetim kurulu üyeleri, genel müdür ve diğer üst düzey yöneticilerle tanıştırma toplantılarının planlanması.", sorumlu: "Genel Müdürlük / İnsan Kaynakları" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 5, baslik: "Şirket Vizyon, Misyon ve Kurumsal Strateji Sunumu", kapsam: "Grup şirketinin stratejik hedeflerinin, büyüme planlarının ve değerlerinin üst düzey bir sunumla aktarılması.", sorumlu: "Genel Müdürlük" },
+      { kategori: "Marka ve Stratejik Yönetim", sira: 6, baslik: "Temsil Edilen Marka Portföyü ve Bayilik Yapısı Bilgilendirmesi", kapsam: "Grup bünyesindeki markaların, bayilik anlaşmalarının ve marka bazlı organizasyon yapısının tanıtılması.", sorumlu: "Genel Müdürlük / Marka Direktörü" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 7, baslik: "Organizasyon Şeması, Bağlı Birimler ve Raporlama Hattı", kapsam: "Yönetim ettiği ekip ve birimlerin organizasyon şemasındaki yeri, kendisine ve kendisinden raporlama yapan kişilerin netleştirilmesi.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 8, baslik: "Bütçe, Harcama Onay Yetkileri ve İmza Sirküleri", kapsam: "Departman bütçesi, harcama onay limitleri ve şirket imza sirkülerindeki yetki kapsamının anlatılması.", sorumlu: "Mali İşler / Genel Müdürlük" },
+      { kategori: "Sistem ve Araç Erişimleri", sira: 9, baslik: "Yönetim Raporlama Sistemleri (BI/ERP) Erişim Tanımlama", kapsam: "Satış, servis, finans gibi alanlardaki üst düzey raporlama panellerine (BI dashboard, ERP yönetici modülü) erişimin tanımlanması.", sorumlu: "IT / Bilgi İşlem" },
+      { kategori: "Marka ve Stratejik Yönetim", sira: 10, baslik: "Yönetim Kurulu Toplantı Takvimi ve Raporlama Formatları", kapsam: "Aylık/üç aylık yönetim toplantılarının takvimi, sunum ve raporlama formatlarının standartlarının aktarılması.", sorumlu: "Genel Müdürlük" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 11, baslik: "İnsan Kaynakları Süreçlerindeki Yönetici Sorumlulukları", kapsam: "İşe alım onayı, performans değerlendirme, disiplin süreçleri ve terfi kararlarında yöneticinin rolünün ve yetkilerinin anlatılması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 12, baslik: "Kurumsal İletişim ve Basın/Medya Temsil Politikası", kapsam: "Şirket adına kamuoyu, basın veya sosyal medya açıklaması yapma yetkisinin sınırlarının ve kurumsal iletişim biriminin sürece dahil edilme kurallarının anlatılması.", sorumlu: "Kurumsal İletişim / Genel Müdürlük" },
+      { kategori: "Marka ve Stratejik Yönetim", sira: 13, baslik: "Departman/Şube Hedefleri ve KPI Sahipliği", kapsam: "Sorumlu olunan birimin yıllık satış/kârlılık/verimlilik hedeflerinin ve bu hedeflerin takip edileceği KPI setinin devralınması.", sorumlu: "Genel Müdürlük" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 14, baslik: "Kriz Yönetimi ve Acil Durum Karar Mekanizması Bilgilendirmesi", kapsam: "Operasyonel kriz, itibar riski veya acil durum hallerinde karar alma sürecinin, eskalasyon hattının ve iletişim protokolünün anlatılması.", sorumlu: "Genel Müdürlük / İSG Uzmanı" },
+      { kategori: "İK SÜREÇLERİ", sira: 15, baslik: "Yıllık Hedef Sözleşmesi ve Üst Düzey Performans Değerlendirmesi", kapsam: "Yıllık bireysel hedeflerin belirlenmesi, hedef sözleşmesinin imzalanması ve üst düzey performans değerlendirme takviminin anlatılması.", sorumlu: "İnsan Kaynakları / Genel Müdürlük" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 16, baslik: "30-60-90 Günlük Uyum Değerlendirme Görüşmeleri", kapsam: "İlk 30, 60 ve 90 gün sonunda stratejik uyum, ekip liderliği ve hedeflere ilerleme konularında kademeli değerlendirme görüşmelerinin yapılması.", sorumlu: "Genel Müdürlük / İnsan Kaynakları" },
+    ]
+  },
+  "depo_lojistik_yedek_parca": {
+    adi: "Depo / Lojistik / Yedek Parça Personeli Oryantasyonu",
+    maddeler: [
+      { kategori: "İK SÜREÇLERİ", sira: 1, baslik: "Özlük Dosyası ve İşe Giriş Evrakları", kapsam: "Kimlik, sağlık raporu, adli sicil kaydı ve banka bilgileri gibi işe giriş evraklarının teslim alınıp özlük dosyasının oluşturulması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "İK SÜREÇLERİ", sira: 2, baslik: "SGK Girişi ve Bordro Bilgilendirmesi", kapsam: "Sigorta girişi işlemleri, maaş ödeme takvimi ve varsa performans primi sisteminin anlatılması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "İş Sağlığı ve Güvenliği", sira: 3, baslik: "Depo İş Güvenliği ve KKD Eğitimi", kapsam: "Raf istifleme, ağır yük kaldırma, forklift/transpalet çevresinde güvenli hareket kuralları ve gerekli KKD'lerin (eldiven, çelik burunlu ayakkabı) teslimi.", sorumlu: "İş Sağlığı ve Güvenliği Uzmanı" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 4, baslik: "Depo / Yedek Parça Bölümü Tesis Tanıtımı", kapsam: "Depo yerleşim planı, raf/lokasyon sistemi, sevkiyat ve mal kabul alanlarının gezdirilmesi.", sorumlu: "Yedek Parça Müdürü / Depo Sorumlusu" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 5, baslik: "Ekip ve Raporlama Hattı ile Tanışma", kapsam: "Yedek parça/lojistik ekibi, servis ve satış birimleriyle olan iş ilişkisinin ve raporlama hattının anlatılması.", sorumlu: "Yedek Parça Müdürü" },
+      { kategori: "Sistem ve Araç Erişimleri", sira: 6, baslik: "Stok Yönetim / ERP Sistemi Kullanım Eğitimi", kapsam: "Stok giriş-çıkış, parça rezervasyonu, minimum stok seviyesi takibi ve sipariş oluşturma işlemlerinin uygulamalı anlatılması.", sorumlu: "IT / Yedek Parça Müdürü" },
+      { kategori: "Sistem ve Araç Erişimleri", sira: 7, baslik: "Marka Parça Katalog Sistemi (EPC) Kullanım Eğitimi", kapsam: "Parça numarası sorgulama, muadil/orijinal parça karşılaştırması ve fiyatlandırma sisteminin anlatılması.", sorumlu: "Yedek Parça Müdürü" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 8, baslik: "Tedarikçi ve Lojistik Firmalarıyla Koordinasyon Süreci", kapsam: "Merkez depo, ithalatçı ve nakliye firmalarıyla sipariş takibi, teslim süreleri ve sevkiyat koordinasyonunun anlatılması.", sorumlu: "Lojistik Uzmanı / Yedek Parça Müdürü" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 9, baslik: "Sayım ve Envanter Kontrol Prosedürleri", kapsam: "Periyodik/yıllık stok sayımı, fire ve fark yönetimi ile envanter doğruluğunun sağlanmasına dair prosedürlerin anlatılması.", sorumlu: "Yedek Parça Müdürü" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 10, baslik: "İade ve Garanti Kapsamlı Parça Süreçleri", kapsam: "Arızalı/garanti kapsamındaki parçaların iade süreci, etiketleme ve üretici/ithalatçıya geri gönderim prosedürünün anlatılması.", sorumlu: "Yedek Parça Müdürü / Garanti Sorumlusu" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 11, baslik: "Araç ve Parça Sevkiyat/Nakliye Planlaması", kapsam: "Şubeler arası araç/parça transferi, nakliye araçlarının planlanması ve sevkiyat evraklarının (irsaliye vb.) düzenlenmesinin anlatılması.", sorumlu: "Lojistik Uzmanı" },
+      { kategori: "İş Sağlığı ve Güvenliği", sira: 12, baslik: "Forklift/Transpalet Kullanım Yetkinlik Kontrolü", kapsam: "Forklift veya transpalet kullanacak personelin operatör sertifikasının kontrolü ve gerekli ise sertifikasyon sürecinin planlanması.", sorumlu: "İş Sağlığı ve Güvenliği Uzmanı" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 13, baslik: "Depo Düzeni ve Lokasyon Kodlama Sistemi", kapsam: "Raf/lokasyon kodlama mantığının, hızlı hareket eden (fast-moving) parçaların yerleşiminin ve düzen standartlarının anlatılması.", sorumlu: "Depo Sorumlusu" },
+      { kategori: "Müşteri Hizmetleri Süreçleri", sira: 14, baslik: "İç Müşteri (Servis/Satış) Talep Karşılama Standartları", kapsam: "Servis ve satış ekiplerinden gelen parça taleplerinin önceliklendirilmesi, acil parça temini ve iletişim standartlarının anlatılması.", sorumlu: "Yedek Parça Müdürü" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 15, baslik: "30 Günlük Deneme Süresi Değerlendirme Görüşmesi", kapsam: "İlk ay sonunda sistem kullanımı, iş güvenliği kurallarına uyum ve süreç hakimiyeti konularında geri bildirim görüşmesi yapılması.", sorumlu: "Yedek Parça Müdürü / İnsan Kaynakları" },
+    ]
+  },
+  "destek_hizmetleri": {
+    adi: "Destek Hizmetleri Personeli Oryantasyonu",
+    maddeler: [
+      { kategori: "İK SÜREÇLERİ", sira: 1, baslik: "Özlük Dosyası ve İşe Giriş Evrakları", kapsam: "Kimlik, sağlık raporu (gerekli ise gıda/hijyen sertifikası), adli sicil kaydı ve banka bilgilerinin teslim alınarak özlük dosyasının oluşturulması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "İK SÜREÇLERİ", sira: 2, baslik: "SGK Girişi, Bordro ve Vardiya/Puantaj Sistemi Bilgilendirmesi", kapsam: "Sigorta girişi, maaş ödeme takvimi ve vardiyalı çalışma düzeninde puantaj/giriş-çıkış takip sisteminin anlatılması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 3, baslik: "Tesis ve Çalışma Alanı Tanıtımı", kapsam: "Görev yapılacak alanın (showroom, atölye, bahçe, bina teknik alanları vb.) ve malzeme/ekipman depolarının gezdirilmesi.", sorumlu: "İlgili Birim Sorumlusu" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 4, baslik: "Amir/Yönetici ve Çalışma Arkadaşları ile Tanışma", kapsam: "Bağlı olunan amir ve birlikte çalışılacak ekip üyeleriyle tanıştırılması, günlük görev dağılımının anlatılması.", sorumlu: "İlgili Birim Sorumlusu" },
+      { kategori: "İş Sağlığı ve Güvenliği", sira: 5, baslik: "Göreve Özgü İş Güvenliği ve KKD Eğitimi", kapsam: "Kimyasal madde kullanımı, elektrikli ekipmanla çalışma veya trafiğe çıkma gibi göreve özgü riskler ve gerekli kişisel koruyucu donanımın (eldiven, maske, reflektörlü yelek vb.) teslimi.", sorumlu: "İş Sağlığı ve Güvenliği Uzmanı" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 6, baslik: "Kıyafet/Üniforma ve Görünüm-Hijyen Standartları", kapsam: "Kurumsal üniforma teslimi, kimlik kartı verilmesi ve müşteri ile temas eden görevler için hijyen/görünüm standartlarının anlatılması.", sorumlu: "İnsan Kaynakları / İlgili Birim Sorumlusu" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 7, baslik: "Görev Ekipmanı ve Araç Zimmeti", kapsam: "Temizlik makinesi, bakım aleti, servis aracı anahtarı gibi görev ekipmanlarının zimmet kaydının yapılması ve kullanım kurallarının anlatılması.", sorumlu: "İlgili Birim Sorumlusu" },
+      { kategori: "Müşteri Hizmetleri Süreçleri", sira: 8, baslik: "Misafir/Müşteri ile Temas Standartları", kapsam: "Müşteri ile doğrudan temas edilen görevlerde (vale, ikram, karşılama, yıkama teslim vb.) nezaket kuralları, selamlama ve temel iletişim standartlarının anlatılması.", sorumlu: "Müşteri İlişkileri Sorumlusu / İlgili Birim Sorumlusu" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 9, baslik: "Araç Kullanımı ve Trafik Güvenliği Kuralları", kapsam: "Şirket/müşteri araçlarını kullanacak personel için ehliyet kontrolü, hız/park kuralları ve kaza/hasar durumunda izlenecek prosedürün anlatılması.", sorumlu: "İlgili Birim Sorumlusu / İSG Uzmanı" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 10, baslik: "Periyodik Bakım/Temizlik Görev Takvimi ve Kontrol Listeleri", kapsam: "Günlük/haftalık temizlik veya bakım görevlerinin kontrol listeleri üzerinden takip edilmesi ve tamamlanma onayı sürecinin anlatılması.", sorumlu: "İlgili Birim Sorumlusu" },
+      { kategori: "İş Sağlığı ve Güvenliği", sira: 11, baslik: "Elektrik ve Teknik Bakım Güvenlik Prosedürleri", kapsam: "Elektrik panosu, aydınlatma ve bina teknik sistemleri üzerinde çalışırken uyulması gereken elektrik güvenliği prosedürlerinin anlatılması (ilgili teknik pozisyonlar için).", sorumlu: "İş Sağlığı ve Güvenliği Uzmanı" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 12, baslik: "Malzeme/Kimyasal Talep ve Güvenli Kullanım Prosedürü", kapsam: "Temizlik malzemesi, kimyasal ve sarf malzeme taleplerinin nasıl yapılacağı ile kimyasalların güvenlik bilgi formlarına (MSDS) uygun kullanımının anlatılması.", sorumlu: "İlgili Birim Sorumlusu" },
+      { kategori: "İK SÜREÇLERİ", sira: 13, baslik: "İzin, Mesai ve Vardiya Değişim Prosedürü", kapsam: "Yıllık izin talebi, vardiya değişimi ve fazla mesai onay sürecinin anlatılması.", sorumlu: "İnsan Kaynakları / İlgili Birim Sorumlusu" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 14, baslik: "30 Günlük Deneme Süresi Değerlendirme Görüşmesi", kapsam: "İlk ay sonunda görev uyumu, iş güvenliği kurallarına riayet ve ekip entegrasyonu hakkında geri bildirim görüşmesi yapılması.", sorumlu: "İlgili Birim Sorumlusu / İnsan Kaynakları" },
+    ]
+  },
+  "stajyer_ogrenci": {
+    adi: "Stajyer / Öğrenci Oryantasyonu",
+    maddeler: [
+      { kategori: "İK SÜREÇLERİ", sira: 1, baslik: "Staj Sözleşmesi ve Zorunlu Evrakların Tamamlanması", kapsam: "Staj sözleşmesi, okul tarafından istenen staj başvuru formu, SGK bildirimi ve staj defterinin teslim alınması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "İK SÜREÇLERİ", sira: 2, baslik: "Staj Ücreti ve Devam Takip Sistemi Bilgilendirmesi", kapsam: "Varsa staj ücreti ödeme koşullarının, giriş-çıkış/devam takip sisteminin ve devamsızlık bildirim kurallarının anlatılması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 3, baslik: "Şirket ve Departman Genel Tanıtımı", kapsam: "Şirketin faaliyet alanı, organizasyon yapısı ve stajın yapılacağı departmanın genel işleyişinin tanıtılması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 4, baslik: "Staj Danışmanı/Mentor Atanması", kapsam: "Staj boyunca yönlendirme yapacak bir mentor/danışmanın atanması ve iletişim bilgilerinin paylaşılması.", sorumlu: "İlgili Departman Yöneticisi" },
+      { kategori: "İş Sağlığı ve Güvenliği", sira: 5, baslik: "Temel İş Sağlığı ve Güvenliği Eğitimi", kapsam: "Staj yapılacak alana (atölye, ofis, saha) özgü temel güvenlik kuralları ve gerekli ise kişisel koruyucu donanımın teslim edilmesi.", sorumlu: "İş Sağlığı ve Güvenliği Uzmanı" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 6, baslik: "Staj Programı Kapsamı ve Öğrenme Hedeflerinin Belirlenmesi", kapsam: "Staj süresince edinilmesi beklenen bilgi/beceri hedeflerinin mentor ile birlikte netleştirilmesi ve staj planının oluşturulması.", sorumlu: "İlgili Departman Yöneticisi / Mentor" },
+      { kategori: "Sistem ve Araç Erişimleri", sira: 7, baslik: "Kısıtlı Sistem Erişimi Tanımlama", kapsam: "Görev kapsamına uygun, kısıtlı yetkili misafir/stajyer hesabının açılması ve gerekli temel yazılımlara erişimin tanımlanması.", sorumlu: "IT / Bilgi İşlem" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 8, baslik: "Gizlilik ve Kurumsal Bilgi Paylaşım Kuralları", kapsam: "Şirket içi bilgilerin, müşteri verilerinin ve ticari sırların gizliliğine ilişkin kuralların ve gizlilik taahhütnamesinin anlatılması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "ORYANTASYON SÜREÇLERİ", sira: 9, baslik: "Şirket Kuralları ve Çalışma Düzeni Bilgilendirmesi", kapsam: "Kıyafet kuralları, mesai saatleri, mola düzeni ve genel davranış kurallarının anlatılması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 10, baslik: "Haftalık Görev Planı ve Mentor Görüşmeleri", kapsam: "Haftalık verilecek görevlerin planlanması ve mentor ile düzenli aralıklarla ilerleme değerlendirme görüşmeleri yapılması.", sorumlu: "Mentor / İlgili Departman Yöneticisi" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 11, baslik: "Staj Defteri ve Değerlendirme Formu Takibi", kapsam: "Okul tarafından istenen staj defterinin düzenli doldurulmasının takip edilmesi ve dönem sonu değerlendirme formunun hazırlanması.", sorumlu: "Mentor / İnsan Kaynakları" },
+      { kategori: "Kurumsal ve Operasyonel Entegrasyon", sira: 12, baslik: "Departmanlar Arası Kısa Rotasyon/Tanıtım Ziyaretleri", kapsam: "Mümkün olduğunda stajyerin şirketi bütünsel tanıması için farklı departmanlara kısa tanıtım ziyaretleri planlanması.", sorumlu: "İnsan Kaynakları" },
+      { kategori: "İK SÜREÇLERİ", sira: 13, baslik: "Staj Sonu Değerlendirme Görüşmesi", kapsam: "Staj bitiminde performans, öğrenme çıktıları ve varsa şirkette istihdam potansiyeli konularının değerlendirildiği kapanış görüşmesinin yapılması.", sorumlu: "İlgili Departman Yöneticisi / İnsan Kaynakları" },
+    ]
+  },
 };
 function oryantasyonSablonSec(unvan) {
-  const key = String(unvan || "").trim().toLocaleLowerCase("tr");
-  for (const k in ORYANTASYON_SABLONLARI) {
-    if (key.indexOf(k) >= 0) return { sablonAdi: k, maddeler: [...ORYANTASYON_GENEL, ...ORYANTASYON_SABLONLARI[k]] };
+  const ham = String(unvan || "").trim();
+  const key = ham.toLocaleLowerCase("tr");
+  // 1) Şirketin gerçek/detaylı formu olan 4 unvan (tam eşleşme)
+  for (const k in ORYANTASYON_SABLONLARI_DETAYLI) {
+    if (key === k) return { sablonAdi: k.replace(/(^|\s)\S/g, (c) => c.toLocaleUpperCase("tr")), maddeler: JSON.parse(JSON.stringify(ORYANTASYON_SABLONLARI_DETAYLI[k])) };
   }
-  return { sablonAdi: "Genel", maddeler: [...ORYANTASYON_GENEL] };
+  // 2) Diğer ~80 unvan için işlev bazlı genel şablon grupları (tam eşleşme, Ağustos 2026 Çalışan Listesi'nden türetilmiştir)
+  const grupAnahtar = UNVAN_GENEL_SABLON_ESLESME[ham] || UNVAN_GENEL_SABLON_ESLESME[Object.keys(UNVAN_GENEL_SABLON_ESLESME).find((u) => u.toLocaleLowerCase("tr") === key)];
+  if (grupAnahtar && ORYANTASYON_SABLONLARI_GENEL_GRUPLAR[grupAnahtar]) {
+    const grup = ORYANTASYON_SABLONLARI_GENEL_GRUPLAR[grupAnahtar];
+    return {
+      sablonAdi: grup.adi,
+      maddeler: grup.maddeler.map((m) => ({ ...m, tamamlandi: false, tamamlanmaTarihi: null }))
+    };
+  }
+  // 3) Listede hiç olmayan bir unvan (ör. "Diğer" ile elle yazılmış) — çıplak genel liste
+  return { sablonAdi: "Genel", maddeler: JSON.parse(JSON.stringify(ORYANTASYON_GENEL)) };
 }
 
 // ---------------------------------------------------------------
@@ -127,6 +584,9 @@ function yarinISO() {
   const d = new Date();
   d.setDate(d.getDate() + 1);
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function gecmisEkle(mevcutGecmis, eskiDurum, yeniDurum, not) {
+  return [...(mevcutGecmis || []), { tarih: bugunISO(), eskiDurum, yeniDurum, kullanici: currentProfile.adSoyad, not: not || "" }];
 }
 function evrakOrani(aday) {
   const list = aday.evraklar || [];
@@ -298,13 +758,16 @@ function openPasswordModal() {
 let TAB = "adaylar";
 function render() {
   const isAdmin = currentProfile.role === "admin";
-  const gorulenAdaylar = isAdmin ? adaylar : adaylar.filter((a) => a.departman === currentProfile.muduluk);
+  // Müdürler yalnızca kendi departmanlarındaki adayları, ve "olumsuz" (reddedilen)
+  // adayları HİÇBİR ZAMAN görmemeli — bkz. Firestore kuralları (aynı kısıt orada
+  // da uygulanmalı, burası yalnızca istemci tarafı ek bir güvence).
+  const gorulenAdaylar = isAdmin ? adaylar : adaylar.filter((a) => a.departman === currentProfile.muduluk && a.durum !== "olumsuz");
 
   root().innerHTML = `
   ${topbar()}
   <div class="app-body">
     <div class="sidebar">
-      <div class="nav-item active" data-nav="adaylar"><span class="ic">${ICONS.people}</span>Adaylar</div>
+      <div class="nav-item active" data-nav="adaylar"><span class="ic">${ICONS.people}</span>Aday Havuzu</div>
     </div>
     <div class="main-content"><div class="wrap" id="pageWrap"></div></div>
   </div>`;
@@ -313,26 +776,31 @@ function render() {
 }
 
 // ---------------------------------------------------------------
-// ADAYLAR SAYFASI
+// ADAYLAR SAYFASI — aşamaya göre gruplu görünüm (tek dropdown yerine)
 // ---------------------------------------------------------------
+const acikGruplar = { gorusme_bekliyor: true, evrak_bekliyor: true, sgk_bekliyor: true, ise_basladi: true, tamamlandi: false, vazgecti: false, olumsuz: false };
 function renderAdaylarPage(list, isAdmin) {
-  const total = list.length;
+  const gorunurListe = isAdmin ? list : list.filter((a) => a.durum !== "olumsuz");
+  const total = gorunurListe.length;
+  const gorusmeBekleyen = list.filter((a) => a.durum === "gorusme_bekliyor").length;
   const evrakBekleyen = list.filter((a) => a.durum === "evrak_bekliyor").length;
   const sgkBekleyen = list.filter((a) => a.durum === "sgk_bekliyor").length;
   const denemeSuresinde = list.filter((a) => a.durum === "ise_basladi").length;
   const tamamlandi = list.filter((a) => a.durum === "tamamlandi").length;
 
   const yarin = yarinISO();
-  const yarinBaslayanlar = list.filter((a) => a.iseBaslamaTarihi === yarin && a.durum !== "vazgecti" && !a.sgkGirisYapildi);
+  const yarinBaslayanlar = list.filter((a) => a.iseBaslamaTarihi === yarin && a.durum !== "vazgecti" && a.durum !== "olumsuz" && !a.sgkGirisYapildi);
   const bugun = bugunISO();
-  const gecikenSgk = list.filter((a) => a.iseBaslamaTarihi && a.iseBaslamaTarihi <= bugun && !a.sgkGirisYapildi && a.durum !== "vazgecti" && a.durum !== "tamamlandi");
+  const gecikenSgk = list.filter((a) => a.iseBaslamaTarihi && a.iseBaslamaTarihi <= bugun && !a.sgkGirisYapildi && a.durum !== "vazgecti" && a.durum !== "tamamlandi" && a.durum !== "olumsuz");
   const denemeYaklasan = list.filter((a) => a.durum === "ise_basladi" && a.denemeSuresi && !a.denemeSuresi.degerlendirmeYapildiMi && gunFarki(a.denemeSuresi.bitisTarihi) !== null && gunFarki(a.denemeSuresi.bitisTarihi) <= 7);
+  const kararBekleyen = list.filter((a) => a.durum === "gorusme_bekliyor" && a.gorusmeTarihi && a.gorusmeTarihi <= bugun);
 
-  const banner = (yarinBaslayanlar.length || gecikenSgk.length || denemeYaklasan.length) ? `
+  const banner = (yarinBaslayanlar.length || gecikenSgk.length || denemeYaklasan.length || kararBekleyen.length) ? `
     <div class="banner">
       <div class="ic">🔔</div>
       <div>
-        ${yarinBaslayanlar.length ? `<div><b>Yarın işe başlayacak ${yarinBaslayanlar.length} kişi var</b> — SGK girişini unutmayın: ${yarinBaslayanlar.map((a) => esc(a.ad + " " + a.soyad)).join(", ")}</div>` : ""}
+        ${kararBekleyen.length ? `<div><b>${kararBekleyen.length} adayın</b> görüşmesi geçti ama karar (olumlu/olumsuz) girilmemiş: ${kararBekleyen.map((a) => esc(a.ad + " " + a.soyad)).join(", ")}</div>` : ""}
+        ${yarinBaslayanlar.length ? `<div style="margin-top:6px"><b>Yarın işe başlayacak ${yarinBaslayanlar.length} kişi var</b> — SGK girişini unutmayın: ${yarinBaslayanlar.map((a) => esc(a.ad + " " + a.soyad)).join(", ")}</div>` : ""}
         ${gecikenSgk.length ? `<div style="margin-top:6px">⚠ <b>${gecikenSgk.length} kişinin</b> işe başlama tarihi geçti ama SGK girişi hâlâ yapılmamış: ${gecikenSgk.map((a) => esc(a.ad + " " + a.soyad)).join(", ")}</div>` : ""}
         ${denemeYaklasan.length ? `<div style="margin-top:6px">📋 <b>${denemeYaklasan.length} kişinin</b> deneme süresi yakında doluyor, değerlendirme formunu doldurmayı unutmayın: ${denemeYaklasan.map((a) => esc(a.ad + " " + a.soyad) + " (" + fmtTarih(a.denemeSuresi.bitisTarihi) + ")").join(", ")}</div>` : ""}
       </div>
@@ -341,39 +809,58 @@ function renderAdaylarPage(list, isAdmin) {
   el("#pageWrap").innerHTML = `
     <div class="page-head">
       <div>
-        <h1>Aday Takibi</h1>
-        <p>İşe alım öncesi evrak, SGK, oryantasyon ve deneme süresi süreçlerini buradan yönetin.</p>
+        <h1>Aday Havuzu</h1>
+        <p>Görüşmeden deneme süresi tamamlanana kadar tüm süreci buradan yönetin.</p>
       </div>
       ${isAdmin ? `<button class="btn btn-teal" id="yeniAdayBtn">+ Yeni Aday Ekle</button>` : ""}
     </div>
     ${banner}
     <div class="stat-row">
-      <div class="stat-card"><div class="n">${total}</div><div class="l">Toplam Aday</div></div>
+      <div class="stat-card"><div class="n">${total}</div><div class="l">Görünen Toplam</div></div>
+      <div class="stat-card"><div class="n">${gorusmeBekleyen}</div><div class="l">Görüşme / Karar Bekliyor</div></div>
       <div class="stat-card"><div class="n">${evrakBekleyen}</div><div class="l">Evrak Bekliyor</div></div>
       <div class="stat-card"><div class="n">${sgkBekleyen}</div><div class="l">SGK Bekliyor</div></div>
       <div class="stat-card"><div class="n">${denemeSuresinde}</div><div class="l">Deneme Süresinde</div></div>
       <div class="stat-card"><div class="n">${tamamlandi}</div><div class="l">Tamamlandı</div></div>
     </div>
     <div class="toolbar">
-      <input type="text" id="searchBox" placeholder="İsimle ara…" style="min-width:200px">
-      <select id="durumFilter">
-        <option value="">Tüm Durumlar</option>
-        ${Object.keys(DURUM_ETIKET).map((k) => `<option value="${k}">${DURUM_ETIKET[k].label}</option>`).join("")}
-      </select>
+      <input type="text" id="searchBox" placeholder="İsim, unvan veya departmanla ara…" style="min-width:240px">
     </div>
-    <div class="card-list" id="adayList"></div>`;
+    <div id="grupListesi"></div>`;
 
   if (isAdmin) el("#yeniAdayBtn").addEventListener("click", () => openAdayForm());
 
   function draw() {
     const term = el("#searchBox").value.trim().toLocaleLowerCase("tr");
-    const stF = el("#durumFilter").value;
-    const filtered = list
-      .filter((a) => (a.ad + " " + a.soyad).toLocaleLowerCase("tr").includes(term))
-      .filter((a) => !stF || a.durum === stF)
-      .sort((a, b) => (a.iseBaslamaTarihi || "").localeCompare(b.iseBaslamaTarihi || ""));
+    const eslesen = (a) => (a.ad + " " + a.soyad + " " + (a.unvan || "") + " " + (a.departman || "")).toLocaleLowerCase("tr").includes(term);
 
-    el("#adayList").innerHTML = filtered.length ? filtered.map((a) => adayCardHtml(a)).join("") : `<div class="empty-state">Aramanızla eşleşen aday bulunamadı.</div>`;
+    const gruplarHtml = AKIS_GRUPLARI
+      .filter((g) => !g.sadeceAdmin || isAdmin)
+      .map((g) => {
+        const grupAdaylari = gorunurListe.filter((a) => a.durum === g.key && eslesen(a))
+          .sort((a, b) => (a.iseBaslamaTarihi || a.gorusmeTarihi || "").localeCompare(b.iseBaslamaTarihi || b.gorusmeTarihi || ""));
+        if (!grupAdaylari.length) return "";
+        const acik = acikGruplar[g.key];
+        return `
+        <div class="stage-group ${acik ? "open" : ""} ${g.key === "olumsuz" ? "olumsuz-grup" : ""}" data-grup="${g.key}">
+          <div class="stage-group-head" data-grup-toggle="${g.key}">
+            <span class="ic">${g.ic}</span>
+            <span class="t">${esc(g.baslik)}</span>
+            <span class="n">${grupAdaylari.length}</span>
+            <span class="caret">▶</span>
+          </div>
+          <div class="stage-group-body">${grupAdaylari.map((a) => adayCardHtml(a)).join("")}</div>
+        </div>`;
+      }).join("");
+
+    el("#grupListesi").innerHTML = gruplarHtml.trim() ? gruplarHtml : `<div class="empty-state">Aramanızla eşleşen aday bulunamadı.</div>`;
+    document.querySelectorAll("[data-grup-toggle]").forEach((h) => {
+      h.addEventListener("click", () => {
+        const k = h.dataset.grupToggle;
+        acikGruplar[k] = !acikGruplar[k];
+        h.closest(".stage-group").classList.toggle("open", acikGruplar[k]);
+      });
+    });
     document.querySelectorAll(".aday-card[data-id]").forEach((card) => {
       card.addEventListener("click", () => {
         const aday = adaylar.find((x) => x.id === card.dataset.id);
@@ -382,41 +869,65 @@ function renderAdaylarPage(list, isAdmin) {
     });
   }
   function adayCardHtml(a) {
-    const st = DURUM_ETIKET[a.durum] || DURUM_ETIKET.evrak_bekliyor;
+    const st = DURUM_ETIKET[a.durum] || DURUM_ETIKET.gorusme_bekliyor;
     const oran = evrakOrani(a);
+    const altBilgi = a.durum === "gorusme_bekliyor"
+      ? `Görüşme: ${fmtTarih(a.gorusmeTarihi)}`
+      : a.durum === "olumsuz"
+        ? `Red nedeni: ${esc(a.redNedeni || "—")}`
+        : `İşe Başlama: ${fmtTarih(a.iseBaslamaTarihi)}`;
     return `
     <div class="aday-card" data-id="${a.id}">
       <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:220px">
         ${avatarHtml(a.ad + " " + a.soyad, 38)}
         <div class="main">
           <b>${esc(a.ad)} ${esc(a.soyad)}</b>
-          <div class="meta">${esc(a.unvan || "")} · ${esc(a.departman || "")} · İşe Başlama: ${fmtTarih(a.iseBaslamaTarihi)}</div>
+          <div class="meta">${esc(a.unvan || "")} · ${esc(a.departman || "")} · ${altBilgi}</div>
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:14px;">
+        ${(a.durum !== "gorusme_bekliyor" && a.durum !== "olumsuz") ? `
         <div style="min-width:110px">
           <div style="font-size:10.5px;color:var(--ink-soft);margin-bottom:3px">Evrak %${oran}</div>
           <div class="progress-track"><div class="progress-fill" style="width:${oran}%"></div></div>
-        </div>
+        </div>` : ""}
         <span class="status-badge ${st.cls}">${st.label}</span>
       </div>
     </div>`;
   }
   el("#searchBox").addEventListener("input", draw);
-  el("#durumFilter").addEventListener("change", draw);
   draw();
 }
 
 // ---------------------------------------------------------------
 // YENİ ADAY FORMU
 // ---------------------------------------------------------------
+function unvanSelectHtml(id, secili) {
+  const varMi = UNVAN_LISTESI.some((u) => u.toLocaleLowerCase("tr") === String(secili || "").trim().toLocaleLowerCase("tr"));
+  return `
+    <select id="${id}">
+      <option value="">Seçiniz…</option>
+      ${UNVAN_LISTESI.map((u) => `<option value="${esc(u)}" ${secili === u ? "selected" : ""}>${esc(u)}</option>`).join("")}
+      <option value="__diger__" ${secili && !varMi ? "selected" : ""}>Diğer (elle yaz)</option>
+    </select>
+    <input type="text" id="${id}Diger" placeholder="Unvanı yazın" style="margin-top:6px;${secili && !varMi ? "" : "display:none"}" value="${secili && !varMi ? esc(secili) : ""}">`;
+}
+function wireUnvanSelect(id) {
+  const sel = el("#" + id), diger = el("#" + id + "Diger");
+  sel.addEventListener("change", () => { diger.style.display = sel.value === "__diger__" ? "" : "none"; });
+}
+function unvanDegeriOku(id) {
+  const sel = el("#" + id), diger = el("#" + id + "Diger");
+  return sel.value === "__diger__" ? diger.value.trim() : sel.value;
+}
+
 function openAdayForm() {
   const overlay = document.createElement("div");
   overlay.className = "overlay";
   overlay.innerHTML = `
     <div class="drawer">
       <div class="drawer-head">
-        <div><h2>Yeni Aday Ekle</h2><div class="meta">Standart evrak listesi otomatik atanacaktır</div></div>
+        <div><h2>Yeni Aday Ekle</h2><div class="meta">Görüşme aşamasında eklenir — olumlu karar verilince evrak/oryantasyon süreci otomatik başlar</div></div>
         <button class="close-x" id="closeDrawer">✕</button>
       </div>
       <div class="drawer-body">
@@ -425,15 +936,17 @@ function openAdayForm() {
           <div class="field"><label>Soyad</label><input type="text" id="fSoyad" required></div>
         </div>
         <div class="two-col">
-          <div class="field"><label>Unvan</label><input type="text" id="fUnvan" placeholder="Örn: Satış Danışmanı"></div>
+          <div class="field"><label>Unvan (görüşülen pozisyon)</label>${unvanSelectHtml("fUnvan", "")}</div>
           <div class="field"><label>Departman</label><input type="text" id="fDepartman" placeholder="Örn: Peugeot"></div>
         </div>
         <div class="two-col">
           <div class="field"><label>Telefon</label><input type="text" id="fTelefon" placeholder="05xx xxx xx xx"></div>
           <div class="field"><label>E-posta</label><input type="email" id="fEmail"></div>
         </div>
-        <div class="field"><label>İşe Başlama Tarihi</label><input type="date" id="fTarih" required></div>
-        <div class="field"><label>Not</label><textarea id="fNot" rows="3" placeholder="Varsa eklemek istediğiniz not…"></textarea></div>
+        <div class="section-title" style="margin-top:22px">Görüşme Bilgisi</div>
+        <div class="field"><label>Görüşme Tarihi</label><input type="date" id="fGorusmeTarihi" required></div>
+        <div class="field"><label>Görüşme Notu</label><textarea id="fGorusmeNotu" rows="4" placeholder="Görüşmede alınan notlar, izlenimler…"></textarea></div>
+        <div class="field"><label>Genel Not</label><textarea id="fNot" rows="2" placeholder="Varsa eklemek istediğiniz başka bir not…"></textarea></div>
       </div>
       <div class="drawer-foot">
         <button class="btn btn-ghost" id="vazgecBtn">Vazgeç</button>
@@ -444,24 +957,30 @@ function openAdayForm() {
   overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
   el("#closeDrawer").onclick = () => overlay.remove();
   el("#vazgecBtn").onclick = () => overlay.remove();
+  wireUnvanSelect("fUnvan");
   el("#kaydetBtn").onclick = async () => {
-    const ad = el("#fAd").value.trim(), soyad = el("#fSoyad").value.trim(), tarih = el("#fTarih").value;
-    if (!ad || !soyad || !tarih) { toast("Ad, soyad ve işe başlama tarihi zorunludur."); return; }
+    const ad = el("#fAd").value.trim(), soyad = el("#fSoyad").value.trim(), gorusmeTarihi = el("#fGorusmeTarihi").value;
+    if (!ad || !soyad || !gorusmeTarihi) { toast("Ad, soyad ve görüşme tarihi zorunludur."); return; }
     const btn = el("#kaydetBtn");
     btn.disabled = true; btn.textContent = "Kaydediliyor…";
+    const simdi = bugunISO();
     try {
       await addDoc(collection(db, "iseAlimAday"), {
         ad, soyad,
-        unvan: el("#fUnvan").value.trim(),
+        unvan: unvanDegeriOku("fUnvan"),
         departman: el("#fDepartman").value.trim(),
         telefon: el("#fTelefon").value.trim(),
         email: el("#fEmail").value.trim(),
-        iseBaslamaTarihi: tarih,
+        gorusmeTarihi,
+        gorusmeNotu: el("#fGorusmeNotu").value.trim(),
+        iseBaslamaTarihi: null,
         notlar: el("#fNot").value.trim(),
-        durum: "evrak_bekliyor",
+        durum: "gorusme_bekliyor",
+        karar: null, kararTarihi: null, redNedeni: null, redAciklama: null,
         sgkGirisYapildi: false,
         sgkGirisTarihi: null,
-        evraklar: STANDART_EVRAK_LISTESI.map((ad2) => ({ ad: ad2, teslimAlindi: false, dosyaUrl: null, dosyaAdi: null, yuklemeTarihi: null })),
+        evraklar: [],
+        gecmis: [{ tarih: simdi, eskiDurum: null, yeniDurum: "gorusme_bekliyor", kullanici: currentProfile.adSoyad, not: "Aday kaydı oluşturuldu." }],
         olusturanKullanici: currentProfile.adSoyad,
         olusturmaTarihi: serverTimestamp(),
         guncellemeTarihi: serverTimestamp()
@@ -489,19 +1008,24 @@ function openAdayDetay(aday, isAdmin) {
 
   function bodyHtml(a) {
     const oran = evrakOrani(a);
+    const gorusmeAsamasinda = a.durum === "gorusme_bekliyor";
+    const olumsuz = a.durum === "olumsuz";
     return `
     <div class="section-title" style="margin-top:0">Genel Bilgiler</div>
+    <div class="two-col">
+      <div class="field"><label>Unvan</label>${unvanSelectHtml("dUnvan", a.unvan || "")}</div>
+      <div class="field"><label>Departman</label><input type="text" id="dDepartman" value="${esc(a.departman || "")}" ${isAdmin ? "" : "disabled"}></div>
+    </div>
     <div class="two-col">
       <div class="field"><label>Telefon</label><input type="text" id="dTelefon" value="${esc(a.telefon || "")}" ${isAdmin ? "" : "disabled"}></div>
       <div class="field"><label>E-posta</label><input type="email" id="dEmail" value="${esc(a.email || "")}" ${isAdmin ? "" : "disabled"}></div>
     </div>
-    <div class="field"><label>İşe Başlama Tarihi</label><input type="date" id="dTarih" value="${esc(a.iseBaslamaTarihi || "")}" ${isAdmin ? "" : "disabled"}></div>
-    <div class="field"><label>Durum</label>
-      <select id="dDurum" ${isAdmin ? "" : "disabled"}>
-        ${Object.keys(DURUM_ETIKET).map((k) => `<option value="${k}" ${a.durum === k ? "selected" : ""}>${DURUM_ETIKET[k].label}</option>`).join("")}
-      </select>
-    </div>
+    ${!gorusmeAsamasinda && !olumsuz ? `<div class="field"><label>İşe Başlama Tarihi</label><input type="date" id="dTarih" value="${esc(a.iseBaslamaTarihi || "")}" ${isAdmin ? "" : "disabled"}></div>` : ""}
 
+    ${gorusmeAsamasinda ? gorusmeHtml(a) : ""}
+    ${olumsuz ? olumsuzOzetHtml(a) : ""}
+
+    ${!gorusmeAsamasinda && !olumsuz ? `
     <div class="section-title">SGK Girişi</div>
     <div class="evrak-row ${a.sgkGirisYapildi ? "done" : ""}">
       <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;flex:1">
@@ -519,9 +1043,66 @@ function openAdayDetay(aday, isAdmin) {
 
     ${a.oryantasyon ? oryantasyonHtml(a) : ""}
     ${a.denemeSuresi ? denemeSuresiHtml(a) : ""}
+    ` : ""}
+
+    ${a.gecmis && a.gecmis.length ? gecmisHtml(a) : ""}
 
     <div class="section-title">Not</div>
-    <textarea id="dNot" rows="3" ${isAdmin ? "" : "disabled"}>${esc(a.notlar || "")}</textarea>`;
+    <textarea id="dNot" rows="3" ${isAdmin ? "" : "disabled"}>${esc(a.notlar || "")}</textarea>
+
+    ${!gorusmeAsamasinda ? `<div class="field" style="margin-top:14px"><label>Durum (elle düzeltme — normalde yukarıdaki aksiyon butonları kullanılır)</label>
+      <select id="dDurum" ${isAdmin ? "" : "disabled"}>
+        ${Object.keys(DURUM_ETIKET).filter((k) => k !== "gorusme_bekliyor").map((k) => `<option value="${k}" ${a.durum === k ? "selected" : ""}>${DURUM_ETIKET[k].label}</option>`).join("")}
+      </select>
+    </div>` : ""}`;
+  }
+
+  function gorusmeHtml(a) {
+    return `
+    <div class="section-title">Görüşme Bilgisi</div>
+    <div class="two-col">
+      <div class="field"><label>Görüşme Tarihi</label><input type="date" id="dGorusmeTarihi" value="${esc(a.gorusmeTarihi || "")}" ${isAdmin ? "" : "disabled"}></div>
+    </div>
+    <div class="field"><label>Görüşme Notu</label><textarea id="dGorusmeNotu" rows="4" ${isAdmin ? "" : "disabled"}>${esc(a.gorusmeNotu || "")}</textarea></div>
+    ${isAdmin ? `
+    <div class="karar-box">
+      <div style="font-size:12.5px;font-weight:700;color:var(--ink-soft);margin-bottom:4px">KARAR</div>
+      <div style="font-size:12px;color:var(--ink-soft);margin-bottom:6px">Görüşme sonucunda bu aday hakkındaki kararınızı seçin.</div>
+      <button type="button" class="btn btn-good btn-sm" id="olumluBtn">✓ Olumlu — İşe Alınacak</button>
+      <button type="button" class="btn btn-bad btn-sm" id="olumsuzBtn">✗ Olumsuz — Reddet</button>
+      <div id="olumluForm" style="display:none;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)">
+        <div class="field"><label>İşe Başlama Tarihi</label><input type="date" id="fOlumluTarih" required></div>
+        <button type="button" class="btn btn-teal btn-sm" id="olumluOnayBtn">İşe Alımı Onayla</button>
+      </div>
+      <div id="olumsuzForm" style="display:none;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)">
+        <div class="field"><label>Red Nedeni</label>
+          <select id="fRedNedeni">${RED_NEDENLERI.map((r) => `<option value="${esc(r)}">${esc(r)}</option>`).join("")}</select>
+        </div>
+        <div class="field"><label>Açıklama (opsiyonel)</label><textarea id="fRedAciklama" rows="2"></textarea></div>
+        <button type="button" class="btn btn-bad btn-sm" id="olumsuzOnayBtn">Reddi Onayla</button>
+      </div>
+    </div>` : `<div style="font-size:12.5px;color:var(--ink-soft)">Görüşme kararı yalnızca İK tarafından girilir.</div>`}`;
+  }
+
+  function olumsuzOzetHtml(a) {
+    return `
+    <div class="section-title">Görüşme Sonucu</div>
+    <div class="evrak-row" style="border-color:var(--bad);background:var(--bad-bg)">
+      <div>
+        <div style="font-weight:700;color:var(--bad)">✗ Olumsuz — ${esc(a.redNedeni || "")}</div>
+        ${a.redAciklama ? `<div style="font-size:12px;margin-top:4px">${esc(a.redAciklama)}</div>` : ""}
+        <div style="font-size:11px;color:var(--ink-soft);margin-top:4px">Karar tarihi: ${fmtTarih(a.kararTarihi)}</div>
+      </div>
+    </div>
+    <div style="font-size:11.5px;color:var(--ink-soft);margin-top:6px">Bu aday müdür panelinde görünmez, yalnızca İK erişebilir.</div>`;
+  }
+
+  function gecmisHtml(a) {
+    const satirlar = [...a.gecmis].reverse().map((g) => `
+      <div style="font-size:11.5px;color:var(--ink-soft);padding:6px 0;border-bottom:1px solid #eef1ef">
+        <b style="color:var(--ink)">${fmtTarih(g.tarih)}</b> — ${esc(g.kullanici || "")}${g.not ? ": " + esc(g.not) : ""}
+      </div>`).join("");
+    return `<div class="section-title">Süreç Geçmişi</div><div style="margin-bottom:4px">${satirlar}</div>`;
   }
 
   function evrakRowHtml(e, i) {
@@ -538,18 +1119,43 @@ function openAdayDetay(aday, isAdmin) {
     const maddeler = a.oryantasyon.maddeler || [];
     const tamam = maddeler.length ? maddeler.filter((m) => m.tamamlandi).length : 0;
     const oran = maddeler.length ? Math.round((tamam / maddeler.length) * 100) : 0;
+    // maddeler kategoriye göre grupla, orijinal sıra korunur
+    const kategoriler = [];
+    maddeler.forEach((m, i) => {
+      const kat = m.kategori || "Genel";
+      let grp = kategoriler.find((g) => g.ad === kat);
+      if (!grp) { grp = { ad: kat, satirlar: [] }; kategoriler.push(grp); }
+      grp.satirlar.push({ ...m, idx: i });
+    });
     return `
-    <div class="section-title">Oryantasyon (${esc(a.oryantasyon.sablonAdi || "Genel")}) — %${oran} tamamlandı</div>
+    <div class="section-title">Oryantasyon (${esc(a.oryantasyon.sablonAdi || "Genel")}) — %${oran} tamamlandı (${tamam}/${maddeler.length})</div>
     <div class="progress-track" style="margin-bottom:12px"><div class="progress-fill" style="width:${oran}%"></div></div>
     <div id="oryantasyonListesi">
-      ${maddeler.map((m, i) => `
-        <div class="evrak-row ${m.tamamlandi ? "done" : ""}" data-idx="${i}">
-          <label style="display:flex;align-items:center;gap:8px;" class="name">
-            <input type="checkbox" data-oryantasyon-check="${i}" ${m.tamamlandi ? "checked" : ""} ${canEditSurec ? "" : "disabled"}>
-            ${esc(m.ad)}
-          </label>
-          <span style="font-size:11px;color:var(--ink-soft)">${m.tarih ? fmtTarih(m.tarih) : ""}</span>
-        </div>`).join("")}
+      ${kategoriler.map((grp, gi) => {
+        const grpTamam = grp.satirlar.filter((m) => m.tamamlandi).length;
+        const grpOran = Math.round((grpTamam / grp.satirlar.length) * 100);
+        const acik = grpOran < 100;
+        return `
+        <div class="oryan-kategori ${acik ? "open" : ""}" data-kategori-idx="${gi}">
+          <div class="oryan-kategori-head" data-kategori-toggle="${gi}">
+            <span class="t">${esc(grp.ad)}</span>
+            <span class="pc">${grpTamam}/${grp.satirlar.length}</span>
+            <div class="progress-track"><div class="progress-fill" style="width:${grpOran}%"></div></div>
+            <span class="caret">▶</span>
+          </div>
+          <div class="oryan-kategori-body">
+            ${grp.satirlar.map((m) => `
+              <div class="oryan-madde">
+                <label class="baslik">
+                  <input type="checkbox" data-oryantasyon-check="${m.idx}" ${m.tamamlandi ? "checked" : ""} ${canEditSurec ? "" : "disabled"}>
+                  ${esc(m.baslik || m.ad || "")}
+                </label>
+                ${m.kapsam ? `<div class="kapsam">${esc(m.kapsam)}</div>` : ""}
+                ${m.sorumlu ? `<div class="sorumlu">Sorumlu: ${esc(m.sorumlu)}${m.tamamlanmaTarihi || m.tarih ? " · Tamamlandı: " + fmtTarih(m.tamamlanmaTarihi || m.tarih) : ""}</div>` : (m.tamamlanmaTarihi || m.tarih ? `<div class="sorumlu">Tamamlandı: ${fmtTarih(m.tamamlanmaTarihi || m.tarih)}</div>` : "")}
+              </div>`).join("")}
+          </div>
+        </div>`;
+      }).join("")}
     </div>`;
   }
 
@@ -624,9 +1230,68 @@ function openAdayDetay(aday, isAdmin) {
       cb.addEventListener("change", () => {
         const i = +cb.dataset.oryantasyonCheck;
         workingCopy.oryantasyon.maddeler[i].tamamlandi = cb.checked;
-        workingCopy.oryantasyon.maddeler[i].tarih = cb.checked ? bugunISO() : null;
-        cb.closest(".evrak-row").classList.toggle("done", cb.checked);
+        workingCopy.oryantasyon.maddeler[i].tamamlanmaTarihi = cb.checked ? bugunISO() : null;
+        cb.closest(".oryan-madde").classList.toggle("done", cb.checked);
       });
+    });
+    document.querySelectorAll("[data-kategori-toggle]").forEach((h) => {
+      h.addEventListener("click", () => h.closest(".oryan-kategori").classList.toggle("open"));
+    });
+    const unvanSel = document.getElementById("dUnvan");
+    if (unvanSel) wireUnvanSelect("dUnvan");
+    const olumluBtn = document.getElementById("olumluBtn"), olumsuzBtn = document.getElementById("olumsuzBtn");
+    if (olumluBtn) olumluBtn.addEventListener("click", () => {
+      document.getElementById("olumluForm").style.display = "";
+      document.getElementById("olumsuzForm").style.display = "none";
+    });
+    if (olumsuzBtn) olumsuzBtn.addEventListener("click", () => {
+      document.getElementById("olumsuzForm").style.display = "";
+      document.getElementById("olumluForm").style.display = "none";
+    });
+    const olumluOnayBtn = document.getElementById("olumluOnayBtn");
+    if (olumluOnayBtn) olumluOnayBtn.addEventListener("click", async () => {
+      const tarih = document.getElementById("fOlumluTarih").value;
+      if (!tarih) { toast("İşe başlama tarihi zorunludur."); return; }
+      olumluOnayBtn.disabled = true; olumluOnayBtn.textContent = "Kaydediliyor…";
+      const unvanGuncel = unvanDegeriOku("dUnvan") || aday.unvan;
+      const sablon = oryantasyonSablonSec(unvanGuncel);
+      const patch = {
+        unvan: unvanGuncel,
+        durum: "evrak_bekliyor",
+        karar: "olumlu", kararTarihi: bugunISO(),
+        iseBaslamaTarihi: tarih,
+        evraklar: STANDART_EVRAK_LISTESI.map((ad2) => ({ ad: ad2, teslimAlindi: false, dosyaUrl: null, dosyaAdi: null, yuklemeTarihi: null })),
+        oryantasyon: { sablonAdi: sablon.sablonAdi, maddeler: sablon.maddeler },
+        gecmis: gecmisEkle(aday.gecmis, "gorusme_bekliyor", "evrak_bekliyor", `Görüşme olumlu sonuçlandı, işe başlama: ${fmtTarih(tarih)}.`)
+      };
+      try {
+        await persist(patch);
+        toast("✓ Aday işe alım sürecine alındı.");
+        overlay.remove();
+      } catch (e) {
+        toast("Kaydedilemedi: " + e.message);
+        olumluOnayBtn.disabled = false; olumluOnayBtn.textContent = "İşe Alımı Onayla";
+      }
+    });
+    const olumsuzOnayBtn = document.getElementById("olumsuzOnayBtn");
+    if (olumsuzOnayBtn) olumsuzOnayBtn.addEventListener("click", async () => {
+      const redNedeni = document.getElementById("fRedNedeni").value;
+      const redAciklama = document.getElementById("fRedAciklama").value.trim();
+      olumsuzOnayBtn.disabled = true; olumsuzOnayBtn.textContent = "Kaydediliyor…";
+      const patch = {
+        durum: "olumsuz",
+        karar: "olumsuz", kararTarihi: bugunISO(),
+        redNedeni, redAciklama,
+        gecmis: gecmisEkle(aday.gecmis, "gorusme_bekliyor", "olumsuz", `Görüşme olumsuz sonuçlandı: ${redNedeni}.`)
+      };
+      try {
+        await persist(patch);
+        toast("✓ Kaydedildi.");
+        overlay.remove();
+      } catch (e) {
+        toast("Kaydedilemedi: " + e.message);
+        olumsuzOnayBtn.disabled = false; olumsuzOnayBtn.textContent = "Reddi Onayla";
+      }
     });
     document.querySelectorAll("[data-deneme-kriter]").forEach((sel) => {
       sel.addEventListener("change", () => {
@@ -653,7 +1318,8 @@ function openAdayDetay(aday, isAdmin) {
             degerlendirme: { ...workingCopy.denemeSuresi.degerlendirme, yorum, sonuc, degerlendirenKullanici: currentProfile.adSoyad, tarih: bugunISO() },
             bitisTarihi: sonuc === "Süre Uzatılsın" ? denemeSuresiBitisHesapla(bugunISO()) : workingCopy.denemeSuresi.bitisTarihi
           },
-          durum: yeniDurum
+          durum: yeniDurum,
+          gecmis: gecmisEkle(aday.gecmis, aday.durum, yeniDurum, `Deneme süresi değerlendirmesi kesinleşti: ${sonuc}.`)
         };
         try {
           await persist(patch);
@@ -675,23 +1341,48 @@ function openAdayDetay(aday, isAdmin) {
   el("#guncelleBtn").onclick = async () => {
     const btn = el("#guncelleBtn");
     btn.disabled = true; btn.textContent = "Kaydediliyor…";
+    const ortakPatch = {
+      unvan: unvanDegeriOku("dUnvan"),
+      departman: el("#dDepartman").value.trim(),
+      telefon: el("#dTelefon").value.trim(),
+      email: el("#dEmail").value.trim(),
+      notlar: el("#dNot").value.trim()
+    };
+    // Görüşme aşamasındayken "Kaydet", karar butonlarına dokunmadan sadece
+    // notları/bilgileri günceller — karar yalnızca Olumlu/Olumsuz butonlarıyla verilir.
+    if (aday.durum === "gorusme_bekliyor") {
+      const patch = {
+        ...ortakPatch,
+        gorusmeTarihi: el("#dGorusmeTarihi").value,
+        gorusmeNotu: el("#dGorusmeNotu").value.trim()
+      };
+      try {
+        await persist(patch);
+        toast("✓ Kaydedildi.");
+        overlay.remove();
+      } catch (e) {
+        toast("Kaydedilemedi: " + e.message);
+        btn.disabled = false; btn.textContent = "Kaydet";
+      }
+      return;
+    }
+
     const sgkChecked = el("#dSgk").checked;
     const yeniDurum = el("#dDurum").value;
     const patch = {
-      telefon: el("#dTelefon").value.trim(),
-      email: el("#dEmail").value.trim(),
+      ...ortakPatch,
       iseBaslamaTarihi: el("#dTarih").value,
       durum: yeniDurum,
       sgkGirisYapildi: sgkChecked,
       sgkGirisTarihi: sgkChecked ? (aday.sgkGirisTarihi || bugunISO()) : null,
-      notlar: el("#dNot").value.trim(),
       evraklar: workingCopy.evraklar
     };
+    if (yeniDurum !== aday.durum) patch.gecmis = gecmisEkle(aday.gecmis, aday.durum, yeniDurum, "Durum elle güncellendi.");
     // İşe Başladı durumuna ilk kez geçiliyorsa oryantasyon şablonunu ve
     // deneme süresi bitiş tarihini otomatik oluştur.
     if (yeniDurum === "ise_basladi" && !aday.oryantasyon) {
-      const sablon = oryantasyonSablonSec(aday.unvan);
-      patch.oryantasyon = { sablonAdi: sablon.sablonAdi, maddeler: sablon.maddeler.map((ad2) => ({ ad: ad2, tamamlandi: false, tarih: null })) };
+      const sablon = oryantasyonSablonSec(patch.unvan || aday.unvan);
+      patch.oryantasyon = { sablonAdi: sablon.sablonAdi, maddeler: sablon.maddeler };
     } else if (workingCopy.oryantasyon) {
       patch.oryantasyon = workingCopy.oryantasyon;
     }
