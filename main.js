@@ -74,6 +74,83 @@ const RED_NEDENLERI = [
 ];
 
 // ---------------------------------------------------------------
+// Personel Talepleri — şirketin kağıt üzerindeki gerçek "Personel Talep
+// Formu"nun alanları birebir işlenmiştir (poziyon bilgileri, talep nedeni,
+// iç aday değerlendirmesi, sürdürülebilirlik analizi, riskler, ücret/bütçe,
+// marka zorunluluğu). Onay zinciri kağıtta Müdür→Direktör→İK Direktörü→CEO
+// şeklinde görünse de, uygulamadaki karar adımı bilinçli olarak TEK adımda
+// (İK/admin onaylar/reddeder/erteler/revize ister) tutuluyor — talep
+// sahibinin istediği basit akış budur. Onaylanan bir talep 1:N ilişkiyle
+// birden fazla adaya bağlanabilir (karsilananAdet sayacı otomatik ilerler,
+// adet'e ulaşınca talep kendiliğinden "karsilandi" olur).
+// ---------------------------------------------------------------
+const TALEP_DURUM_ETIKET = {
+  talep_edildi: { label: "Onay Bekliyor", cls: "st-gorusme" },
+  onaylandi: { label: "Onaylandı — Aday Aranıyor", cls: "st-basladi" },
+  revize_istendi: { label: "Revize İstendi", cls: "st-sgk" },
+  ertelendi: { label: "Ertelendi", cls: "st-sgk" },
+  kismen_karsilandi: { label: "Kısmen Karşılandı", cls: "st-sgk" },
+  karsilandi: { label: "Karşılandı", cls: "st-tamam" },
+  reddedildi: { label: "Reddedildi", cls: "st-olumsuz" },
+  iptal_edildi: { label: "İptal Edildi", cls: "st-vazgecti" }
+};
+const TALEP_KARAR_OPT = [
+  { key: "onaylandi", label: "Onaylandı" },
+  { key: "revize_istendi", label: "Revize İstendi" },
+  { key: "ertelendi", label: "Ertelendi" },
+  { key: "reddedildi", label: "Reddedildi" }
+];
+const TALEP_NEDEN_OPT = [
+  { key: "ek_kadro", label: "Ek Kadro" },
+  { key: "is_hacmi_artisi", label: "İş Hacmi Artışı" },
+  { key: "yeni_kadro", label: "Yeni Kadro Açılması" },
+  { key: "personel_yedekleme", label: "Personel Yedekleme" },
+  { key: "organizasyonel_revizyon", label: "Organizasyonel Revizyon" },
+  { key: "yerine_alim", label: "Yerine Alım (kimin yerine olduğunu ve çıkış tarihini yazınız)" }
+];
+const IC_ADAY_OPT = [
+  { key: "degerlendirilebilir", label: "İç Aday Değerlendirilebilir" },
+  { key: "talebi_yoktur", label: "İç Aday Talebi Yoktur" },
+  { key: "gelistirilebilir", label: "Geliştirilebilir İç Aday Değerlendirilebilir" }
+];
+const SURDURULEBILIRLIK_OPT = [
+  { key: "surdurulebilir", label: "Sürdürülebilir" },
+  { key: "kisa_vadede", label: "Kısa Vadede Sürdürülebilir" },
+  { key: "surdurulemez", label: "Sürdürülemez" }
+];
+const RISK_OPT = [
+  { key: "is_kaybi", label: "İş Kaybı" },
+  { key: "musteri_memnuniyeti", label: "Müşteri Memnuniyeti" },
+  { key: "kalite_etkisi", label: "Kalite Etkisi" }
+];
+const MARKA_ZORUNLULUK_OPT = [
+  { key: "zorunlu_kadro", label: "Zorunlu Kadro" },
+  { key: "tavsiye_edilen", label: "Tavsiye Edilen Kadro" },
+  { key: "zorunluluk_yok", label: "Zorunluluk Yok" }
+];
+function checkboxGrupHtml(name, secililer, opts) {
+  return `<div style="display:flex;flex-direction:column;gap:6px">${opts.map((o) => `
+    <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;font-weight:500;cursor:pointer">
+      <input type="checkbox" name="${name}" value="${o.key}" ${(secililer || []).includes(o.key) ? "checked" : ""} style="margin-top:2px">
+      ${esc(o.label)}
+    </label>`).join("")}</div>`;
+}
+function checkboxGrupOku(name) {
+  return [...document.querySelectorAll(`input[name="${name}"]:checked`)].map((c) => c.value);
+}
+function radioGrupHtml(name, secili, opts) {
+  return `<div style="display:flex;flex-direction:column;gap:6px">${opts.map((o) => `
+    <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;font-weight:500;cursor:pointer">
+      <input type="radio" name="${name}" value="${o.key}" ${secili === o.key ? "checked" : ""} style="margin-top:2px">
+      ${esc(o.label)}
+    </label>`).join("")}</div>`;
+}
+function radioGrupOku(name) {
+  const el2 = document.querySelector(`input[name="${name}"]:checked`);
+  return el2 ? el2.value : null;
+}
+
+// ---------------------------------------------------------------
 // Unvan listesi — Ağustos 2026 Çalışan Listesi'ndeki aktif unvanlardan
 // derlenmiştir. Listede olmayan bir unvan çıkarsa "Diğer (elle yaz)"
 // seçeneğiyle serbest metin girilebilir.
@@ -614,10 +691,13 @@ function evrakOrani(aday) {
 let currentUid = null;
 let currentProfile = null;
 let adaylar = [];
+let talepler = [];
 let unsubAday = null;
+let unsubTalep = null;
 
 onAuthStateChanged(auth, async (user) => {
   if (unsubAday) unsubAday();
+  if (unsubTalep) unsubTalep();
   if (!user) {
     currentUid = null;
     currentProfile = null;
@@ -634,6 +714,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     currentProfile = snap.data();
     subscribeAdaylar();
+    subscribeTalepler();
   } catch (e) {
     console.error(e);
     renderLogin("Giriş sırasında bir hata oluştu: " + e.message);
@@ -663,6 +744,22 @@ function subscribeAdaylar() {
   }, (err) => {
     console.error(err);
     root().innerHTML = `<div class="center-screen"><div class="login-card"><h1>Veri okunamadı</h1><p class="hint">${esc(err.message)}</p></div></div>`;
+  });
+}
+
+function subscribeTalepler() {
+  // Aynı prensip: admin filtresiz okur, müdür TEK eşitlik koşuluyla (departman)
+  // kısıtlanır — bkz. subscribeAdaylar() üstündeki not.
+  const isAdminHesap = currentProfile.role === "admin";
+  const ref = isAdminHesap
+    ? collection(db, "personelTalepleri")
+    : query(collection(db, "personelTalepleri"), where("departman", "==", currentProfile.muduluk));
+  unsubTalep = onSnapshot(ref, (qs) => {
+    talepler = [];
+    qs.forEach((d) => talepler.push({ id: d.id, ...d.data() }));
+    render();
+  }, (err) => {
+    console.error("Personel talepleri okunamadı:", err);
   });
 }
 
@@ -712,7 +809,10 @@ function renderLogin(errMsg) {
 // SHELL
 // ---------------------------------------------------------------
 const ICONS = {
-  people: `<svg width="16" height="16" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.4" fill="currentColor"/><path d="M2.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5" fill="currentColor" opacity=".85"/><circle cx="17.5" cy="8.5" r="2.6" fill="currentColor" opacity=".55"/><path d="M14.8 13.9c1-.6 2.1-.9 3-.9 2.8 0 5 2 5.2 5" fill="currentColor" opacity=".55"/></svg>`
+  people: `<svg width="16" height="16" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.4" fill="currentColor"/><path d="M2.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5" fill="currentColor" opacity=".85"/><circle cx="17.5" cy="8.5" r="2.6" fill="currentColor" opacity=".55"/><path d="M14.8 13.9c1-.6 2.1-.9 3-.9 2.8 0 5 2 5.2 5" fill="currentColor" opacity=".55"/></svg>`,
+  genel: `<svg width="16" height="16" viewBox="0 0 24 24"><rect x="2.5" y="13" width="4.5" height="8.5" rx="1" fill="currentColor" opacity=".55"/><rect x="9.7" y="7" width="4.5" height="14.5" rx="1" fill="currentColor" opacity=".8"/><rect x="17" y="2.5" width="4.5" height="19" rx="1" fill="currentColor"/></svg>`,
+  talep: `<svg width="16" height="16" viewBox="0 0 24 24"><rect x="3.5" y="2.5" width="17" height="19" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
+  oryantasyon: `<svg width="16" height="16" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 12.5l2.6 2.6L16.5 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 };
 function topbar() {
   return `
@@ -784,24 +884,37 @@ function openPasswordModal() {
   };
 }
 
-let TAB = "adaylar";
+let TAB = "genel";
 function render() {
   const isAdmin = currentProfile.role === "admin";
   // Müdürler yalnızca kendi departmanlarındaki adayları, ve "olumsuz" (reddedilen)
   // adayları HİÇBİR ZAMAN görmemeli — bkz. Firestore kuralları (aynı kısıt orada
   // da uygulanmalı, burası yalnızca istemci tarafı ek bir güvence).
   const gorulenAdaylar = isAdmin ? adaylar : adaylar.filter((a) => a.departman === currentProfile.muduluk && a.durum !== "olumsuz");
+  const gorulenTalepler = isAdmin ? talepler : talepler.filter((t) => t.departman === currentProfile.muduluk);
+
+  const navItems = [
+    { key: "genel", label: "Genel Bakış", ic: ICONS.genel },
+    { key: "adaylar", label: "Aday Havuzu", ic: ICONS.people },
+    { key: "talepler", label: "Personel Talepleri", ic: ICONS.talep },
+    { key: "oryantasyon", label: "Oryantasyon", ic: ICONS.oryantasyon }
+  ];
 
   root().innerHTML = `
   ${topbar()}
   <div class="app-body">
     <div class="sidebar">
-      <div class="nav-item active" data-nav="adaylar"><span class="ic">${ICONS.people}</span>Aday Havuzu</div>
+      ${navItems.map((n) => `<div class="nav-item ${TAB === n.key ? "active" : ""}" data-nav="${n.key}"><span class="ic">${n.ic}</span>${n.label}</div>`).join("")}
     </div>
     <div class="main-content"><div class="wrap" id="pageWrap"></div></div>
   </div>`;
   wireTopbar();
-  renderAdaylarPage(gorulenAdaylar, isAdmin);
+  document.querySelectorAll("[data-nav]").forEach((n) => n.addEventListener("click", () => { TAB = n.dataset.nav; render(); }));
+
+  if (TAB === "talepler") renderTaleplerPage(gorulenTalepler, isAdmin);
+  else if (TAB === "oryantasyon") renderOryantasyonPage(gorulenAdaylar, isAdmin);
+  else if (TAB === "genel") renderGenelBakisPage(gorulenAdaylar, gorulenTalepler, isAdmin);
+  else renderAdaylarPage(gorulenAdaylar, isAdmin);
 }
 
 // ---------------------------------------------------------------
@@ -964,7 +1077,440 @@ function bolumSelectHtml(id, secili, disabled) {
   return `<select id="${id}" ${disabled ? "disabled" : ""}><option value="">Seçiniz…</option>${BOLUM_LISTESI.map((b) => `<option value="${esc(b)}" ${secili === b ? "selected" : ""}>${esc(b)}</option>`).join("")}</select>`;
 }
 
-function openAdayForm() {
+// ---------------------------------------------------------------
+// GENEL BAKIŞ — günlük olarak "bugün ne yapmalıyım" sorusuna cevap veren
+// aksiyon odaklı özet. Statik sayaç değil, tıklanınca ilgili sayfaya/gruba
+// götüren kartlardan oluşur.
+// ---------------------------------------------------------------
+function renderGenelBakisPage(adaylarList, talepList, isAdmin) {
+  const bugun = bugunISO();
+  const kararBekleyen = adaylarList.filter((a) => a.durum === "gorusme_bekliyor" && a.gorusmeTarihi && a.gorusmeTarihi <= bugun);
+  const onayBekleyenTalep = talepList.filter((t) => t.durum === "talep_edildi");
+  const gecikenEvrakSgk = adaylarList.filter((a) => (a.durum === "evrak_bekliyor" || a.durum === "sgk_bekliyor") && a.iseBaslamaTarihi && a.iseBaslamaTarihi <= bugun);
+  const oryantasyonSurenler = adaylarList.filter((a) => a.durum === "ise_basladi" && a.oryantasyon);
+  const denemeYaklasan = adaylarList.filter((a) => a.durum === "ise_basladi" && a.denemeSuresi && !a.denemeSuresi.degerlendirmeYapildiMi && gunFarki(a.denemeSuresi.bitisTarihi) !== null && gunFarki(a.denemeSuresi.bitisTarihi) <= 7);
+
+  const kart = (n, l, ic, hedefTab) => `
+    <div class="stat-card" data-git="${hedefTab}" style="cursor:pointer">
+      <div class="n">${n}</div><div class="l">${ic ? ic + " " : ""}${l}</div>
+    </div>`;
+
+  el("#pageWrap").innerHTML = `
+    <div class="page-head">
+      <div>
+        <h1>Genel Bakış</h1>
+        <p>Bugün dikkat etmeniz gereken maddelerin özeti.</p>
+      </div>
+    </div>
+    <div class="stat-row">
+      ${kart(kararBekleyen.length, "Karar Bekleyen Görüşme", "🗓️", "adaylar")}
+      ${isAdmin ? kart(onayBekleyenTalep.length, "Onay Bekleyen Talep", "📋", "talepler") : ""}
+      ${kart(gecikenEvrakSgk.length, "Evrak/SGK'da Gecikme", "⚠", "adaylar")}
+      ${kart(oryantasyonSurenler.length, "Devam Eden Oryantasyon", "🎯", "oryantasyon")}
+      ${kart(denemeYaklasan.length, "Deneme Süresi Yaklaşan", "⏳", "adaylar")}
+    </div>
+    ${!kararBekleyen.length && !onayBekleyenTalep.length && !gecikenEvrakSgk.length && !denemeYaklasan.length
+      ? `<div class="empty-state">🎉 Şu anda bekleyen bir aksiyon yok — her şey güncel.</div>`
+      : `
+      <div class="card-list">
+        ${kararBekleyen.map((a) => `<div class="aday-card" data-gitaday="${a.id}"><div class="main"><b>${esc(a.ad)} ${esc(a.soyad)}</b><div class="meta">Görüşme tarihi geçti, karar bekliyor (${esc(a.unvan || "")} · ${esc(a.departman || "")})</div></div><span class="status-badge st-gorusme">Karar Ver</span></div>`).join("")}
+        ${isAdmin ? onayBekleyenTalep.map((t) => `<div class="aday-card" data-gittalep="${t.id}"><div class="main"><b>${esc(t.unvan)} × ${t.adet}</b><div class="meta">${esc(t.departman)} · ${esc(t.talepEdenKullanici || "")}</div></div><span class="status-badge st-gorusme">Talebi İncele</span></div>`).join("") : ""}
+        ${gecikenEvrakSgk.map((a) => `<div class="aday-card" data-gitaday="${a.id}"><div class="main"><b>${esc(a.ad)} ${esc(a.soyad)}</b><div class="meta">${a.durum === "evrak_bekliyor" ? "Evrak" : "SGK"} bekliyor, işe başlama tarihi geçti (${fmtTarih(a.iseBaslamaTarihi)})</div></div><span class="status-badge st-sgk">İncele</span></div>`).join("")}
+        ${denemeYaklasan.map((a) => `<div class="aday-card" data-gitaday="${a.id}"><div class="main"><b>${esc(a.ad)} ${esc(a.soyad)}</b><div class="meta">Deneme süresi ${fmtTarih(a.denemeSuresi.bitisTarihi)} tarihinde doluyor</div></div><span class="status-badge st-basladi">Değerlendir</span></div>`).join("")}
+      </div>`}`;
+
+  document.querySelectorAll("[data-git]").forEach((c) => c.addEventListener("click", () => { TAB = c.dataset.git; render(); }));
+  document.querySelectorAll("[data-gitaday]").forEach((c) => c.addEventListener("click", () => {
+    TAB = "adaylar"; render();
+    const aday = adaylar.find((x) => x.id === c.dataset.gitaday);
+    if (aday) openAdayDetay(aday, isAdmin);
+  }));
+  document.querySelectorAll("[data-gittalep]").forEach((c) => c.addEventListener("click", () => {
+    TAB = "talepler"; render();
+    const t = talepler.find((x) => x.id === c.dataset.gittalep);
+    if (t) openTalepDetay(t, isAdmin);
+  }));
+}
+
+// ---------------------------------------------------------------
+// PERSONEL TALEPLERİ — müdür kadro talebi açar, İK onaylar/reddeder.
+// Onaylanan talep, "Bu Talep İçin Aday Ekle" ile doğrudan Yeni Aday
+// formunu unvan/departman/bölüm önceden dolu şekilde açar ve adayı talebe
+// bağlar; adet dolunca talep otomatik "karsilandi" olur.
+// ---------------------------------------------------------------
+function renderTaleplerPage(list, isAdmin) {
+  const acik = list.filter((t) => t.durum === "talep_edildi" || t.durum === "onaylandi" || t.durum === "revize_istendi" || t.durum === "ertelendi" || t.durum === "kismen_karsilandi");
+  const kapali = list.filter((t) => t.durum === "karsilandi" || t.durum === "reddedildi" || t.durum === "iptal_edildi");
+
+  const talepCard = (t) => {
+    const st = TALEP_DURUM_ETIKET[t.durum] || TALEP_DURUM_ETIKET.talep_edildi;
+    const nedenEtiket = (t.talepNedenleri || []).map((k) => (TALEP_NEDEN_OPT.find((o) => o.key === k) || {}).label).filter(Boolean).join(", ");
+    return `
+    <div class="aday-card" data-id="${t.id}">
+      <div class="main" style="flex:1">
+        <b>${esc(t.unvan)}</b> <span style="color:var(--ink-soft);font-weight:400">× ${t.adet || 1} kişi${t.karsilananAdet ? " (" + t.karsilananAdet + " karşılandı)" : ""}</span>
+        <div class="meta">${esc(t.departman)} · ${esc(t.bolum || "")}${nedenEtiket ? " · " + esc(nedenEtiket) : ""}</div>
+        <div class="meta">Talep eden: ${esc(t.talepEdenKullanici || "")}</div>
+      </div>
+      <span class="status-badge ${st.cls}">${st.label}</span>
+    </div>`;
+  };
+
+  el("#pageWrap").innerHTML = `
+    <div class="page-head">
+      <div>
+        <h1>Personel Talepleri</h1>
+        <p>${isAdmin ? "Müdürlerden gelen kadro taleplerini onaylayın/reddedin." : "Departmanınız için yeni personel ihtiyacını İK'ya iletin."}</p>
+      </div>
+      ${!isAdmin ? `<button class="btn btn-teal" id="yeniTalepBtn">+ Yeni Talep</button>` : ""}
+    </div>
+    <div class="stat-row">
+      <div class="stat-card"><div class="n">${acik.length}</div><div class="l">Açık Talep</div></div>
+      <div class="stat-card"><div class="n">${list.filter((t) => t.durum === "talep_edildi").length}</div><div class="l">Onay Bekliyor</div></div>
+      <div class="stat-card"><div class="n">${list.filter((t) => t.durum === "karsilandi").length}</div><div class="l">Karşılandı</div></div>
+    </div>
+    <div class="section-title" style="margin-top:0">Açık Talepler</div>
+    <div class="card-list">${acik.length ? acik.map(talepCard).join("") : `<div class="empty-state">Açık talep yok.</div>`}</div>
+    ${kapali.length ? `<div class="section-title">Geçmiş</div><div class="card-list">${kapali.map(talepCard).join("")}</div>` : ""}`;
+
+  if (!isAdmin) el("#yeniTalepBtn").addEventListener("click", () => openTalepForm());
+  document.querySelectorAll(".aday-card[data-id]").forEach((c) => {
+    c.addEventListener("click", () => {
+      const t = talepler.find((x) => x.id === c.dataset.id);
+      if (t) openTalepDetay(t, isAdmin);
+    });
+  });
+}
+
+function openTalepForm() {
+  const overlay = document.createElement("div");
+  overlay.className = "overlay";
+  overlay.innerHTML = `
+    <div class="drawer">
+      <div class="drawer-head">
+        <div><h2>Yeni Personel Talebi</h2><div class="meta">${esc(currentProfile.muduluk || "")} — resmi Personel Talep Formu'nun elektronik hali</div></div>
+        <button class="close-x" id="closeDrawer">✕</button>
+      </div>
+      <div class="drawer-body">
+        <div class="section-title" style="margin-top:0">İstenilen Pozisyon Bilgileri</div>
+        <div class="two-col">
+          <div class="field"><label>Pozisyon Adı (Unvan)</label>${unvanSelectHtml("tUnvan", "")}</div>
+          <div class="field"><label>Bölüm</label>${bolumSelectHtml("tBolum", "")}</div>
+        </div>
+        <div class="two-col">
+          <div class="field"><label>Adet</label><input type="number" id="tAdet" min="1" value="1"></div>
+          <div class="field"><label>Cinsiyet Tercihi (varsa)</label><input type="text" id="tCinsiyet" placeholder="Fark etmez / Kadın / Erkek"></div>
+        </div>
+        <div class="two-col">
+          <div class="field"><label>Mezuniyet Bilgisi</label><input type="text" id="tMezuniyet" placeholder="Örn: Üniversite mezunu"></div>
+          <div class="field"><label>Deneyim</label><input type="text" id="tDeneyim" placeholder="Örn: 2 yıl otomotiv satış deneyimi"></div>
+        </div>
+        <div class="field"><label>Gerekli Sertifikalar</label><input type="text" id="tSertifika" placeholder="Varsa yazınız"></div>
+        <div class="field"><label>Beklentiler</label><textarea id="tBeklentiler" rows="2"></textarea></div>
+        <div class="field"><label>Görev Tanımı</label><textarea id="tGorevTanimi" rows="3"></textarea></div>
+
+        <div class="section-title">Talep Nedeni</div>
+        ${checkboxGrupHtml("tNeden", [], TALEP_NEDEN_OPT)}
+        <div class="field" style="margin-top:8px"><label>Yerine Alım İse: Kimin Yerine / Çıkış Tarihi</label><input type="text" id="tYerineAciklama" placeholder="Yalnızca \"Yerine Alım\" işaretlediyseniz doldurun"></div>
+        <div class="field"><label>Alım Talebinin Detaylı Açıklaması</label><textarea id="tDetayliAciklama" rows="3" required></textarea></div>
+
+        <div class="two-col">
+          <div>
+            <div class="section-title">İç Aday Değerlendirmesi</div>
+            ${radioGrupHtml("tIcAday", "", IC_ADAY_OPT)}
+          </div>
+          <div>
+            <div class="section-title">Eksik Personelle Devam Edilebilirlik</div>
+            ${radioGrupHtml("tSurdur", "", SURDURULEBILIRLIK_OPT)}
+            <div class="field" style="margin-top:8px"><label>Sürdürülemezse açıklama</label><input type="text" id="tSurdurAciklama"></div>
+          </div>
+        </div>
+
+        <div class="section-title">Pozisyon Alınmazsa Oluşacak Riskler</div>
+        ${checkboxGrupHtml("tRisk", [], RISK_OPT)}
+        <div class="field" style="margin-top:8px"><label>Açıklama (Zorunlu Alan)</label><textarea id="tRiskAciklama" rows="2" required></textarea></div>
+
+        <div class="section-title">Talep Edilen Ücret / Bütçe</div>
+        <div class="two-col">
+          <div class="field"><label>Yönetici Ücret Önerisi</label><input type="text" id="tUcretOneri" placeholder="Örn: 45.000 TL"></div>
+          <div class="field"><label>Hedeflenen Başlama Tarihi</label><input type="date" id="tHedefTarih"></div>
+        </div>
+        <div class="two-col">
+          <div class="field"><label>İlgili Birim Bütçesi (Yıllık)</label><input type="text" id="tButceYillik"></div>
+          <div class="field"><label>Kalan Bütçe</label><input type="text" id="tButceKalan"></div>
+        </div>
+
+        <div class="section-title">Distribütör / Marka Zorunluluğu</div>
+        ${radioGrupHtml("tMarkaZorunluluk", "", MARKA_ZORUNLULUK_OPT)}
+        <div class="field" style="margin-top:8px"><label>Dayanak (marka yazısı, denetim, KPI, sözleşme maddesi vb.)</label><input type="text" id="tMarkaDayanak"></div>
+      </div>
+      <div class="drawer-foot">
+        <button class="btn btn-ghost" id="vazgecBtn">Vazgeç</button>
+        <button class="btn btn-teal" id="kaydetBtn">Talebi Gönder</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+  el("#closeDrawer").onclick = () => overlay.remove();
+  el("#vazgecBtn").onclick = () => overlay.remove();
+  wireUnvanSelect("tUnvan");
+  el("#kaydetBtn").onclick = async () => {
+    const unvan = unvanDegeriOku("tUnvan"), adet = +el("#tAdet").value;
+    const detayliAciklama = el("#tDetayliAciklama").value.trim();
+    const riskAciklama = el("#tRiskAciklama").value.trim();
+    if (!unvan || !adet || adet < 1) { toast("Pozisyon adı ve en az 1 adet girilmelidir."); return; }
+    if (!detayliAciklama) { toast("Alım talebinin detaylı açıklaması zorunludur."); return; }
+    if (!riskAciklama) { toast("Risk açıklaması zorunlu alandır."); return; }
+    const btn = el("#kaydetBtn");
+    btn.disabled = true; btn.textContent = "Gönderiliyor…";
+    try {
+      await addDoc(collection(db, "personelTalepleri"), {
+        unvan, adet,
+        bolum: el("#tBolum").value,
+        departman: currentProfile.muduluk,
+        cinsiyet: el("#tCinsiyet").value.trim(),
+        mezuniyetBilgisi: el("#tMezuniyet").value.trim(),
+        deneyim: el("#tDeneyim").value.trim(),
+        gerekliSertifikalar: el("#tSertifika").value.trim(),
+        beklentiler: el("#tBeklentiler").value.trim(),
+        gorevTanimi: el("#tGorevTanimi").value.trim(),
+        talepNedenleri: checkboxGrupOku("tNeden"),
+        yerineAlimAciklama: el("#tYerineAciklama").value.trim(),
+        detayliAciklama,
+        icAdayDegerlendirmesi: radioGrupOku("tIcAday"),
+        surdurulebilirlik: radioGrupOku("tSurdur"),
+        surdurulemezAciklama: el("#tSurdurAciklama").value.trim(),
+        riskler: checkboxGrupOku("tRisk"),
+        riskAciklama,
+        yoneticiUcretOnerisi: el("#tUcretOneri").value.trim(),
+        ikUcretOnerisi: "",
+        birimButcesiYillik: el("#tButceYillik").value.trim(),
+        kullanilanButce: "",
+        kalanButce: el("#tButceKalan").value.trim(),
+        markaZorunlulugu: radioGrupOku("tMarkaZorunluluk"),
+        markaDayanak: el("#tMarkaDayanak").value.trim(),
+        kadroPlaninaUygunluk: null,
+        hedefBaslamaTarihi: el("#tHedefTarih").value || null,
+        durum: "talep_edildi",
+        karsilananAdet: 0,
+        ikNotu: "", kararTarihi: null, kararVerenKullanici: null,
+        talepEdenKullanici: currentProfile.adSoyad,
+        talepEdenUsername: currentProfile.username,
+        olusturmaTarihi: serverTimestamp(),
+        guncellemeTarihi: serverTimestamp()
+      });
+      toast("✓ Talebiniz İK'ya iletildi.");
+      overlay.remove();
+    } catch (e) {
+      toast("Gönderilemedi: " + e.message);
+      btn.disabled = false; btn.textContent = "Talebi Gönder";
+    }
+  };
+}
+
+function openTalepDetay(talep, isAdmin) {
+  const overlay = document.createElement("div");
+  overlay.className = "overlay";
+  const st = TALEP_DURUM_ETIKET[talep.durum] || TALEP_DURUM_ETIKET.talep_edildi;
+  const acikMi = talep.durum === "onaylandi" || talep.durum === "kismen_karsilandi";
+  const kararVerilebilir = isAdmin && (talep.durum === "talep_edildi" || talep.durum === "revize_istendi" || talep.durum === "ertelendi");
+  const nedenEtiket = (talep.talepNedenleri || []).map((k) => (TALEP_NEDEN_OPT.find((o) => o.key === k) || {}).label).filter(Boolean);
+  const riskEtiket = (talep.riskler || []).map((k) => (RISK_OPT.find((o) => o.key === k) || {}).label).filter(Boolean);
+  const satir = (etiket, deger) => (deger ? `<div><b>${esc(etiket)}:</b> ${esc(deger)}</div>` : "");
+  const tekDeger = (deger) => (deger ? `<div>${esc(deger)}</div>` : "<div>—</div>");
+
+  overlay.innerHTML = `
+    <div class="drawer">
+      <div class="drawer-head">
+        <div><h2>${esc(talep.unvan)}</h2><div class="meta">${esc(talep.departman)} · ${esc(talep.bolum || "")}</div></div>
+        <button class="close-x" id="closeDrawer">✕</button>
+      </div>
+      <div class="drawer-body">
+        <span class="status-badge ${st.cls}">${st.label}</span>
+
+        <div class="section-title">İstenilen Pozisyon Bilgileri</div>
+        <div class="meta" style="font-size:13px;line-height:1.9">
+          ${satir("Adet", (talep.adet || 1) + " kişi" + (talep.karsilananAdet ? ` (${talep.karsilananAdet} karşılandı)` : ""))}
+          ${satir("Cinsiyet Tercihi", talep.cinsiyet)}
+          ${satir("Mezuniyet Bilgisi", talep.mezuniyetBilgisi)}
+          ${satir("Deneyim", talep.deneyim)}
+          ${satir("Gerekli Sertifikalar", talep.gerekliSertifikalar)}
+          ${satir("Beklentiler", talep.beklentiler)}
+          ${satir("Görev Tanımı", talep.gorevTanimi)}
+          ${satir("Hedeflenen Başlama", talep.hedefBaslamaTarihi ? fmtTarih(talep.hedefBaslamaTarihi) : "")}
+          ${satir("Talep Eden", talep.talepEdenKullanici)}
+        </div>
+
+        <div class="section-title">Talep Nedeni</div>
+        <div class="meta" style="font-size:13px;line-height:1.9">
+          ${satir("Neden(ler)", nedenEtiket.join(", ") || "—")}
+          ${satir("Yerine Alım Detayı", talep.yerineAlimAciklama)}
+          ${satir("Detaylı Açıklama", talep.detayliAciklama)}
+        </div>
+
+        <div class="two-col">
+          <div class="meta" style="font-size:13px;line-height:1.9">
+            <div class="section-title" style="margin-top:0">İç Aday Değerlendirmesi</div>
+            ${tekDeger((IC_ADAY_OPT.find((o) => o.key === talep.icAdayDegerlendirmesi) || {}).label)}
+          </div>
+          <div class="meta" style="font-size:13px;line-height:1.9">
+            <div class="section-title" style="margin-top:0">Sürdürülebilirlik</div>
+            ${tekDeger((SURDURULEBILIRLIK_OPT.find((o) => o.key === talep.surdurulebilirlik) || {}).label)}
+            ${satir("Açıklama", talep.surdurulemezAciklama)}
+          </div>
+        </div>
+
+        <div class="section-title">Pozisyon Alınmazsa Oluşacak Riskler</div>
+        <div class="meta" style="font-size:13px;line-height:1.9">
+          ${satir("Riskler", riskEtiket.join(", ") || "—")}
+          ${satir("Açıklama", talep.riskAciklama)}
+        </div>
+
+        <div class="section-title">Ücret / Bütçe</div>
+        <div class="meta" style="font-size:13px;line-height:1.9">
+          ${satir("Yönetici Ücret Önerisi", talep.yoneticiUcretOnerisi)}
+          ${satir("İK Ücret Önerisi", talep.ikUcretOnerisi)}
+          ${satir("İlgili Birim Bütçesi (Yıllık)", talep.birimButcesiYillik)}
+          ${satir("Kalan Bütçe", talep.kalanButce)}
+        </div>
+
+        <div class="section-title">Distribütör / Marka Zorunluluğu</div>
+        <div class="meta" style="font-size:13px;line-height:1.9">
+          ${tekDeger((MARKA_ZORUNLULUK_OPT.find((o) => o.key === talep.markaZorunlulugu) || {}).label)}
+          ${satir("Dayanak", talep.markaDayanak)}
+        </div>
+
+        ${isAdmin ? `
+        <div class="section-title">İnsan Kaynakları Değerlendirmesi</div>
+        <div class="field"><label>Kadro Planına Uygunluk</label>
+          <select id="dKadroUygun">
+            <option value="">Seçiniz…</option>
+            <option value="uygun" ${talep.kadroPlaninaUygunluk === "uygun" ? "selected" : ""}>Uygun</option>
+            <option value="degil" ${talep.kadroPlaninaUygunluk === "degil" ? "selected" : ""}>Değil</option>
+          </select>
+        </div>
+        <div class="field"><label>İK Ücret Önerisi</label><input type="text" id="dIkUcret" value="${esc(talep.ikUcretOnerisi || "")}"></div>` : ""}
+
+        ${talep.ikNotu ? `<div class="section-title">İK Notu</div><div class="meta" style="font-size:13px">${esc(talep.ikNotu)}</div>` : ""}
+        ${kararVerilebilir ? `
+        <div class="section-title">Karar</div>
+        <div class="field"><label>İK Notu (opsiyonel)</label><textarea id="dIkNotu" rows="2">${esc(talep.ikNotu || "")}</textarea></div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          ${TALEP_KARAR_OPT.map((k) => `<button type="button" class="btn ${k.key === "onaylandi" ? "btn-good" : k.key === "reddedildi" ? "btn-bad" : "btn-ghost"} btn-sm" data-karar="${k.key}">${k.key === "onaylandi" ? "✓ " : k.key === "reddedildi" ? "✗ " : ""}${k.label}</button>`).join("")}
+        </div>` : ""}
+        ${isAdmin && acikMi ? `<div class="section-title">Aksiyon</div><button type="button" class="btn btn-teal btn-sm" id="adayEkleBtn">+ Bu Talep İçin Aday Ekle</button>` : ""}
+      </div>
+      <div class="drawer-foot">
+        ${isAdmin ? `<button class="btn btn-ghost" id="silBtn" style="color:var(--bad)">Talebi Sil</button><button class="btn btn-teal" id="guncelleBtn">Değerlendirmeyi Kaydet</button>` : ""}
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+  el("#closeDrawer").onclick = () => overlay.remove();
+
+  document.querySelectorAll("[data-karar]").forEach((b) => b.addEventListener("click", async () => {
+    b.disabled = true;
+    try {
+      await setDoc(doc(db, "personelTalepleri", talep.id), {
+        durum: b.dataset.karar,
+        ikNotu: el("#dIkNotu").value.trim(),
+        kadroPlaninaUygunluk: document.getElementById("dKadroUygun") ? document.getElementById("dKadroUygun").value : talep.kadroPlaninaUygunluk,
+        ikUcretOnerisi: document.getElementById("dIkUcret") ? document.getElementById("dIkUcret").value.trim() : talep.ikUcretOnerisi,
+        kararTarihi: bugunISO(), kararVerenKullanici: currentProfile.adSoyad,
+        guncellemeTarihi: serverTimestamp()
+      }, { merge: true });
+      toast("✓ Kaydedildi.");
+      overlay.remove();
+    } catch (e) { toast("Kaydedilemedi: " + e.message); b.disabled = false; }
+  }));
+  const adayEkleBtn = document.getElementById("adayEkleBtn");
+  if (adayEkleBtn) adayEkleBtn.addEventListener("click", () => {
+    overlay.remove();
+    openAdayForm({ unvan: talep.unvan, departman: talep.departman, bolum: talep.bolum, baglıTalepId: talep.id });
+  });
+  if (isAdmin) {
+    const guncelleBtn = document.getElementById("guncelleBtn");
+    if (guncelleBtn) guncelleBtn.onclick = async () => {
+      guncelleBtn.disabled = true; guncelleBtn.textContent = "Kaydediliyor…";
+      try {
+        await setDoc(doc(db, "personelTalepleri", talep.id), {
+          kadroPlaninaUygunluk: document.getElementById("dKadroUygun").value,
+          ikUcretOnerisi: document.getElementById("dIkUcret").value.trim(),
+          ikNotu: document.getElementById("dIkNotu") ? document.getElementById("dIkNotu").value.trim() : talep.ikNotu,
+          guncellemeTarihi: serverTimestamp()
+        }, { merge: true });
+        toast("✓ Değerlendirme kaydedildi.");
+        overlay.remove();
+      } catch (e) { toast("Kaydedilemedi: " + e.message); guncelleBtn.disabled = false; guncelleBtn.textContent = "Değerlendirmeyi Kaydet"; }
+    };
+    const silBtn = document.getElementById("silBtn");
+    if (silBtn) silBtn.onclick = async () => {
+      if (!confirm("Bu talebi kalıcı olarak silmek istediğinize emin misiniz?")) return;
+      try {
+        await deleteDoc(doc(db, "personelTalepleri", talep.id));
+        toast("✓ Talep silindi.");
+        overlay.remove();
+      } catch (e) { toast("Silinemedi: " + e.message); }
+    };
+  }
+}
+
+// ---------------------------------------------------------------
+// ORYANTASYON — şirket genelinde, oryantasyon süreci başlamış (ise_basladi
+// veya tamamlandi) HERKESİN tek bir yerden görülebildiği özet sayfa. Bir
+// kişiye tıklayınca yine aynı, zaten var olan aday detay ekranı açılır —
+// oryantasyon içeriği/kaydetme mantığı tek yerde kalır, tekrarlanmaz.
+// ---------------------------------------------------------------
+function renderOryantasyonPage(list, isAdmin) {
+  const surenler = list.filter((a) => a.oryantasyon).sort((a, b) => {
+    const oa = oryantasyonOrani(a), ob = oryantasyonOrani(b);
+    return oa - ob;
+  });
+
+  el("#pageWrap").innerHTML = `
+    <div class="page-head">
+      <div>
+        <h1>Oryantasyon</h1>
+        <p>İşe başlayan herkesin oryantasyon ilerlemesi tek bakışta.</p>
+      </div>
+    </div>
+    <div class="card-list">
+      ${surenler.length ? surenler.map((a) => {
+        const oran = oryantasyonOrani(a);
+        return `
+        <div class="aday-card" data-id="${a.id}">
+          <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:220px">
+            ${avatarHtml(a.ad + " " + a.soyad, 38)}
+            <div class="main">
+              <b>${esc(a.ad)} ${esc(a.soyad)}</b>
+              <div class="meta">${esc(a.unvan || "")} · ${esc(a.departman || "")} · ${esc(a.oryantasyon.sablonAdi || "Genel")}</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div style="min-width:130px">
+              <div style="font-size:10.5px;color:var(--ink-soft);margin-bottom:3px">%${oran} tamamlandı</div>
+              <div class="progress-track"><div class="progress-fill" style="width:${oran}%"></div></div>
+            </div>
+            <span class="status-badge ${oran === 100 ? "st-tamam" : "st-basladi"}">${oran === 100 ? "Tamamlandı" : "Devam Ediyor"}</span>
+          </div>
+        </div>`;
+      }).join("") : `<div class="empty-state">Şu anda oryantasyon sürecinde kimse yok.</div>`}
+    </div>`;
+
+  document.querySelectorAll(".aday-card[data-id]").forEach((card) => {
+    card.addEventListener("click", () => {
+      const aday = adaylar.find((x) => x.id === card.dataset.id);
+      if (aday) openAdayDetay(aday, isAdmin);
+    });
+  });
+}
+function oryantasyonOrani(a) {
+  const maddeler = (a.oryantasyon && a.oryantasyon.maddeler) || [];
+  if (!maddeler.length) return 0;
+  return Math.round((maddeler.filter((m) => m.tamamlandi).length / maddeler.length) * 100);
+}
+
+function openAdayForm(onDoldur) {
   const overlay = document.createElement("div");
   overlay.className = "overlay";
   overlay.innerHTML = `
@@ -979,12 +1525,13 @@ function openAdayForm() {
           <div class="field"><label>Soyad</label><input type="text" id="fSoyad" required></div>
         </div>
         <div class="two-col">
-          <div class="field"><label>Unvan (görüşülen pozisyon)</label>${unvanSelectHtml("fUnvan", "")}</div>
-          <div class="field"><label>Departman</label>${departmanSelectHtml("fDepartman", "")}</div>
+          <div class="field"><label>Unvan (görüşülen pozisyon)</label>${unvanSelectHtml("fUnvan", (onDoldur && onDoldur.unvan) || "")}</div>
+          <div class="field"><label>Departman</label>${departmanSelectHtml("fDepartman", (onDoldur && onDoldur.departman) || "", !!(onDoldur && onDoldur.departman))}</div>
         </div>
         <div class="two-col">
-          <div class="field"><label>Bölüm</label>${bolumSelectHtml("fBolum", "")}</div>
+          <div class="field"><label>Bölüm</label>${bolumSelectHtml("fBolum", (onDoldur && onDoldur.bolum) || "")}</div>
         </div>
+        ${onDoldur && onDoldur.baglıTalepId ? `<div class="meta" style="margin:-6px 0 10px">📋 Bu aday, onaylanmış bir personel talebine bağlanacak.</div>` : ""}
         <div class="two-col">
           <div class="field"><label>Telefon</label><input type="text" id="fTelefon" placeholder="05xx xxx xx xx"></div>
           <div class="field"><label>E-posta</label><input type="email" id="fEmail"></div>
@@ -1011,6 +1558,7 @@ function openAdayForm() {
     const btn = el("#kaydetBtn");
     btn.disabled = true; btn.textContent = "Kaydediliyor…";
     const simdi = bugunISO();
+    const baglıTalepId = (onDoldur && onDoldur.baglıTalepId) || null;
     try {
       await addDoc(collection(db, "iseAlimAday"), {
         ad, soyad,
@@ -1028,11 +1576,23 @@ function openAdayForm() {
         sgkGirisYapildi: false,
         sgkGirisTarihi: null,
         evraklar: [],
+        baglıTalepId,
         gecmis: [{ tarih: simdi, eskiDurum: null, yeniDurum: "gorusme_bekliyor", kullanici: currentProfile.adSoyad, not: "Aday kaydı oluşturuldu." }],
         olusturanKullanici: currentProfile.adSoyad,
         olusturmaTarihi: serverTimestamp(),
         guncellemeTarihi: serverTimestamp()
       });
+      if (baglıTalepId) {
+        const talep = talepler.find((x) => x.id === baglıTalepId);
+        if (talep) {
+          const yeniKarsilanan = (talep.karsilananAdet || 0) + 1;
+          await setDoc(doc(db, "personelTalepleri", baglıTalepId), {
+            karsilananAdet: yeniKarsilanan,
+            durum: yeniKarsilanan >= talep.adet ? "karsilandi" : "kismen_karsilandi",
+            guncellemeTarihi: serverTimestamp()
+          }, { merge: true });
+        }
+      }
       toast("✓ Aday eklendi.");
       overlay.remove();
     } catch (e) {
