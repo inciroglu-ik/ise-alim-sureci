@@ -138,10 +138,10 @@ function checkboxGrupHtml(name, secililer, opts) {
 function checkboxGrupOku(name) {
   return [...document.querySelectorAll(`input[name="${name}"]:checked`)].map((c) => c.value);
 }
-function radioGrupHtml(name, secili, opts) {
+function radioGrupHtml(name, secili, opts, disabled) {
   return `<div style="display:flex;flex-direction:column;gap:6px">${opts.map((o) => `
     <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;font-weight:500;cursor:pointer">
-      <input type="radio" name="${name}" value="${o.key}" ${secili === o.key ? "checked" : ""} style="margin-top:2px">
+      <input type="radio" name="${name}" value="${o.key}" ${secili === o.key ? "checked" : ""} ${disabled ? "disabled" : ""} style="margin-top:2px">
       ${esc(o.label)}
     </label>`).join("")}</div>`;
 }
@@ -627,18 +627,41 @@ function oryantasyonSablonSec(unvan) {
 }
 
 // ---------------------------------------------------------------
-// Deneme Süresi Değerlendirmesi (Google Form'un yerini alan bölüm)
+// Deneme Süresi Değerlendirmesi — şirketin gerçek Google Form'unun
+// ("DENEME SÜRESİ FORMU — PERFORMANS DEĞERLENDİRME FORMU") 10 kriteri,
+// 4'lü puan skalası ve KVKK aydınlatma metni birebir işlenmiştir. Form
+// yalnızca Başarılı/Başarısız sonucu tanıyor — "süre uzatma" seçeneği
+// resmi formda yok, bu yüzden kaldırıldı.
 // ---------------------------------------------------------------
+const DENEME_KVKK_METNI = `Bu form ile paylaştığınız veriler, 6698 sayılı KVKK kapsamında; İnciroğlu Otomotiv tarafından personelin deneme süresi performans değerlendirme sürecinin yürütülmesi ve İK politikalarımızın yönetilmesi amacıyla işlenmektedir.
+
+İşleme Amacı: Çalışanın işe uyum sürecinin analizi ve yasal özlük süreçlerinin takibi.
+
+Gizlilik: Toplanan bilgiler yalnızca yetkili İnsan Kaynakları birimi ve ilgili üst yönetim ile paylaşılacak; üçüncü taraflara aktarılmayacaktır.
+
+FORM; DOLDURULDUKTAN SONRA İLGİLİ ÇALIŞANIN MÜDÜRÜ, DİREKTÖRÜ VE İNSAN KAYNAKLARI DEPARTMANI TARAFINDAN İMZALANIP ÖZLÜK DOSYASINA KONULACAKTIR.`;
 const DENEME_KRITERLERI = [
-  { key: "uyum", ad: "İşe Uyum ve Adaptasyon" },
-  { key: "disiplin", ad: "İş Disiplini (Devamlılık / Dakiklik)" },
-  { key: "gorev", ad: "Görev ve Sorumlulukları Yerine Getirme" },
-  { key: "ogrenme", ad: "Öğrenme ve Gelişim Hızı" },
-  { key: "ekip", ad: "Ekip Çalışması ve İletişim" },
-  { key: "genel", ad: "Genel Performans" }
+  { key: "ekip_uyum", kategori: "Ekip Çalışmasına Uyum ve Yatkınlık", ad: "Ekip çalışmasına yatkındır, ekip arkadaşlarıyla uyumludur." },
+  { key: "iletisim", kategori: "İletişim", ad: "Anlatılanları dikkatle dinler, kendisine iletilen mesajları anlamaya çalışır. Düşünceleri ve bilgileri net, düzgün ve anlaşılır bir şekilde ifade eder." },
+  { key: "kural_uyum", kategori: "İşyeri Kural ve Talimatlara Uyum", ad: "İş yeri kural ve talimatlarına uyum sağlar." },
+  { key: "dikkat_ozen", kategori: "İşe Gösterilen Dikkat ve Özen", ad: "İş yapma kapasitesi ve çalışma arzusu beklenen düzeydedir, verilen işleri takip eder." },
+  { key: "kendini_gelistirme", kategori: "Kendini Geliştirme", ad: "Kendini geliştirmek için çaba sarf eder ve sonuç alır." },
+  { key: "sorumluluk_1", kategori: "Sorumluluk Bilinci ve Nitelikli İş Üretme", ad: "Mesai saatleri içinde işine odaklanır. İşine heves, istek ve kararlılıkla yaklaşarak çabuk harekete geçer. İşini dikkatle ve zamanında yapar." },
+  { key: "sorumluluk_2", kategori: "Sorumluluk Bilinci ve Nitelikli İş Üretme", ad: "Görevini ve verilen işleri benimseyerek nitelikli iş yapar." },
+  { key: "sorun_cozme_1", kategori: "Sorun Çözme ve Analiz Yeteneği", ad: "Verilen görevi kavrayarak planlı, dikkatli ve hatasız olarak yerine getirir." },
+  { key: "sorun_cozme_2", kategori: "Sorun Çözme ve Analiz Yeteneği", ad: "Sorunlar karşısında alternatif çözümleri belirler ve sonuçlandırır." },
+  { key: "musteri_odaklilik", kategori: "Müşteri Odaklılık", ad: "Müşteri ihtiyaçlarını anlamak ve karşılamak için çaba gösterir." }
 ];
-const DENEME_PUAN_OPT = ["Yetersiz", "Geliştirilmeli", "Yeterli", "İyi", "Çok İyi"];
-const DENEME_SONUC_OPT = ["İşe Devam Etsin", "Süre Uzatılsın", "İşe Son Verilsin"];
+const DENEME_PUAN_OPT = [
+  { key: "4", label: "Çok iyi (4)" },
+  { key: "3", label: "İyi (3)" },
+  { key: "2", label: "Orta (2)" },
+  { key: "1", label: "Zayıf (1)" }
+];
+const DENEME_SONUC_OPT = [
+  "Değerlendirme süresinde başarılı bulunmuştur, çalışan görevine devam edecektir.",
+  "Değerlendirme süresinde başarısız bulunmuştur, çalışan görevine devam etmeyecektir."
+];
 function denemeSuresiBitisHesapla(baslangicISO) {
   const d = new Date(baslangicISO + "T00:00:00");
   if (isNaN(d)) return null;
@@ -1773,32 +1796,42 @@ function openAdayDetay(aday, isAdmin) {
     const deg = ds.degerlendirme || {};
     const kilitli = !!ds.degerlendirmeYapildiMi;
     const kalanGun = gunFarki(ds.bitisTarihi);
+    const devreDisi = kilitli || !canEditSurec;
     return `
     <div class="section-title">Deneme Süresi Değerlendirmesi</div>
     <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:10px">
       Başlangıç: ${fmtTarih(a.iseBaslamaTarihi)} · Bitiş: ${fmtTarih(ds.bitisTarihi)}
-      ${kilitli ? ` · <span style="color:var(--good);font-weight:600">✓ Değerlendirme kesinleşti (${esc(deg.sonuc || "")})</span>` : (kalanGun !== null ? ` · ${kalanGun >= 0 ? kalanGun + " gün kaldı" : "süresi doldu"}` : "")}
+      ${kilitli ? ` · <span style="color:var(--good);font-weight:600">✓ Değerlendirme kesinleşti</span>` : (kalanGun !== null ? ` · ${kalanGun >= 0 ? kalanGun + " gün kaldı" : "süresi doldu"}` : "")}
+    </div>
+    ${!kilitli ? `<div class="evrak-row" style="background:var(--paper);font-size:11px;color:var(--ink-soft);line-height:1.5;white-space:pre-wrap">${esc(DENEME_KVKK_METNI)}</div>
+    <label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;font-weight:600;margin:10px 0;cursor:pointer">
+      <input type="checkbox" id="dDenemeKvkk" ${deg._kvkkOnay ? "checked" : ""} ${devreDisi ? "disabled" : ""} style="margin-top:2px">
+      Değerlendirme formunu okudum anladım kabul ediyorum.
+    </label>` : ""}
+    <div class="two-col">
+      <div class="field"><label>Değerlendirilecek Çalışan</label><input type="text" value="${esc(a.ad + " " + a.soyad + ", " + (a.departman || "") + ", " + (a.unvan || ""))}" disabled></div>
+      <div class="field"><label>Değerlendiren Müdür/Direktör</label><input type="text" value="${esc(deg.degerlendirenKullanici || currentProfile.adSoyad)}" disabled></div>
     </div>
     <div id="denemeKriterListesi">
       ${DENEME_KRITERLERI.map((k) => `
-        <div class="evrak-row" style="align-items:flex-start;">
-          <div class="name" style="padding-top:4px">${esc(k.ad)}</div>
-          <select data-deneme-kriter="${k.key}" ${kilitli || !canEditSurec ? "disabled" : ""} style="min-width:150px">
+        <div class="evrak-row" style="align-items:flex-start;flex-direction:column;gap:6px">
+          <div style="width:100%">
+            <div style="font-size:12px;font-weight:700;color:var(--teal-deep)">${esc(k.kategori)}</div>
+            <div class="name" style="font-weight:500">${esc(k.ad)}</div>
+          </div>
+          <select data-deneme-kriter="${k.key}" ${devreDisi ? "disabled" : ""} style="width:100%">
             <option value="">Seçiniz</option>
-            ${DENEME_PUAN_OPT.map((p) => `<option value="${p}" ${deg[k.key] === p ? "selected" : ""}>${p}</option>`).join("")}
+            ${DENEME_PUAN_OPT.map((p) => `<option value="${p.key}" ${deg[k.key] === p.key ? "selected" : ""}>${p.label}</option>`).join("")}
           </select>
         </div>`).join("")}
     </div>
     <div class="field" style="margin-top:10px">
-      <label>Yönetici Görüşü</label>
-      <textarea id="dDenemeYorum" rows="3" ${kilitli || !canEditSurec ? "disabled" : ""}>${esc(deg.yorum || "")}</textarea>
+      <label>Genel Değerlendirme (Yönetici Yorumu)</label>
+      <textarea id="dDenemeYorum" rows="3" ${devreDisi ? "disabled" : ""}>${esc(deg.yorum || "")}</textarea>
     </div>
     <div class="field">
       <label>Sonuç</label>
-      <select id="dDenemeSonuc" ${kilitli || !canEditSurec ? "disabled" : ""}>
-        <option value="">Seçiniz</option>
-        ${DENEME_SONUC_OPT.map((s) => `<option value="${s}" ${deg.sonuc === s ? "selected" : ""}>${s}</option>`).join("")}
-      </select>
+      ${radioGrupHtml("dDenemeSonuc", deg.sonuc || "", DENEME_SONUC_OPT.map((s) => ({ key: s, label: s })), devreDisi)}
     </div>
     ${!kilitli && canEditSurec ? `<button class="btn btn-teal btn-sm" id="denemeKesinlestirBtn" type="button">Değerlendirmeyi Kesinleştir</button>` : ""}`;
   }
@@ -1910,15 +1943,22 @@ function openAdayDetay(aday, isAdmin) {
         workingCopy.denemeSuresi.degerlendirme[sel.dataset.denemeKriter] = sel.value;
       });
     });
+    const denemeKvkkCb = document.getElementById("dDenemeKvkk");
+    if (denemeKvkkCb) denemeKvkkCb.addEventListener("change", () => {
+      if (!workingCopy.denemeSuresi.degerlendirme) workingCopy.denemeSuresi.degerlendirme = {};
+      workingCopy.denemeSuresi.degerlendirme._kvkkOnay = denemeKvkkCb.checked;
+    });
     const denemeKesinlestirBtn = document.getElementById("denemeKesinlestirBtn");
     if (denemeKesinlestirBtn) {
       denemeKesinlestirBtn.addEventListener("click", async () => {
         const yorum = document.getElementById("dDenemeYorum").value.trim();
-        const sonuc = document.getElementById("dDenemeSonuc").value;
+        const sonuc = radioGrupOku("dDenemeSonuc");
+        const kvkkOnayli = document.getElementById("dDenemeKvkk") && document.getElementById("dDenemeKvkk").checked;
         const eksikKriter = DENEME_KRITERLERI.some((k) => !(workingCopy.denemeSuresi.degerlendirme || {})[k.key]);
-        if (eksikKriter || !sonuc) { toast("Tüm kriterler ve sonuç seçilmelidir."); return; }
+        if (!kvkkOnayli) { toast("KVKK aydınlatma metnini onaylamanız gerekiyor."); return; }
+        if (eksikKriter || !sonuc || !yorum) { toast("Tüm kriterler, genel değerlendirme yorumu ve sonuç seçilmelidir."); return; }
         denemeKesinlestirBtn.disabled = true; denemeKesinlestirBtn.textContent = "Kaydediliyor…";
-        const yeniDurum = sonuc === "İşe Devam Etsin" ? "tamamlandi" : sonuc === "İşe Son Verilsin" ? "vazgecti" : "ise_basladi";
+        const yeniDurum = sonuc === DENEME_SONUC_OPT[0] ? "tamamlandi" : "vazgecti";
         const patch = {
           // Aynı oturumda oryantasyon kutucuklarında da değişiklik yapılmış
           // olabilir — Kesinleştir'e basınca bunlar kaybolmasın diye dahil edilir.
@@ -1926,11 +1966,10 @@ function openAdayDetay(aday, isAdmin) {
           denemeSuresi: {
             ...workingCopy.denemeSuresi,
             degerlendirmeYapildiMi: true,
-            degerlendirme: { ...workingCopy.denemeSuresi.degerlendirme, yorum, sonuc, degerlendirenKullanici: currentProfile.adSoyad, tarih: bugunISO() },
-            bitisTarihi: sonuc === "Süre Uzatılsın" ? denemeSuresiBitisHesapla(bugunISO()) : workingCopy.denemeSuresi.bitisTarihi
+            degerlendirme: { ...workingCopy.denemeSuresi.degerlendirme, yorum, sonuc, degerlendirenKullanici: currentProfile.adSoyad, tarih: bugunISO() }
           },
           durum: yeniDurum,
-          gecmis: gecmisEkle(aday.gecmis, aday.durum, yeniDurum, `Deneme süresi değerlendirmesi kesinleşti: ${sonuc}.`)
+          gecmis: gecmisEkle(aday.gecmis, aday.durum, yeniDurum, `Deneme süresi değerlendirmesi kesinleşti: ${sonuc}`)
         };
         try {
           await persist(patch);
