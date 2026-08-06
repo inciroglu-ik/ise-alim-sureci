@@ -835,7 +835,8 @@ const ICONS = {
   people: `<svg width="16" height="16" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.4" fill="currentColor"/><path d="M2.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5" fill="currentColor" opacity=".85"/><circle cx="17.5" cy="8.5" r="2.6" fill="currentColor" opacity=".55"/><path d="M14.8 13.9c1-.6 2.1-.9 3-.9 2.8 0 5 2 5.2 5" fill="currentColor" opacity=".55"/></svg>`,
   genel: `<svg width="16" height="16" viewBox="0 0 24 24"><rect x="2.5" y="13" width="4.5" height="8.5" rx="1" fill="currentColor" opacity=".55"/><rect x="9.7" y="7" width="4.5" height="14.5" rx="1" fill="currentColor" opacity=".8"/><rect x="17" y="2.5" width="4.5" height="19" rx="1" fill="currentColor"/></svg>`,
   talep: `<svg width="16" height="16" viewBox="0 0 24 24"><rect x="3.5" y="2.5" width="17" height="19" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
-  oryantasyon: `<svg width="16" height="16" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 12.5l2.6 2.6L16.5 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+  oryantasyon: `<svg width="16" height="16" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 12.5l2.6 2.6L16.5 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  rapor: `<svg width="16" height="16" viewBox="0 0 24 24"><rect x="4" y="2.5" width="16" height="19" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 7.5h8M8 11.5h8M8 15.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M8 19h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".6"/></svg>`
 };
 function topbar() {
   return `
@@ -920,7 +921,8 @@ function render() {
     { key: "genel", label: "Genel Bakış", ic: ICONS.genel },
     { key: "adaylar", label: "Aday Havuzu", ic: ICONS.people },
     { key: "talepler", label: "Personel Talepleri", ic: ICONS.talep },
-    { key: "oryantasyon", label: "Oryantasyon", ic: ICONS.oryantasyon }
+    { key: "oryantasyon", label: "Oryantasyon", ic: ICONS.oryantasyon },
+    { key: "raporlar", label: "Raporlar", ic: ICONS.rapor }
   ];
 
   root().innerHTML = `
@@ -936,6 +938,7 @@ function render() {
 
   if (TAB === "talepler") renderTaleplerPage(gorulenTalepler, isAdmin);
   else if (TAB === "oryantasyon") renderOryantasyonPage(gorulenAdaylar, isAdmin);
+  else if (TAB === "raporlar") renderRaporlarPage(gorulenAdaylar, gorulenTalepler, isAdmin);
   else if (TAB === "genel") renderGenelBakisPage(gorulenAdaylar, gorulenTalepler, isAdmin);
   else renderAdaylarPage(gorulenAdaylar, isAdmin);
 }
@@ -1531,6 +1534,242 @@ function oryantasyonOrani(a) {
   const maddeler = (a.oryantasyon && a.oryantasyon.maddeler) || [];
   if (!maddeler.length) return 0;
   return Math.round((maddeler.filter((m) => m.tamamlandi).length / maddeler.length) * 100);
+}
+
+// ---------------------------------------------------------------
+// RAPORLAR — CEO'ya doğrudan sunulabilecek, kurumsal antetli, yazdırma/PDF'e
+// hazır raporlar. Ekranda görülen kartlarla aynı veriyi kullanır ama tek
+// amacı budur: seçilen tür + filtreye göre temiz, özenli bir belge üretmek.
+// ---------------------------------------------------------------
+const RAPOR_TURLERI = [
+  { key: "havuz", label: "Personel Havuzu Özeti" },
+  { key: "oryantasyon", label: "Oryantasyon Raporu" },
+  { key: "talepler", label: "Personel Talepleri Raporu" },
+  { key: "deneme", label: "Deneme Süresi Raporu (Ayrıntılı)" }
+];
+function raporLetterhead(baslik, altBaslik, filtreOzetHtml) {
+  return `
+    <div class="letterhead">
+      <div class="brand">İNCİROĞLU OTOMOTİV<small>İnsan Kaynakları — İşe Alım Süreci</small></div>
+      <div class="meta">Oluşturma Tarihi: ${fmtTarih(bugunISO())}<br>Hazırlayan: ${esc(currentProfile.adSoyad)}</div>
+    </div>
+    <h1 class="rapor-title">${esc(baslik)}</h1>
+    <div class="rapor-subtitle">${esc(altBaslik)}</div>
+    ${filtreOzetHtml ? `<div class="filtre-ozet">${filtreOzetHtml}</div>` : ""}`;
+}
+function raporKapsayiciHtml(title, bodyHtml) {
+  return `<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${esc(title)}</title>
+  <style>
+    @page { margin: 16mm 14mm; }
+    *{box-sizing:border-box}
+    body{font-family:Arial,Helvetica,sans-serif;color:#1c2530;font-size:12px;line-height:1.55;margin:0;padding:22px 26px}
+    .letterhead{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #117a63;padding-bottom:12px;margin-bottom:16px}
+    .letterhead .brand{font-size:19px;font-weight:800;color:#0b5548}
+    .letterhead .brand small{display:block;font-size:10.5px;font-weight:400;color:#666;margin-top:2px}
+    .letterhead .meta{text-align:right;font-size:10.5px;color:#666;line-height:1.5}
+    .rapor-title{font-size:16.5px;margin:0 0 3px;color:#0b5548}
+    .rapor-subtitle{font-size:11.5px;color:#666;margin-bottom:14px}
+    .filtre-ozet{background:#f5f6f5;border:1px solid #dfe3e0;border-radius:8px;padding:9px 13px;font-size:11px;margin-bottom:18px;color:#4a5568}
+    .kpi-row{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+    .kpi{flex:1;min-width:110px;border:1px solid #dfe3e0;border-radius:9px;padding:11px 12px;text-align:center}
+    .kpi .n{font-size:21px;font-weight:800;color:#0b5548;line-height:1}
+    .kpi .l{font-size:9.5px;color:#666;text-transform:uppercase;letter-spacing:.04em;margin-top:5px}
+    h3.bolum{font-size:12.5px;color:#0b5548;border-bottom:2px solid #dcefe9;padding-bottom:5px;margin:20px 0 10px}
+    table{width:100%;border-collapse:collapse;margin-top:4px;font-size:10.8px}
+    th{background:#0b5548;color:#fff;padding:7px 8px;text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.03em}
+    td{padding:6.5px 8px;border-bottom:1px solid #e5e8e5;vertical-align:top}
+    tr:nth-child(even) td{background:#f7f8f7}
+    .rozet{display:inline-block;padding:2px 8px;border-radius:14px;font-size:9px;font-weight:700}
+    .r-basari{background:#e7f2ea;color:#3d7a52}.r-bekle{background:#e5e9f5;color:#3d4f8f}
+    .r-uyari{background:#f7ead9;color:#a15c1f}.r-bad{background:#f8e6e6;color:#a13030}
+    .kisi-blok{border:1px solid #dfe3e0;border-radius:10px;padding:16px 18px;margin-bottom:16px}
+    .kisi-blok.yeni-sayfa{page-break-before:always}
+    .kisi-blok h4{margin:0 0 2px;font-size:13.5px;color:#0b5548}
+    .kisi-blok .kisi-meta{font-size:10.5px;color:#666;margin-bottom:10px}
+    .kriter-satir{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid #eef1ef;font-size:10.8px}
+    .kriter-satir b{font-weight:600}
+    .kriter-puan{font-weight:800;color:#0b5548;white-space:nowrap}
+    .yorum-blok{background:#f7f8f7;border-radius:7px;padding:9px 11px;margin-top:8px;font-size:10.8px;white-space:pre-wrap}
+    .footer{margin-top:26px;padding-top:8px;border-top:1px solid #dfe3e0;font-size:9px;color:#999;display:flex;justify-content:space-between}
+    .empty{text-align:center;color:#999;padding:30px 0;font-size:11.5px}
+    @media print{.no-print{display:none}}
+  </style></head><body>
+  ${bodyHtml}
+  <div class="footer"><span>İnciroğlu Otomotiv — İç Kullanım / Gizli Belge</span><span>${fmtTarih(bugunISO())}</span></div>
+  </body></html>`;
+}
+function raporAcVeYazdir(html, title) {
+  const win = window.open("", "_blank");
+  if (!win) { toast("⚠ Açılır pencere engellendi. Tarayıcı ayarlarından izin verin."); return; }
+  win.document.open(); win.document.write(raporKapsayiciHtml(title, html)); win.document.close();
+  win.focus();
+  setTimeout(() => { try { win.print(); } catch (_) {} }, 350);
+}
+function rozetSpan(cls, text) { return `<span class="rozet ${cls}">${esc(text)}</span>`; }
+
+function renderRaporlarPage(adaylarList, talepList, isAdmin) {
+  const departmanlar = isAdmin ? DEPARTMAN_LISTESI : [currentProfile.muduluk].filter(Boolean);
+  el("#pageWrap").innerHTML = `
+    <div class="page-head">
+      <div>
+        <h1>Raporlar</h1>
+        <p>CEO'ya veya üst yönetime doğrudan sunulabilecek, yazdırmaya/PDF'e hazır raporlar oluşturun.</p>
+      </div>
+    </div>
+    <div class="card-list" style="max-width:640px">
+      <div class="aday-card" style="cursor:default;flex-direction:column;align-items:stretch;gap:12px">
+        <div class="field" style="margin:0"><label>Rapor Türü</label>
+          <select id="rTur">${RAPOR_TURLERI.map((t) => `<option value="${t.key}">${t.label}</option>`).join("")}</select>
+        </div>
+        <div class="field" style="margin:0"><label>Departman</label>
+          <select id="rDepartman">
+            ${isAdmin ? `<option value="">Tüm Departmanlar</option>` : ""}
+            ${departmanlar.map((d) => `<option value="${esc(d)}">${esc(d)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field" id="rDurumWrap" style="margin:0;display:none"><label>Durum</label><select id="rDurum"></select></div>
+        <button class="btn btn-teal" id="raporOlusturBtn" style="align-self:flex-start">🖨 Raporu Oluştur ve Yazdır</button>
+      </div>
+    </div>`;
+
+  const turSel = el("#rTur"), durumWrap = el("#rDurumWrap"), durumSel = el("#rDurum");
+  function durumSecenekleriGuncelle() {
+    if (turSel.value === "talepler") {
+      durumWrap.style.display = "";
+      durumSel.innerHTML = `<option value="">Tüm Durumlar</option>${Object.keys(TALEP_DURUM_ETIKET).map((k) => `<option value="${k}">${TALEP_DURUM_ETIKET[k].label}</option>`).join("")}`;
+    } else if (turSel.value === "havuz") {
+      durumWrap.style.display = "";
+      durumSel.innerHTML = `<option value="">Tüm Durumlar</option>${Object.keys(DURUM_ETIKET).map((k) => `<option value="${k}">${DURUM_ETIKET[k].label}</option>`).join("")}`;
+    } else {
+      durumWrap.style.display = "none";
+    }
+  }
+  durumSecenekleriGuncelle();
+  turSel.addEventListener("change", durumSecenekleriGuncelle);
+
+  el("#raporOlusturBtn").addEventListener("click", () => {
+    const tur = turSel.value;
+    const departman = el("#rDepartman").value;
+    const durum = durumSel.value;
+    const filtreOzetParcalar = [`Departman: ${departman || "Tümü"}`];
+    if (durumWrap.style.display !== "none" && durum) filtreOzetParcalar.push(`Durum: ${(TALEP_DURUM_ETIKET[durum] || DURUM_ETIKET[durum] || {}).label || durum}`);
+    const filtreOzet = filtreOzetParcalar.join(" · ");
+
+    let adaylarF = departman ? adaylarList.filter((a) => a.departman === departman) : adaylarList;
+    let talepF = departman ? talepList.filter((t) => t.departman === departman) : talepList;
+    if (tur === "havuz" && durum) adaylarF = adaylarF.filter((a) => a.durum === durum);
+    if (tur === "talepler" && durum) talepF = talepF.filter((t) => t.durum === durum);
+
+    if (tur === "havuz") raporAcVeYazdir(raporHavuzIcerik(adaylarF, filtreOzet), "Personel Havuzu Raporu");
+    else if (tur === "oryantasyon") raporAcVeYazdir(raporOryantasyonIcerik(adaylarF, filtreOzet), "Oryantasyon Raporu");
+    else if (tur === "talepler") raporAcVeYazdir(raporTaleplerIcerik(talepF, filtreOzet), "Personel Talepleri Raporu");
+    else if (tur === "deneme") raporAcVeYazdir(raporDenemeIcerik(adaylarF, filtreOzet), "Deneme Süresi Raporu");
+  });
+}
+
+function raporHavuzIcerik(list, filtreOzet) {
+  const sayim = {};
+  Object.keys(DURUM_ETIKET).forEach((k) => { sayim[k] = list.filter((a) => a.durum === k).length; });
+  const kpi = `
+    <div class="kpi-row">
+      <div class="kpi"><div class="n">${list.length}</div><div class="l">Toplam</div></div>
+      <div class="kpi"><div class="n">${sayim.gorusme_bekliyor}</div><div class="l">Görüşme Bekliyor</div></div>
+      <div class="kpi"><div class="n">${sayim.evrak_bekliyor + sayim.sgk_bekliyor}</div><div class="l">Evrak/SGK</div></div>
+      <div class="kpi"><div class="n">${sayim.ise_basladi}</div><div class="l">Deneme Süresinde</div></div>
+      <div class="kpi"><div class="n">${sayim.tamamlandi}</div><div class="l">Tamamlandı</div></div>
+    </div>`;
+  const depSayim = {};
+  list.forEach((a) => { depSayim[a.departman] = depSayim[a.departman] || { toplam: 0 }; depSayim[a.departman].toplam++; depSayim[a.departman][a.durum] = (depSayim[a.departman][a.durum] || 0) + 1; });
+  const depTablo = Object.keys(depSayim).length ? `
+    <h3 class="bolum">Departman Bazında Dağılım</h3>
+    <table><thead><tr><th>Departman</th><th>Toplam</th><th>Görüşme</th><th>Evrak/SGK</th><th>Deneme</th><th>Tamamlandı</th><th>Olumsuz</th></tr></thead>
+    <tbody>${Object.entries(depSayim).map(([d, s]) => `<tr><td>${esc(d)}</td><td>${s.toplam}</td><td>${s.gorusme_bekliyor || 0}</td><td>${(s.evrak_bekliyor || 0) + (s.sgk_bekliyor || 0)}</td><td>${s.ise_basladi || 0}</td><td>${s.tamamlandi || 0}</td><td>${s.olumsuz || 0}</td></tr>`).join("")}</tbody></table>` : "";
+  const rows = list.slice().sort((a, b) => (a.departman || "").localeCompare(b.departman || "", "tr")).map((a) => {
+    const st = DURUM_ETIKET[a.durum] || {};
+    const cls = a.durum === "tamamlandi" ? "r-basari" : a.durum === "olumsuz" || a.durum === "vazgecti" ? "r-bad" : a.durum === "gorusme_bekliyor" ? "r-bekle" : "r-uyari";
+    return `<tr><td>${esc(a.ad)} ${esc(a.soyad)}</td><td>${esc(a.unvan || "")}</td><td>${esc(a.departman || "")}</td><td>${esc(a.bolum || "")}</td><td>${rozetSpan(cls, st.label || a.durum)}</td><td>${fmtTarih(a.durum === "gorusme_bekliyor" ? a.gorusmeTarihi : a.iseBaslamaTarihi)}</td></tr>`;
+  }).join("");
+  return raporLetterhead("Personel Havuzu Özeti", "Aday havuzundaki tüm kayıtların güncel durumu", filtreOzet) + kpi + depTablo +
+    `<h3 class="bolum">Detaylı Liste</h3>` +
+    (rows ? `<table><thead><tr><th>Ad Soyad</th><th>Unvan</th><th>Departman</th><th>Bölüm</th><th>Durum</th><th>Tarih</th></tr></thead><tbody>${rows}</tbody></table>` : `<div class="empty">Bu filtrelerle kayıt bulunamadı.</div>`);
+}
+
+function raporOryantasyonIcerik(list, filtreOzet) {
+  const surenler = list.filter((a) => a.oryantasyon);
+  const tamamlanan = surenler.filter((a) => oryantasyonOrani(a) === 100).length;
+  const ortalama = surenler.length ? Math.round(surenler.reduce((s, a) => s + oryantasyonOrani(a), 0) / surenler.length) : 0;
+  const kpi = `
+    <div class="kpi-row">
+      <div class="kpi"><div class="n">${surenler.length}</div><div class="l">Oryantasyon Sürecinde/Tamamlanmış</div></div>
+      <div class="kpi"><div class="n">${tamamlanan}</div><div class="l">Tamamlanan</div></div>
+      <div class="kpi"><div class="n">%${ortalama}</div><div class="l">Ortalama İlerleme</div></div>
+    </div>`;
+  const rows = surenler.slice().sort((a, b) => oryantasyonOrani(a) - oryantasyonOrani(b)).map((a) => {
+    const oran = oryantasyonOrani(a);
+    const maddeler = (a.oryantasyon.maddeler || []);
+    const tamam = maddeler.filter((m) => m.tamamlandi).length;
+    const cls = oran === 100 ? "r-basari" : oran >= 50 ? "r-uyari" : "r-bekle";
+    return `<tr><td>${esc(a.ad)} ${esc(a.soyad)}</td><td>${esc(a.unvan || "")}</td><td>${esc(a.departman || "")}</td><td>${esc(a.oryantasyon.sablonAdi || "Genel")}</td><td>${tamam}/${maddeler.length}</td><td>${rozetSpan(cls, "%" + oran)}</td></tr>`;
+  }).join("");
+  return raporLetterhead("Oryantasyon Raporu", "İşe başlayan personelin oryantasyon ilerleme durumu", filtreOzet) + kpi +
+    (rows ? `<table><thead><tr><th>Ad Soyad</th><th>Unvan</th><th>Departman</th><th>Şablon</th><th>Madde</th><th>İlerleme</th></tr></thead><tbody>${rows}</tbody></table>` : `<div class="empty">Bu filtrelerle oryantasyon kaydı bulunamadı.</div>`);
+}
+
+function raporTaleplerIcerik(list, filtreOzet) {
+  const sayim = {}; Object.keys(TALEP_DURUM_ETIKET).forEach((k) => { sayim[k] = list.filter((t) => t.durum === k).length; });
+  const kpi = `
+    <div class="kpi-row">
+      <div class="kpi"><div class="n">${list.length}</div><div class="l">Toplam Talep</div></div>
+      <div class="kpi"><div class="n">${sayim.talep_edildi}</div><div class="l">Onay Bekliyor</div></div>
+      <div class="kpi"><div class="n">${sayim.onaylandi + sayim.kismen_karsilandi}</div><div class="l">Aday Aranıyor</div></div>
+      <div class="kpi"><div class="n">${sayim.karsilandi}</div><div class="l">Karşılandı</div></div>
+      <div class="kpi"><div class="n">${sayim.reddedildi}</div><div class="l">Reddedildi</div></div>
+    </div>`;
+  const rows = list.slice().sort((a, b) => (a.departman || "").localeCompare(b.departman || "", "tr")).map((t) => {
+    const st = TALEP_DURUM_ETIKET[t.durum] || {};
+    const cls = t.durum === "karsilandi" ? "r-basari" : t.durum === "reddedildi" || t.durum === "iptal_edildi" ? "r-bad" : t.durum === "talep_edildi" ? "r-bekle" : "r-uyari";
+    const nedenEtiket = (t.talepNedenleri || []).map((k) => (TALEP_NEDEN_OPT.find((o) => o.key === k) || {}).label).filter(Boolean).join(", ");
+    return `<tr><td>${esc(t.unvan)}</td><td>${esc(t.departman)}</td><td>${esc(t.bolum || "")}</td><td>${t.adet || 1}</td><td>${esc(nedenEtiket)}</td><td>${rozetSpan(cls, st.label || t.durum)}</td><td>${esc(t.talepEdenKullanici || "")}</td></tr>`;
+  }).join("");
+  return raporLetterhead("Personel Talepleri Raporu", "Departmanlardan gelen kadro taleplerinin durumu", filtreOzet) + kpi +
+    (rows ? `<table><thead><tr><th>Unvan</th><th>Departman</th><th>Bölüm</th><th>Adet</th><th>Neden</th><th>Durum</th><th>Talep Eden</th></tr></thead><tbody>${rows}</tbody></table>` : `<div class="empty">Bu filtrelerle talep bulunamadı.</div>`);
+}
+
+function raporDenemeIcerik(list, filtreOzet) {
+  const kisiler = list.filter((a) => a.denemeSuresi);
+  const ozetRows = kisiler.map((a) => {
+    const deg = a.denemeSuresi.degerlendirme || {};
+    const yapildi = a.denemeSuresi.degerlendirmeYapildiMi;
+    const cls = !yapildi ? "r-bekle" : deg.sonuc === DENEME_SONUC_OPT[0] ? "r-basari" : "r-bad";
+    const durumEtiket = !yapildi ? "Değerlendirme Bekliyor" : (deg.sonuc === DENEME_SONUC_OPT[0] ? "Başarılı" : "Başarısız");
+    return `<tr><td>${esc(a.ad)} ${esc(a.soyad)}</td><td>${esc(a.departman || "")}</td><td>${fmtTarih(a.iseBaslamaTarihi)}</td><td>${fmtTarih(a.denemeSuresi.bitisTarihi)}</td><td>${rozetSpan(cls, durumEtiket)}</td></tr>`;
+  }).join("");
+  const kpi = `
+    <div class="kpi-row">
+      <div class="kpi"><div class="n">${kisiler.length}</div><div class="l">Deneme Süreci Kaydı</div></div>
+      <div class="kpi"><div class="n">${kisiler.filter((a) => a.denemeSuresi.degerlendirmeYapildiMi && (a.denemeSuresi.degerlendirme || {}).sonuc === DENEME_SONUC_OPT[0]).length}</div><div class="l">Başarılı</div></div>
+      <div class="kpi"><div class="n">${kisiler.filter((a) => a.denemeSuresi.degerlendirmeYapildiMi && (a.denemeSuresi.degerlendirme || {}).sonuc === DENEME_SONUC_OPT[1]).length}</div><div class="l">Başarısız</div></div>
+      <div class="kpi"><div class="n">${kisiler.filter((a) => !a.denemeSuresi.degerlendirmeYapildiMi).length}</div><div class="l">Değerlendirme Bekliyor</div></div>
+    </div>`;
+  const ozet = ozetRows ? `<h3 class="bolum">Özet</h3><table><thead><tr><th>Ad Soyad</th><th>Departman</th><th>Başlangıç</th><th>Bitiş</th><th>Sonuç</th></tr></thead><tbody>${ozetRows}</tbody></table>` : `<div class="empty">Bu filtrelerle deneme süresi kaydı bulunamadı.</div>`;
+  const detaylar = kisiler.filter((a) => a.denemeSuresi.degerlendirmeYapildiMi).map((a, i) => {
+    const deg = a.denemeSuresi.degerlendirme || {};
+    const kriterSatirlari = DENEME_KRITERLERI.map((k) => {
+      const puanOpt = DENEME_PUAN_OPT.find((p) => p.key === deg[k.key]);
+      return `<div class="kriter-satir"><span><b>${esc(k.kategori)}</b> — ${esc(k.ad)}</span><span class="kriter-puan">${puanOpt ? esc(puanOpt.label) : "—"}</span></div>`;
+    }).join("");
+    const basariMi = deg.sonuc === DENEME_SONUC_OPT[0];
+    return `
+    <div class="kisi-blok yeni-sayfa">
+      <h4>${esc(a.ad)} ${esc(a.soyad)}</h4>
+      <div class="kisi-meta">${esc(a.unvan || "")} · ${esc(a.departman || "")} · Değerlendiren: ${esc(deg.degerlendirenKullanici || "")} · Tarih: ${fmtTarih(deg.tarih)}</div>
+      ${kriterSatirlari}
+      <div class="yorum-blok"><b>Genel Değerlendirme:</b> ${esc(deg.yorum || "—")}</div>
+      <div style="margin-top:8px">${rozetSpan(basariMi ? "r-basari" : "r-bad", basariMi ? "Başarılı" : "Başarısız")}</div>
+    </div>`;
+  }).join("");
+  return raporLetterhead("Deneme Süresi Raporu", "Deneme süreci ve değerlendirme sonuçlarının ayrıntılı dökümü", filtreOzet) + kpi + ozet +
+    (detaylar ? `<h3 class="bolum" style="page-break-before:always">Ayrıntılı Değerlendirme Formları</h3>${detaylar}` : "");
 }
 
 function openAdayForm(onDoldur) {
