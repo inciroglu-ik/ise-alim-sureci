@@ -113,6 +113,31 @@ const IC_ADAY_OPT = [
   { key: "talebi_yoktur", label: "İç Aday Talebi Yoktur" },
   { key: "gelistirilebilir", label: "Geliştirilebilir İç Aday Değerlendirilebilir" }
 ];
+// CV / yapay zeka aday havuzu — sabit rol listesi (uygunluk puanı bu rollere göre).
+// İnciroğlu: otomotiv (satış/servis/idari) + deniz kolu. Ekle/çıkar serbest.
+const ADAY_ROLLER = [
+  { key: "satis_danismani", label: "Satış Danışmanı", grup: "Satış" },
+  { key: "kidemli_satis_danismani", label: "Kıdemli Satış Danışmanı", grup: "Satış" },
+  { key: "satis_mudur_sef", label: "Satış Müdürü / Şefi", grup: "Satış" },
+  { key: "servis_danismani", label: "Servis Danışmanı", grup: "Servis" },
+  { key: "teknisyen", label: "Mekanik / Teknisyen", grup: "Servis" },
+  { key: "atolye_sefi", label: "Atölye Şefi", grup: "Servis" },
+  { key: "ik", label: "İnsan Kaynakları", grup: "İdari" },
+  { key: "muhasebe_finans", label: "Muhasebe / Finans", grup: "İdari" },
+  { key: "pazarlama", label: "Pazarlama", grup: "İdari" },
+  { key: "lojistik_depo", label: "Lojistik / Depo", grup: "İdari" },
+  { key: "resepsiyon", label: "Resepsiyon / Ön Büro", grup: "İdari" },
+  { key: "yat_kaptani", label: "Yat Kaptanı", grup: "Deniz" },
+  { key: "yat_hostesi", label: "Yat Hostesi", grup: "Deniz" },
+  { key: "gemici", label: "Gemici", grup: "Deniz" },
+  { key: "asci", label: "Aşçı", grup: "Deniz" }
+];
+const rolLabel = (k) => (ADAY_ROLLER.find((r) => r.key === k) || {}).label || k;
+// Aday havuzu görüşme durumu filtreleri.
+const GORUSME_DURUM_OPT = [
+  { key: "gorusulecek", label: "Görüşülecek" },
+  { key: "gorusuldu", label: "Görüşüldü" }
+];
 const SURDURULEBILIRLIK_OPT = [
   { key: "surdurulebilir", label: "Sürdürülebilir" },
   { key: "kisa_vadede", label: "Kısa Vadede Sürdürülebilir" },
@@ -993,6 +1018,10 @@ function renderAdaylarPage(list, isAdmin) {
     </div>
     <div class="toolbar">
       <input type="text" id="searchBox" placeholder="İsim, unvan veya departmanla ara…" style="min-width:240px">
+      <select id="rolFiltre" style="min-width:230px">
+        <option value="">— Pozisyona göre havuz (kapalı) —</option>
+        ${ADAY_ROLLER.map((r) => `<option value="${r.key}">${esc(r.grup)} · ${esc(r.label)}</option>`).join("")}
+      </select>
     </div>
     <div id="grupListesi"></div>`;
 
@@ -1002,14 +1031,28 @@ function renderAdaylarPage(list, isAdmin) {
     const term = el("#searchBox").value.trim().toLocaleLowerCase("tr");
     const eslesen = (a) => (a.ad + " " + a.soyad + " " + (a.unvan || "") + " " + (a.departman || "")).toLocaleLowerCase("tr").includes(term);
 
-    const gruplarHtml = AKIS_GRUPLARI
-      .filter((g) => !g.sadeceAdmin || isAdmin)
-      .map((g) => {
-        const grupAdaylari = gorunurListe.filter((a) => a.durum === g.key && eslesen(a))
-          .sort((a, b) => (a.iseBaslamaTarihi || a.gorusmeTarihi || "").localeCompare(b.iseBaslamaTarihi || b.gorusmeTarihi || ""));
-        if (!grupAdaylari.length) return "";
-        const acik = acikGruplar[g.key];
-        return `
+    const rolSec = el("#rolFiltre") ? el("#rolFiltre").value : "";
+    let html;
+    if (rolSec) {
+      // FAZ 1b — Pozisyona göre havuz: bu role uygun (hedefRoller'ında bu rol olan) adaylar,
+      // %uygunlukla (rolPuanlari[rol]). Faz 1'de puan yok → "AI puanı bekleniyor" rozeti.
+      const uygunlar = gorunurListe
+        .filter((a) => (a.hedefRoller || []).includes(rolSec) && eslesen(a))
+        .map((a) => ({ a, p: (a.rolPuanlari && a.rolPuanlari[rolSec] != null) ? a.rolPuanlari[rolSec] : null }))
+        .sort((x, y) => ((y.p == null ? -1 : y.p) - (x.p == null ? -1 : x.p)));
+      html = `<div style="padding:10px 4px;font-size:14px">📌 <b>${esc(rolLabel(rolSec))}</b> pozisyonu için <b>${uygunlar.length}</b> uygun aday</div>`
+        + (uygunlar.length
+            ? `<div class="stage-group-body" style="display:block">${uygunlar.map((o) => posKartHtml(o.a, o.p)).join("")}</div>`
+            : `<div class="empty-state">Bu pozisyon için etiketlenmiş aday yok. Aday eklerken "Değerlendirilebileceği pozisyon(lar)" alanında bu rolü seçin.</div>`);
+    } else {
+      const gruplarHtml = AKIS_GRUPLARI
+        .filter((g) => !g.sadeceAdmin || isAdmin)
+        .map((g) => {
+          const grupAdaylari = gorunurListe.filter((a) => a.durum === g.key && eslesen(a))
+            .sort((a, b) => (a.iseBaslamaTarihi || a.gorusmeTarihi || "").localeCompare(b.iseBaslamaTarihi || b.gorusmeTarihi || ""));
+          if (!grupAdaylari.length) return "";
+          const acik = acikGruplar[g.key];
+          return `
         <div class="stage-group ${acik ? "open" : ""} ${g.key === "olumsuz" ? "olumsuz-grup" : ""}" data-grup="${g.key}">
           <div class="stage-group-head" data-grup-toggle="${g.key}">
             <span class="ic">${g.ic}</span>
@@ -1019,9 +1062,11 @@ function renderAdaylarPage(list, isAdmin) {
           </div>
           <div class="stage-group-body">${grupAdaylari.map((a) => adayCardHtml(a)).join("")}</div>
         </div>`;
-      }).join("");
+        }).join("");
+      html = gruplarHtml.trim() ? gruplarHtml : `<div class="empty-state">Aramanızla eşleşen aday bulunamadı.</div>`;
+    }
 
-    el("#grupListesi").innerHTML = gruplarHtml.trim() ? gruplarHtml : `<div class="empty-state">Aramanızla eşleşen aday bulunamadı.</div>`;
+    el("#grupListesi").innerHTML = html;
     document.querySelectorAll("[data-grup-toggle]").forEach((h) => {
       h.addEventListener("click", () => {
         const k = h.dataset.grupToggle;
@@ -1063,7 +1108,29 @@ function renderAdaylarPage(list, isAdmin) {
       </div>
     </div>`;
   }
+  function posKartHtml(a, p) {
+    const pct = (p == null) ? null : Math.round(p);
+    const badge = (pct == null)
+      ? `<span style="background:#eef2ff;color:#4f5b93;border-radius:12px;padding:3px 11px;font-size:11px;white-space:nowrap">AI puanı bekleniyor</span>`
+      : `<span style="background:${pct >= 70 ? '#0e7490' : pct >= 40 ? '#b45309' : '#9ca3af'};color:#fff;border-radius:12px;padding:3px 11px;font-size:12.5px;font-weight:700;white-space:nowrap">%${pct} uygun</span>`;
+    const parts = [];
+    if (a.unvan || a.departman) parts.push(esc(a.unvan || a.departman));
+    if (a.yer) parts.push(esc(a.yer));
+    if (a.deneyimYil != null) parts.push(a.deneyimYil + " yıl deneyim");
+    return `
+    <div class="aday-card" data-id="${a.id}">
+      <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:220px">
+        ${avatarHtml(a.ad + " " + a.soyad, 38)}
+        <div class="main">
+          <b>${esc(a.ad)} ${esc(a.soyad)}</b>
+          <div class="meta">${parts.join(" · ")}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;">${badge}</div>
+    </div>`;
+  }
   el("#searchBox").addEventListener("input", draw);
+  const rf = el("#rolFiltre"); if (rf) rf.addEventListener("change", draw);
   draw();
 }
 
@@ -1782,6 +1849,15 @@ function openAdayForm(onDoldur) {
         <button class="close-x" id="closeDrawer">✕</button>
       </div>
       <div class="drawer-body">
+        <div class="cv-ai-box" style="border:1px dashed var(--line,#c9d3dc);border-radius:12px;padding:14px;margin-bottom:18px;background:rgba(20,80,120,.03)">
+          <div style="font-weight:700;font-size:13px;margin-bottom:6px">🤖 CV'den Otomatik Doldur</div>
+          <div class="meta" style="margin-bottom:8px">Adayın PDF CV'sini yükle; yapay zeka bilgileri çıkarıp aşağıdaki alanları doldursun.</div>
+          <div class="two-col" style="align-items:end">
+            <div class="field"><label>CV (PDF)</label><input type="file" id="fCvPdf" accept="application/pdf"></div>
+            <div class="field"><button type="button" class="btn btn-teal" id="cvDoldurBtn" style="width:100%">Yapay zeka ile doldur</button></div>
+          </div>
+          <div id="cvAiStatus" class="meta" style="margin-top:6px;min-height:16px"></div>
+        </div>
         <div class="two-col">
           <div class="field"><label>Ad</label><input type="text" id="fAd" required></div>
           <div class="field"><label>Soyad</label><input type="text" id="fSoyad" required></div>
@@ -1798,6 +1874,19 @@ function openAdayForm(onDoldur) {
           <div class="field"><label>Telefon</label><input type="text" id="fTelefon" placeholder="05xx xxx xx xx"></div>
           <div class="field"><label>E-posta</label><input type="email" id="fEmail"></div>
         </div>
+        <div class="two-col">
+          <div class="field"><label>Yaş</label><input type="number" id="fYas" min="16" max="80"></div>
+          <div class="field"><label>Cinsiyet</label><select id="fCinsiyet"><option value="">—</option><option>Kadın</option><option>Erkek</option><option>Belirtilmemiş</option></select></div>
+        </div>
+        <div class="two-col">
+          <div class="field"><label>Yaşadığı Yer</label><input type="text" id="fYer" placeholder="İl / İlçe"></div>
+          <div class="field"><label>Toplam Deneyim (yıl)</label><input type="number" id="fDeneyimYil" min="0" max="50" step="0.5"></div>
+        </div>
+        <div class="field"><label>Deneyim Özeti</label><textarea id="fDeneyim" rows="3" placeholder="Çalıştığı yerler, roller, süreler…"></textarea></div>
+        <div class="section-title" style="margin-top:22px">Değerlendirme</div>
+        <div class="field"><label>Değerlendirilebileceği / görüşülen pozisyon(lar)</label><div id="fRollerChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div></div>
+        <div class="field"><label>Görüşme Durumu</label><select id="fGorusmeDurumu">${GORUSME_DURUM_OPT.map((o) => `<option value="${o.key}">${o.label}</option>`).join("")}</select></div>
+        <div class="field"><label>Yapay Zeka Yorumu (işe alım uzmanı analizi)</label><textarea id="fAiYorum" rows="4" placeholder="Seçilen pozisyonlara göre profesyonel değerlendirme…"></textarea></div>
         <div class="section-title" style="margin-top:22px">Görüşme Bilgisi</div>
         <div class="field"><label>Görüşme Tarihi</label><input type="date" id="fGorusmeTarihi" required></div>
         <div class="field"><label>Görüşme Notu</label><textarea id="fGorusmeNotu" rows="4" placeholder="Görüşmede alınan notlar, izlenimler…"></textarea></div>
@@ -1814,6 +1903,43 @@ function openAdayForm(onDoldur) {
   el("#vazgecBtn").onclick = () => overlay.remove();
   wireUnvanSelect("fUnvan");
   wireDepartmanSelect("fDepartman");
+  // Hedef rol çipleri (çoklu seçim) — uygunluk puanı Faz 3'te bu rollere göre gelir.
+  const secilenRoller = new Set();
+  const chipBox = el("#fRollerChips");
+  ADAY_ROLLER.forEach((r) => {
+    const c = document.createElement("button");
+    c.type = "button"; c.textContent = r.label; c.dataset.key = r.key;
+    c.style.cssText = "border:1px solid var(--line,#c9d3dc);background:#fff;border-radius:16px;padding:5px 12px;font-size:12px;cursor:pointer;color:inherit";
+    c.onclick = () => {
+      if (secilenRoller.has(r.key)) { secilenRoller.delete(r.key); c.style.background = "#fff"; c.style.color = "inherit"; c.style.borderColor = "var(--line,#c9d3dc)"; }
+      else { secilenRoller.add(r.key); c.style.background = "#0e7490"; c.style.color = "#fff"; c.style.borderColor = "#0e7490"; }
+    };
+    chipBox.appendChild(c);
+  });
+  // Faz 1: CV'den doldur — ŞİMDİLİK ÖRNEK/SAHTE veri. Gerçek CV analizi (Gemini)
+  // Faz 3'te Cloudflare Worker üzerinden bağlanacak; bu blok o yanıtla değişecek.
+  el("#cvDoldurBtn").onclick = async () => {
+    const f = el("#fCvPdf").files && el("#fCvPdf").files[0];
+    const st = el("#cvAiStatus");
+    if (!f) { st.textContent = "Önce bir PDF CV seçin."; st.style.color = "var(--bad,#c0392b)"; return; }
+    if (f.type !== "application/pdf") { st.textContent = "Dosya PDF olmalı."; st.style.color = "var(--bad,#c0392b)"; return; }
+    const btn = el("#cvDoldurBtn"); btn.disabled = true;
+    st.style.color = ""; st.textContent = "CV okunuyor… (Faz 1: örnek veri — gerçek yapay zeka anahtar bağlanınca çalışacak)";
+    await new Promise((r) => setTimeout(r, 700));
+    const ornek = {
+      ad: "Sena", soyad: "Bostancı", yas: 28, cinsiyet: "Kadın", yer: "İstanbul / Kadıköy",
+      email: "sena.bostanci@example.com", telefon: "0532 000 00 00", deneyimYil: 2,
+      deneyim: "2 yıl perakende satış (giyim), 6 ay çağrı merkezi. Ekip çalışması ve müşteri ilişkileri güçlü.",
+      aiYorum: "(Örnek) Satış deneyimi kısa; otomotiv satışında hızlı adaptasyon gerekebilir. İletişim ve müşteri odağı güçlü — İK / ön büro gibi rollerde de değerlendirilebilir."
+    };
+    el("#fAd").value = ornek.ad; el("#fSoyad").value = ornek.soyad;
+    el("#fYas").value = ornek.yas; el("#fCinsiyet").value = ornek.cinsiyet; el("#fYer").value = ornek.yer;
+    el("#fEmail").value = ornek.email; el("#fTelefon").value = ornek.telefon;
+    el("#fDeneyimYil").value = ornek.deneyimYil; el("#fDeneyim").value = ornek.deneyim;
+    el("#fAiYorum").value = ornek.aiYorum;
+    st.style.color = "var(--ok,#0a7d0a)"; st.textContent = "✓ Örnek veri dolduruldu. (Gerçek CV analizi Faz 3'te bağlanacak.)";
+    btn.disabled = false;
+  };
   el("#kaydetBtn").onclick = async () => {
     const ad = el("#fAd").value.trim(), soyad = el("#fSoyad").value.trim(), gorusmeTarihi = el("#fGorusmeTarihi").value;
     if (!ad || !soyad || !gorusmeTarihi) { toast("Ad, soyad ve görüşme tarihi zorunludur."); return; }
@@ -1829,6 +1955,15 @@ function openAdayForm(onDoldur) {
         bolum: el("#fBolum").value,
         telefon: el("#fTelefon").value.trim(),
         email: el("#fEmail").value.trim(),
+        yas: el("#fYas").value ? Number(el("#fYas").value) : null,
+        cinsiyet: el("#fCinsiyet").value || "",
+        yer: el("#fYer").value.trim(),
+        deneyimYil: el("#fDeneyimYil").value ? Number(el("#fDeneyimYil").value) : null,
+        deneyim: el("#fDeneyim").value.trim(),
+        hedefRoller: [...secilenRoller],
+        rolPuanlari: {},
+        aiYorum: el("#fAiYorum").value.trim(),
+        gorusmeDurumu: el("#fGorusmeDurumu").value || "gorusulecek",
         gorusmeTarihi,
         gorusmeNotu: el("#fGorusmeNotu").value.trim(),
         iseBaslamaTarihi: null,
