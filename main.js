@@ -138,6 +138,50 @@ const GORUSME_DURUM_OPT = [
   { key: "gorusulecek", label: "Görüşülecek" },
   { key: "gorusuldu", label: "Görüşüldü" }
 ];
+// ===== FAZ 3 · Yapay zeka (Google Gemini) =====
+// Anahtar YALNIZCA bu tarayıcının localStorage'ında saklanır (herkese açık repo'ya girmez).
+// Doğrudan tarayıcı -> Gemini çağrısı (Cloudflare Worker'a gerek yok; istenirse sonra yükseltilir).
+const GEMINI_MODEL = "gemini-2.0-flash";
+function getGeminiKey(sorGerekirse) {
+  let k = "";
+  try { k = localStorage.getItem("iseAlim_gemini_key") || ""; } catch (_) {}
+  if (!k && sorGerekirse) {
+    k = (window.prompt("Google Gemini API anahtarını yapıştırın.\n(aistudio.google.com → Get API key · ücretsiz · yalnızca bu tarayıcıda saklanır)") || "").trim();
+    if (k) { try { localStorage.setItem("iseAlim_gemini_key", k); } catch (_) {} }
+  }
+  return k;
+}
+function fileToBase64(f) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(",")[1]);
+    r.onerror = reject;
+    r.readAsDataURL(f);
+  });
+}
+function parseJsonLoose(s) {
+  if (!s) return null;
+  let t = String(s).trim().replace(/^```(json)?\s*/i, "").replace(/```\s*$/, "");
+  try { return JSON.parse(t); } catch (_) {}
+  const m = t.match(/\{[\s\S]*\}/);
+  if (m) { try { return JSON.parse(m[0]); } catch (_) {} }
+  return null;
+}
+async function geminiGenerate(parts) {
+  const key = getGeminiKey(true);
+  if (!key) throw new Error("Gemini API anahtarı girilmedi.");
+  const url = "https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent?key=" + encodeURIComponent(key);
+  const body = { contents: [{ parts }], generationConfig: { responseMimeType: "application/json", temperature: 0.2 } };
+  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!res.ok) {
+    const t = await res.text();
+    if (res.status === 400 && /API key|API_KEY|invalid/i.test(t)) { try { localStorage.removeItem("iseAlim_gemini_key"); } catch (_) {} }
+    throw new Error("Gemini hatası (" + res.status + "). Anahtarı ve kotayı kontrol edin.");
+  }
+  const data = await res.json();
+  const parts2 = (((data.candidates || [])[0] || {}).content || {}).parts || [];
+  return parts2.map((p) => p.text || "").join("");
+}
 const SURDURULEBILIRLIK_OPT = [
   { key: "surdurulebilir", label: "Sürdürülebilir" },
   { key: "kisa_vadede", label: "Kısa Vadede Sürdürülebilir" },
@@ -1852,6 +1896,7 @@ function openAdayForm(onDoldur) {
         <div class="cv-ai-box" style="border:1px dashed var(--line,#c9d3dc);border-radius:12px;padding:14px;margin-bottom:18px;background:rgba(20,80,120,.03)">
           <div style="font-weight:700;font-size:13px;margin-bottom:6px">🤖 CV'den Otomatik Doldur</div>
           <div class="meta" style="margin-bottom:8px">Adayın PDF CV'sini yükle; yapay zeka bilgileri çıkarıp aşağıdaki alanları doldursun.</div>
+          <div class="meta" style="margin-bottom:8px;color:var(--bad,#c0392b);font-size:11px">⚠ CV, analiz için Google Gemini'ye gönderilir — KVKK gereği gerçek aday verisi için kurumsal onay/politika gerekir; test aşamasında örnek CV kullanın.</div>
           <div class="two-col" style="align-items:end">
             <div class="field"><label>CV (PDF)</label><input type="file" id="fCvPdf" accept="application/pdf"></div>
             <div class="field"><button type="button" class="btn btn-teal" id="cvDoldurBtn" style="width:100%">Yapay zeka ile doldur</button></div>
@@ -1886,6 +1931,10 @@ function openAdayForm(onDoldur) {
         <div class="section-title" style="margin-top:22px">Değerlendirme</div>
         <div class="field"><label>Değerlendirilebileceği / görüşülen pozisyon(lar)</label><div id="fRollerChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div></div>
         <div class="field"><label>Görüşme Durumu</label><select id="fGorusmeDurumu">${GORUSME_DURUM_OPT.map((o) => `<option value="${o.key}">${o.label}</option>`).join("")}</select></div>
+        <div class="field">
+          <button type="button" class="btn btn-ghost" id="aiDegerlendirBtn" style="width:100%">🤖 AI ile değerlendir (pozisyon uygunluğu + yorum)</button>
+          <div id="aiDegerlendirStatus" class="meta" style="margin-top:6px;min-height:16px"></div>
+        </div>
         <div class="field"><label>Yapay Zeka Yorumu (işe alım uzmanı analizi)</label><textarea id="fAiYorum" rows="4" placeholder="Seçilen pozisyonlara göre profesyonel değerlendirme…"></textarea></div>
         <div class="section-title" style="margin-top:22px">Görüşme Bilgisi</div>
         <div class="field"><label>Görüşme Tarihi</label><input type="date" id="fGorusmeTarihi" required></div>
@@ -1916,28 +1965,63 @@ function openAdayForm(onDoldur) {
     };
     chipBox.appendChild(c);
   });
-  // Faz 1: CV'den doldur — ŞİMDİLİK ÖRNEK/SAHTE veri. Gerçek CV analizi (Gemini)
-  // Faz 3'te Cloudflare Worker üzerinden bağlanacak; bu blok o yanıtla değişecek.
+  // FAZ 3: yapay zeka değerlendirme sonucu (rol uygunluk puanları) burada tutulur, kayıtta yazılır.
+  let rolPuanlariAI = {};
+  // CV'den doldur — Gemini ile PDF'ten alan çıkarımı.
   el("#cvDoldurBtn").onclick = async () => {
     const f = el("#fCvPdf").files && el("#fCvPdf").files[0];
     const st = el("#cvAiStatus");
     if (!f) { st.textContent = "Önce bir PDF CV seçin."; st.style.color = "var(--bad,#c0392b)"; return; }
     if (f.type !== "application/pdf") { st.textContent = "Dosya PDF olmalı."; st.style.color = "var(--bad,#c0392b)"; return; }
     const btn = el("#cvDoldurBtn"); btn.disabled = true;
-    st.style.color = ""; st.textContent = "CV okunuyor… (Faz 1: örnek veri — gerçek yapay zeka anahtar bağlanınca çalışacak)";
-    await new Promise((r) => setTimeout(r, 700));
-    const ornek = {
-      ad: "Sena", soyad: "Bostancı", yas: 28, cinsiyet: "Kadın", yer: "İstanbul / Kadıköy",
-      email: "sena.bostanci@example.com", telefon: "0532 000 00 00", deneyimYil: 2,
-      deneyim: "2 yıl perakende satış (giyim), 6 ay çağrı merkezi. Ekip çalışması ve müşteri ilişkileri güçlü.",
-      aiYorum: "(Örnek) Satış deneyimi kısa; otomotiv satışında hızlı adaptasyon gerekebilir. İletişim ve müşteri odağı güçlü — İK / ön büro gibi rollerde de değerlendirilebilir."
-    };
-    el("#fAd").value = ornek.ad; el("#fSoyad").value = ornek.soyad;
-    el("#fYas").value = ornek.yas; el("#fCinsiyet").value = ornek.cinsiyet; el("#fYer").value = ornek.yer;
-    el("#fEmail").value = ornek.email; el("#fTelefon").value = ornek.telefon;
-    el("#fDeneyimYil").value = ornek.deneyimYil; el("#fDeneyim").value = ornek.deneyim;
-    el("#fAiYorum").value = ornek.aiYorum;
-    st.style.color = "var(--ok,#0a7d0a)"; st.textContent = "✓ Örnek veri dolduruldu. (Gerçek CV analizi Faz 3'te bağlanacak.)";
+    st.style.color = ""; st.textContent = "CV yapay zekayla okunuyor…";
+    try {
+      const b64 = await fileToBase64(f);
+      const istem = "Bu bir özgeçmiş (CV). Alanları çıkar ve SADECE şu JSON'u döndür: {\"ad\":\"\",\"soyad\":\"\",\"yas\":null,\"cinsiyet\":\"\",\"yer\":\"\",\"email\":\"\",\"telefon\":\"\",\"deneyimYil\":null,\"deneyim\":\"\"}. yas ve deneyimYil sayı olmalı (bilinmiyorsa null). cinsiyet yalnızca Kadın, Erkek ya da Belirtilmemiş. yer = il/ilçe. deneyim = çalıştığı yerler, roller ve süreleri 1-2 cümlede özetle. Bilinmeyen metinler boş string.";
+      const raw = await geminiGenerate([{ inline_data: { mime_type: "application/pdf", data: b64 } }, { text: istem }]);
+      const o = parseJsonLoose(raw);
+      if (!o) throw new Error("Yanıt çözümlenemedi.");
+      if (o.ad != null) el("#fAd").value = o.ad;
+      if (o.soyad != null) el("#fSoyad").value = o.soyad;
+      if (o.yas != null && o.yas !== "") el("#fYas").value = o.yas;
+      if (o.cinsiyet) el("#fCinsiyet").value = (["Kadın", "Erkek", "Belirtilmemiş"].indexOf(o.cinsiyet) >= 0 ? o.cinsiyet : "Belirtilmemiş");
+      if (o.yer != null) el("#fYer").value = o.yer;
+      if (o.email != null) el("#fEmail").value = o.email;
+      if (o.telefon != null) el("#fTelefon").value = o.telefon;
+      if (o.deneyimYil != null && o.deneyimYil !== "") el("#fDeneyimYil").value = o.deneyimYil;
+      if (o.deneyim != null) el("#fDeneyim").value = o.deneyim;
+      st.style.color = "var(--ok,#0a7d0a)"; st.textContent = "✓ CV okundu. Kontrol edip pozisyon seçin, sonra 'AI ile değerlendir'.";
+    } catch (e) {
+      st.style.color = "var(--bad,#c0392b)"; st.textContent = "✗ " + e.message;
+    }
+    btn.disabled = false;
+  };
+  // Pozisyon uygunluğu (rolPuanlari) + profesyonel yorum — Gemini.
+  el("#aiDegerlendirBtn").onclick = async () => {
+    const roller = [...secilenRoller];
+    const st = el("#aiDegerlendirStatus");
+    if (!roller.length) { st.textContent = "Önce en az bir pozisyon (rol) seçin."; st.style.color = "var(--bad,#c0392b)"; return; }
+    const den = el("#fDeneyim").value.trim();
+    if (!den && !el("#fAd").value.trim()) { st.textContent = "Önce CV'yi doldurun ya da deneyim özeti girin."; st.style.color = "var(--bad,#c0392b)"; return; }
+    const btn = el("#aiDegerlendirBtn"); btn.disabled = true;
+    st.style.color = ""; st.textContent = "Yapay zeka değerlendiriyor…";
+    try {
+      const rolListe = roller.map((r) => rolLabel(r) + " (" + r + ")").join(", ");
+      const istem = "Deneyimli bir işe alım uzmanı gibi değerlendir. ADAY: " + el("#fAd").value + " " + el("#fSoyad").value
+        + ". Yaş: " + (el("#fYas").value || "?") + ". Toplam deneyim (yıl): " + (el("#fDeneyimYil").value || "?")
+        + ". Deneyim özeti: " + (den || "-")
+        + ". DEĞERLENDİRİLECEK POZİSYONLAR (anahtar: etiket): " + rolListe
+        + ". Her pozisyon için 0-100 arası uygunluk puanı ver (deneyim o role ilgisizse düşük) ve profesyonel, gerekçeli bir yorum yaz (güçlü/zayıf yönler, hangi rolde daha başarılı olur). SADECE şu JSON'u döndür: {\"puanlar\":{" + roller.map((r) => '"' + r + '":0').join(",") + "},\"yorum\":\"\"}. puanlar anahtarları TAM olarak şunlar olsun: " + roller.join(", ") + ".";
+      const raw = await geminiGenerate([{ text: istem }]);
+      const o = parseJsonLoose(raw);
+      if (!o) throw new Error("Yanıt çözümlenemedi.");
+      if (o.yorum) el("#fAiYorum").value = o.yorum;
+      rolPuanlariAI = {};
+      if (o.puanlar) { roller.forEach((r) => { const v = Number(o.puanlar[r]); if (!isNaN(v)) rolPuanlariAI[r] = Math.max(0, Math.min(100, Math.round(v))); }); }
+      st.style.color = "var(--ok,#0a7d0a)"; st.textContent = "✓ Değerlendirme yazıldı; uygunluk puanları kayıtta saklanacak.";
+    } catch (e) {
+      st.style.color = "var(--bad,#c0392b)"; st.textContent = "✗ " + e.message;
+    }
     btn.disabled = false;
   };
   el("#kaydetBtn").onclick = async () => {
@@ -1961,7 +2045,7 @@ function openAdayForm(onDoldur) {
         deneyimYil: el("#fDeneyimYil").value ? Number(el("#fDeneyimYil").value) : null,
         deneyim: el("#fDeneyim").value.trim(),
         hedefRoller: [...secilenRoller],
-        rolPuanlari: {},
+        rolPuanlari: rolPuanlariAI,
         aiYorum: el("#fAiYorum").value.trim(),
         gorusmeDurumu: el("#fGorusmeDurumu").value || "gorusulecek",
         gorusmeTarihi,
