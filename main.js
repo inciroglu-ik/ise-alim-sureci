@@ -141,7 +141,9 @@ const GORUSME_DURUM_OPT = [
 // ===== FAZ 3 · Yapay zeka (Google Gemini) =====
 // Anahtar YALNIZCA bu tarayıcının localStorage'ında saklanır (herkese açık repo'ya girmez).
 // Doğrudan tarayıcı -> Gemini çağrısı (Cloudflare Worker'a gerek yok; istenirse sonra yükseltilir).
-const GEMINI_MODEL = "gemini-2.0-flash";
+// Model SABİT yazılmaz: anahtarın erişebildiği model Google'dan sorulup seçilir,
+// 404 (model bulunamadı) durumunda aşağıdaki yedekler sırayla denenir.
+const GEMINI_MODEL_YEDEK = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest", "gemini-2.0-flash-001", "gemini-1.5-flash"];
 function getGeminiKey(sorGerekirse) {
   let k = "";
   try { k = localStorage.getItem("iseAlim_gemini_key") || ""; } catch (_) {}
@@ -150,6 +152,35 @@ function getGeminiKey(sorGerekirse) {
     if (k) { try { localStorage.setItem("iseAlim_gemini_key", k); } catch (_) {} }
   }
   return k;
+}
+function setGeminiKey(k) {
+  try { if (k) localStorage.setItem("iseAlim_gemini_key", k.trim()); else localStorage.removeItem("iseAlim_gemini_key"); } catch (_) {}
+  try { localStorage.removeItem("iseAlim_gemini_model"); } catch (_) {} // anahtar değişince model yeniden seçilsin
+}
+// Kullanıcı anahtarını girer/günceller (modal içindeki "🔑 API anahtarını gir/değiştir").
+function iseAlimAnahtarDegistir() {
+  const mevcut = getGeminiKey(false);
+  const k = (window.prompt("Google Gemini API anahtarını girin veya güncelleyin:\n(aistudio.google.com → Get API key · ücretsiz)", mevcut || "") || "").trim();
+  if (k) { setGeminiKey(k); alert("✓ API anahtarı kaydedildi. Şimdi 'Yapay zeka ile doldur'u deneyin."); }
+}
+window.iseAlimAnahtarDegistir = iseAlimAnahtarDegistir;
+// Anahtarın erişebildiği, generateContent destekleyen uygun bir 'flash' modeli bul (önbelleğe alınır).
+async function geminiModelSec(key) {
+  try { const m = localStorage.getItem("iseAlim_gemini_model"); if (m) return m; } catch (_) {}
+  try {
+    const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models?key=" + encodeURIComponent(key));
+    if (r.ok) {
+      const d = await r.json();
+      const hepsi = (d.models || [])
+        .filter((m) => (m.supportedGenerationMethods || []).indexOf("generateContent") >= 0)
+        .map((m) => String(m.name || "").replace(/^models\//, ""));
+      const stabil = hepsi.filter((n) => !/embedding|aqa|image|tts|vision|thinking|exp|preview/i.test(n));
+      const sec = stabil.find((n) => /gemini-2\.5-flash$/.test(n)) || stabil.find((n) => /gemini-2\.0-flash$/.test(n))
+        || stabil.find((n) => /flash/i.test(n)) || stabil[0] || hepsi[0];
+      if (sec) { try { localStorage.setItem("iseAlim_gemini_model", sec); } catch (_) {} return sec; }
+    }
+  } catch (_) {}
+  return GEMINI_MODEL_YEDEK[0];
 }
 function fileToBase64(f) {
   return new Promise((resolve, reject) => {
@@ -169,18 +200,37 @@ function parseJsonLoose(s) {
 }
 async function geminiGenerate(parts) {
   const key = getGeminiKey(true);
-  if (!key) throw new Error("Gemini API anahtarı girilmedi.");
-  const url = "https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent?key=" + encodeURIComponent(key);
+  if (!key) throw new Error("Gemini API anahtarı girilmedi. '🔑 API anahtarını gir / değiştir'e tıklayın.");
+  const secili = await geminiModelSec(key);
+  const denenecek = [secili].concat(GEMINI_MODEL_YEDEK.filter((m) => m !== secili));
   const body = { contents: [{ parts }], generationConfig: { responseMimeType: "application/json", temperature: 0.2 } };
-  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (!res.ok) {
+  let sonHata = "";
+  for (const model of denenecek) {
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + encodeURIComponent(key);
+    let res;
+    try {
+      res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    } catch (netErr) {
+      throw new Error("İnternet/erişim hatası: " + netErr.message);
+    }
+    if (res.ok) {
+      try { localStorage.setItem("iseAlim_gemini_model", model); } catch (_) {} // çalışan modeli hatırla
+      const data = await res.json();
+      const parts2 = (((data.candidates || [])[0] || {}).content || {}).parts || [];
+      return parts2.map((p) => p.text || "").join("");
+    }
     const t = await res.text();
-    if (res.status === 400 && /API key|API_KEY|invalid/i.test(t)) { try { localStorage.removeItem("iseAlim_gemini_key"); } catch (_) {} }
-    throw new Error("Gemini hatası (" + res.status + "). Anahtarı ve kotayı kontrol edin.");
+    sonHata = "(" + res.status + ") " + String(t).slice(0, 160);
+    if (res.status === 400 && /API key|API_KEY|invalid/i.test(t)) {
+      setGeminiKey("");
+      throw new Error("API anahtarı geçersiz. '🔑 API anahtarını gir / değiştir' ile doğru anahtarı girin.");
+    }
+    if (res.status === 403) throw new Error("Erişim reddedildi (403). Anahtarın 'Generative Language API' izni açık mı, kontrol edin.");
+    if (res.status === 429) throw new Error("Ücretsiz kota doldu (429). Birkaç dakika sonra tekrar deneyin.");
+    if (res.status === 404) { try { localStorage.removeItem("iseAlim_gemini_model"); } catch (_) {} continue; } // bu model yok → sonrakini dene
+    throw new Error("Gemini hatası " + sonHata);
   }
-  const data = await res.json();
-  const parts2 = (((data.candidates || [])[0] || {}).content || {}).parts || [];
-  return parts2.map((p) => p.text || "").join("");
+  throw new Error("Anahtarınızın eriştiği uygun bir model bulunamadı. Son hata: " + sonHata + ". '🔑 API anahtarını gir / değiştir' ile başka bir anahtar deneyin.");
 }
 const SURDURULEBILIRLIK_OPT = [
   { key: "surdurulebilir", label: "Sürdürülebilir" },
@@ -1902,6 +1952,7 @@ function openAdayForm(onDoldur) {
             <div class="field"><button type="button" class="btn btn-teal" id="cvDoldurBtn" style="width:100%">Yapay zeka ile doldur</button></div>
           </div>
           <div id="cvAiStatus" class="meta" style="margin-top:6px;min-height:16px"></div>
+          <div style="margin-top:2px"><a href="#" id="apiKeyDegistir" style="font-size:11px;color:var(--muted,#667);text-decoration:underline">🔑 API anahtarını gir / değiştir</a></div>
         </div>
         <div class="two-col">
           <div class="field"><label>Ad</label><input type="text" id="fAd" required></div>
@@ -1967,6 +2018,8 @@ function openAdayForm(onDoldur) {
   });
   // FAZ 3: yapay zeka değerlendirme sonucu (rol uygunluk puanları) burada tutulur, kayıtta yazılır.
   let rolPuanlariAI = {};
+  // API anahtarını gir/değiştir (yanlış/eski anahtarı temizlemek için).
+  { const akd = el("#apiKeyDegistir"); if (akd) akd.onclick = (ev) => { ev.preventDefault(); iseAlimAnahtarDegistir(); }; }
   // CV'den doldur — Gemini ile PDF'ten alan çıkarımı.
   el("#cvDoldurBtn").onclick = async () => {
     const f = el("#fCvPdf").files && el("#fCvPdf").files[0];
