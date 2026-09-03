@@ -204,33 +204,40 @@ async function geminiGenerate(parts) {
   const secili = await geminiModelSec(key);
   const denenecek = [secili].concat(GEMINI_MODEL_YEDEK.filter((m) => m !== secili));
   const body = { contents: [{ parts }], generationConfig: { responseMimeType: "application/json", temperature: 0.2 } };
+  const uyku = (ms) => new Promise((r) => setTimeout(r, ms));
   let sonHata = "";
-  for (const model of denenecek) {
-    const url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + encodeURIComponent(key);
-    let res;
-    try {
-      res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    } catch (netErr) {
-      throw new Error("İnternet/erişim hatası: " + netErr.message);
+  // Dış döngü: geçici yoğunluk (429/5xx) için birkaç tur, artan beklemeyle.
+  for (let tur = 0; tur < 3; tur++) {
+    let geciciVar = false;
+    for (const model of denenecek) {
+      const url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + encodeURIComponent(key);
+      let res;
+      try {
+        res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      } catch (netErr) {
+        throw new Error("İnternet/erişim hatası: " + netErr.message);
+      }
+      if (res.ok) {
+        try { localStorage.setItem("iseAlim_gemini_model", model); } catch (_) {} // çalışan modeli hatırla
+        const data = await res.json();
+        const parts2 = (((data.candidates || [])[0] || {}).content || {}).parts || [];
+        return parts2.map((p) => p.text || "").join("");
+      }
+      const t = await res.text();
+      sonHata = "(" + res.status + ") " + String(t).slice(0, 160);
+      if (res.status === 400 && /API key|API_KEY|invalid/i.test(t)) {
+        setGeminiKey("");
+        throw new Error("API anahtarı geçersiz. '🔑 API anahtarını gir / değiştir' ile doğru anahtarı girin.");
+      }
+      if (res.status === 403) throw new Error("Erişim reddedildi (403). Anahtarın 'Generative Language API' izni açık mı, kontrol edin.");
+      if (res.status === 404) { try { localStorage.removeItem("iseAlim_gemini_model"); } catch (_) {} continue; } // bu model yok → sonrakini dene
+      if (res.status === 429 || res.status >= 500) { geciciVar = true; continue; } // yoğunluk/kota → başka model, sonra bekleyip tekrar
+      throw new Error("Gemini hatası " + sonHata);
     }
-    if (res.ok) {
-      try { localStorage.setItem("iseAlim_gemini_model", model); } catch (_) {} // çalışan modeli hatırla
-      const data = await res.json();
-      const parts2 = (((data.candidates || [])[0] || {}).content || {}).parts || [];
-      return parts2.map((p) => p.text || "").join("");
-    }
-    const t = await res.text();
-    sonHata = "(" + res.status + ") " + String(t).slice(0, 160);
-    if (res.status === 400 && /API key|API_KEY|invalid/i.test(t)) {
-      setGeminiKey("");
-      throw new Error("API anahtarı geçersiz. '🔑 API anahtarını gir / değiştir' ile doğru anahtarı girin.");
-    }
-    if (res.status === 403) throw new Error("Erişim reddedildi (403). Anahtarın 'Generative Language API' izni açık mı, kontrol edin.");
-    if (res.status === 429) throw new Error("Ücretsiz kota doldu (429). Birkaç dakika sonra tekrar deneyin.");
-    if (res.status === 404) { try { localStorage.removeItem("iseAlim_gemini_model"); } catch (_) {} continue; } // bu model yok → sonrakini dene
-    throw new Error("Gemini hatası " + sonHata);
+    if (!geciciVar) break;            // geçici olmayan bir sebeple bittiyse tekrar denemenin anlamı yok
+    await uyku(1500 * (tur + 1));     // 1.5sn, 3sn artan bekleme
   }
-  throw new Error("Anahtarınızın eriştiği uygun bir model bulunamadı. Son hata: " + sonHata + ". '🔑 API anahtarını gir / değiştir' ile başka bir anahtar deneyin.");
+  throw new Error("Model şu an yoğun ya da kota dolu (geçici) — son durum " + sonHata + ". 1-2 dakika sonra tekrar deneyin.");
 }
 const SURDURULEBILIRLIK_OPT = [
   { key: "surdurulebilir", label: "Sürdürülebilir" },
