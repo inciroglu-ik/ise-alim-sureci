@@ -1,25 +1,25 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ä°ÅŸe AlÄ±m SÃ¼reci</title>
+<title>İşe Alım Süreci</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23117a63'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-size='26' font-weight='700' fill='white' text-anchor='middle'%3E%C4%B0A%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
 <style>
   /* =============================================================
-     Ä°nciroÄŸlu Otomotiv Â· Ä°ÅŸe AlÄ±m SÃ¼reci
-     GÃ¶rsel tema â€” v2 (premium teal). YalnÄ±zca sunum katmanÄ±;
-     hiÃ§bir sÄ±nÄ±f adÄ± / id deÄŸiÅŸtirilmemiÅŸtir.
+     İnciroğlu Otomotiv · İşe Alım Süreci
+     Görsel tema — v2 (premium teal). Yalnızca sunum katmanı;
+     hiçbir sınıf adı / id değiştirilmemiştir.
      ============================================================= */
   :root{
-    /* --- mÃ¼rekkep & yÃ¼zeyler --- */
+    /* --- mürekkep & yüzeyler --- */
     --ink:#0f1a20; --ink-soft:#56676f; --ink-mute:#8b9aa1;
     --paper:#f2f5f4; --panel:#ffffff; --panel-alt:#fafcfb;
     --line:#e2e8e5; --line-soft:#eef2f0; --line-strong:#cfdad5;
 
-    /* --- teal Ã¶lÃ§eÄŸi (marka) --- */
+    /* --- teal ölçeği (marka) --- */
     --teal-50:#f0f8f5; --teal-100:#dcefe9; --teal-200:#bde0d5;
     --teal-400:#2fb094; --teal:#117a63; --teal-deep:#0b5548; --teal-900:#06342c;
     --teal-soft:#dcefe9;
@@ -31,7 +31,7 @@
     --bad:#9c2b2b; --bad-bg:#fbe8e8; --bad-line:#efc9c9;
     --info:#38508f; --info-bg:#e8ecf8; --info-line:#ccd6ef;
 
-    /* --- gÃ¶lge katmanlarÄ± --- */
+    /* --- gölge katmanları --- */
     --sh-1:0 1px 2px rgba(15,26,32,.05);
     --sh-2:0 1px 2px rgba(15,26,32,.05), 0 6px 16px -10px rgba(15,26,32,.18);
     --sh-3:0 1px 3px rgba(15,26,32,.06), 0 16px 34px -18px rgba(15,26,32,.28);
@@ -66,7 +66,7 @@
   input,select,textarea{font-family:inherit;font-size:14px;}
   textarea{resize:vertical;}
 
-  /* ince, markaya uygun kaydÄ±rma Ã§ubuÄŸu */
+  /* ince, markaya uygun kaydırma çubuğu */
   *::-webkit-scrollbar{width:11px;height:11px;}
   *::-webkit-scrollbar-track{background:transparent;}
   *::-webkit-scrollbar-thumb{background:#c8d4cf;border-radius:20px;border:3px solid transparent;background-clip:content-box;}
@@ -75,7 +75,7 @@
   #app{min-height:100vh;}
 
   /* =============================================================
-     GÄ°RÄ°Å EKRANI
+     GİRİŞ EKRANI
      ============================================================= */
   .center-screen{
     min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
@@ -129,8 +129,8 @@
      FORM ELEMANLARI
      ============================================================= */
   .field{margin-bottom:15px;}
-  /* yalnÄ±zca alanÄ±n kendi etiketi bÃ¼yÃ¼k harf olur â€” iÃ§teki radio/checkbox
-     etiketleri (radioGrupHtml / checkboxGrupHtml) normal cÃ¼mle dÃ¼zeninde kalÄ±r */
+  /* yalnızca alanın kendi etiketi büyük harf olur — içteki radio/checkbox
+     etiketleri (radioGrupHtml / checkboxGrupHtml) normal cümle düzeninde kalır */
   .field > label{
     display:block;font-size:10.5px;font-weight:700;color:var(--ink-soft);
     margin-bottom:6px;text-transform:uppercase;letter-spacing:.07em;
@@ -225,7 +225,7 @@
   .btn-bad{background:linear-gradient(180deg,#ad3434 0%,var(--bad) 100%);color:#fff;box-shadow:0 8px 20px -12px rgba(156,43,43,.7);}
   .btn-bad:hover:not(:disabled){background:linear-gradient(180deg,#b93a3a 0%,#8a2424 100%);}
 
-  /* Ãœst bardaki hayalet butonlar koyu zemin Ã¼zerinde ters Ã§alÄ±ÅŸÄ±r */
+  /* Üst bardaki hayalet butonlar koyu zemin üzerinde ters çalışır */
   .topbar .btn-ghost{
     background:rgba(255,255,255,.08);color:#e4f1ec;border-color:rgba(255,255,255,.18);
     box-shadow:none;backdrop-filter:blur(4px);
@@ -233,7 +233,7 @@
   .topbar .btn-ghost:hover{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.32);color:#fff;}
 
   /* =============================================================
-     ÃœST BAR
+     ÜST BAR
      ============================================================= */
   .topbar{
     position:sticky;top:0;z-index:20;
@@ -261,7 +261,7 @@
   }
 
   /* =============================================================
-     KABUK / KENAR Ã‡UBUÄU
+     KABUK / KENAR ÇUBUĞU
      ============================================================= */
   .app-body{display:flex;align-items:flex-start;}
   .sidebar{
@@ -306,14 +306,14 @@
   }
 
   /* =============================================================
-     SAYFA BAÅLIÄI
+     SAYFA BAŞLIĞI
      ============================================================= */
   .page-head{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:24px;}
   .page-head h1{font-size:28px;margin:0 0 5px;color:var(--ink);font-weight:700;letter-spacing:-.022em;}
   .page-head p{margin:0;color:var(--ink-soft);font-size:13.5px;line-height:1.5;max-width:62ch;}
 
   /* =============================================================
-     Ä°STATÄ°STÄ°K KARTLARI
+     İSTATİSTİK KARTLARI
      ============================================================= */
   .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:13px;margin-bottom:24px;}
   .stat-card{
@@ -331,9 +331,9 @@
   }
   .stat-card:hover{transform:translateY(-2px);box-shadow:var(--sh-3);border-color:var(--teal-200);}
   .stat-card:hover::before{opacity:1;}
-  /* Genel BakÄ±ÅŸ'taki kartlar tÄ±klanabilir (data-git) â€” Ã¼zerine gelince ok belirir */
+  /* Genel Bakış'taki kartlar tıklanabilir (data-git) — üzerine gelince ok belirir */
   .stat-card[data-git]::after{
-    content:"â†’";position:absolute;right:15px;top:14px;
+    content:"→";position:absolute;right:15px;top:14px;
     font-size:14px;font-weight:700;color:var(--teal);
     opacity:0;transform:translateX(-5px);
     transition:opacity .2s var(--ease), transform .2s var(--ease);
@@ -350,7 +350,7 @@
   }
 
   /* =============================================================
-     BÄ°LDÄ°RÄ°M ÅERÄ°DÄ°
+     BİLDİRİM ŞERİDİ
      ============================================================= */
   .banner{
     background:linear-gradient(135deg,#fdf6e9 0%,var(--amber-bg) 100%);
@@ -368,7 +368,7 @@
   .banner b{color:#653f08;font-weight:700;}
 
   /* =============================================================
-     ARAÃ‡ Ã‡UBUÄU
+     ARAÇ ÇUBUĞU
      ============================================================= */
   .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px;}
   .toolbar input,.toolbar select{width:auto;padding:9px 13px;font-size:13px;border-radius:var(--r-sm);box-shadow:var(--sh-1);}
@@ -413,7 +413,7 @@
   }
 
   /* =============================================================
-     DURUM ROZETLERÄ°
+     DURUM ROZETLERİ
      ============================================================= */
   .status-badge{
     font-size:11.5px;font-weight:650;padding:4.5px 11px 4.5px 9px;border-radius:20px;
@@ -434,7 +434,7 @@
   .st-vazgecti{background:#eef1f0;color:#5f6f75;border-color:#dde3e1;}
 
   /* =============================================================
-     AÅAMA GRUPLARI (akordeon)
+     AŞAMA GRUPLARI (akordeon)
      ============================================================= */
   .stage-group{
     margin-bottom:13px;border:1px solid var(--line);border-radius:var(--r-lg);
@@ -520,7 +520,7 @@
   .karar-box .btn{margin-right:8px;margin-top:8px;}
 
   /* =============================================================
-     Ã–RTÃœ (OVERLAY) & Ã‡EKMECE (DRAWER)
+     ÖRTÜ (OVERLAY) & ÇEKMECE (DRAWER)
      ============================================================= */
   .overlay{
     position:fixed;inset:0;z-index:50;display:flex;justify-content:flex-end;
@@ -569,7 +569,7 @@
   }
 
   /* =============================================================
-     BÃ–LÃœM BAÅLIKLARI
+     BÖLÜM BAŞLIKLARI
      ============================================================= */
   .section-title{
     position:relative;
@@ -584,7 +584,7 @@
   }
   .section-title:first-child{margin-top:0;}
   .two-col{display:grid;grid-template-columns:1fr 1fr;gap:13px;}
-  /* talep detayÄ±nda iki sÃ¼tunlu Ã¶zet bloklarÄ±, Ã¼stteki metin bloÄŸuna yapÄ±ÅŸmasÄ±n */
+  /* talep detayında iki sütunlu özet blokları, üstteki metin bloğuna yapışmasın */
   .drawer-body .meta + .two-col{margin-top:20px;}
   @media(max-width:560px){.two-col{grid-template-columns:1fr;}}
 
@@ -612,7 +612,7 @@
   .file-label:hover{color:var(--teal);}
 
   /* =============================================================
-     Ä°LERLEME Ã‡UBUÄU
+     İLERLEME ÇUBUĞU
      ============================================================= */
   .progress-track{
     height:7px;border-radius:20px;background:#e6ebe9;overflow:hidden;width:100%;
@@ -626,7 +626,7 @@
   }
 
   /* =============================================================
-     BOÅ DURUM / YÃœKLENÄ°YOR / BÄ°LDÄ°RÄ°M
+     BOŞ DURUM / YÜKLENİYOR / BİLDİRİM
      ============================================================= */
   .empty-state{
     text-align:center;padding:58px 26px;color:var(--ink-soft);font-size:13.8px;line-height:1.6;
@@ -654,15 +654,15 @@
     z-index:100;display:none;
   }
 
-  /* hareket azaltma tercihine saygÄ± */
+  /* hareket azaltma tercihine saygı */
   @media (prefers-reduced-motion: reduce){
     *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;}
   }
 </style>
 </head>
 <body>
-<div id="app"><div class="loader">YÃ¼kleniyorâ€¦</div></div>
+<div id="app"><div class="loader">Yükleniyor…</div></div>
 <div class="toast" id="toast"></div>
-<script type="module" src="main.js?v=202609030843"></script>
+<script type="module" src="main.js?v=202609030852"></script>
 </body>
 </html>
