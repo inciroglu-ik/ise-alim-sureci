@@ -1073,6 +1073,57 @@ function render() {
 // ADAYLAR SAYFASI — aşamaya göre gruplu görünüm (tek dropdown yerine)
 // ---------------------------------------------------------------
 const acikGruplar = { gorusme_bekliyor: true, evrak_bekliyor: true, sgk_bekliyor: true, ise_basladi: true, tamamlandi: false, vazgecti: false, olumsuz: false };
+// Aday havuzu görünümü: "liste" (aşama akordeonu) | "pano" (sürükle-bırak Kanban).
+let adayGorunum = "liste";
+// Panoda serbestçe sürüklenip bırakılabilen (doğrudan durum değişen) aşamalar.
+// Terminal/karar aşamaları (olumsuz/tamamlandı/vazgeçti) form akışı gerektirdiği
+// için oraya bırakılınca aday detayı açılır.
+const PANO_SERBEST = ["gorusme_bekliyor", "evrak_bekliyor", "sgk_bekliyor", "ise_basladi"];
+// --- Akış Panosu (Kanban): aşama sütunları, aday kartı, sürükle-bırak taşıma ---
+function kanCardHtml(a, isAdmin) {
+  const oran = evrakOrani(a);
+  let chip = "";
+  if (a.durum === "gorusme_bekliyor") chip = a.gorusmeTarihi ? "🗓️ " + fmtTarih(a.gorusmeTarihi) : "";
+  else if (a.durum === "olumsuz") chip = esc(a.redNedeni || "—");
+  else if (a.durum === "ise_basladi" || a.durum === "tamamlandi") chip = a.iseBaslamaTarihi ? "Başlama: " + fmtTarih(a.iseBaslamaTarihi) : "";
+  else if (a.durum === "evrak_bekliyor" || a.durum === "sgk_bekliyor") chip = "Evrak %" + oran;
+  return `
+    <div class="kan-card" data-id="${a.id}"${isAdmin ? ' draggable="true"' : ""}>
+      <div class="kan-card-top">
+        ${avatarHtml(a.ad + " " + a.soyad, 30)}
+        <div class="kc-main">
+          <b>${esc(a.ad)} ${esc(a.soyad)}</b>
+          <span>${esc(a.unvan || "—")}${a.departman ? " · " + esc(a.departman) : ""}</span>
+        </div>
+      </div>
+      ${chip ? `<div class="kan-card-chip">${chip}</div>` : ""}
+    </div>`;
+}
+function kanbanHtml(list, isAdmin) {
+  const cols = AKIS_GRUPLARI.filter((g) => !g.sadeceAdmin || isAdmin).map((g) => {
+    const items = list.filter((a) => a.durum === g.key)
+      .sort((a, b) => (a.iseBaslamaTarihi || a.gorusmeTarihi || "").localeCompare(b.iseBaslamaTarihi || b.gorusmeTarihi || ""));
+    const baslik = esc(g.baslik.replace(" — yalnız İK görür", ""));
+    return `
+      <div class="kan-col ${g.key === "olumsuz" ? "kan-col-neg" : ""}" data-stage="${g.key}">
+        <div class="kan-col-head"><span class="ic">${g.ic}</span><span class="t">${baslik}</span><span class="n">${items.length}</span></div>
+        <div class="kan-col-body">${items.map((a) => kanCardHtml(a, isAdmin)).join("") || `<div class="kan-empty">—</div>`}</div>
+      </div>`;
+  }).join("");
+  return `<div class="kanban">${cols}</div>`;
+}
+async function panoTasi(aday, yeniDurum, isAdmin) {
+  if (!PANO_SERBEST.includes(yeniDurum)) { openAdayDetay(aday, isAdmin); toast("Bu aşama için karar/bilgi girin."); return; }
+  try {
+    await setDoc(doc(db, "iseAlimAday", aday.id), {
+      durum: yeniDurum,
+      gecmis: gecmisEkle(aday.gecmis, aday.durum, yeniDurum, "Akış panosunda taşındı"),
+      guncellemeTarihi: serverTimestamp()
+    }, { merge: true });
+    toast("✓ " + aday.ad + " " + aday.soyad + " → " + ((DURUM_ETIKET[yeniDurum] || {}).label || yeniDurum));
+  } catch (e) { toast("Taşınamadı: " + e.message); }
+}
+
 function renderAdaylarPage(list, isAdmin) {
   const gorunurListe = isAdmin ? list : list.filter((a) => a.durum !== "olumsuz");
   const total = gorunurListe.length;
@@ -1123,8 +1174,20 @@ function renderAdaylarPage(list, isAdmin) {
         <option value="">— Pozisyona göre havuz (kapalı) —</option>
         ${ADAY_ROLLER.map((r) => `<option value="${r.key}">${esc(r.grup)} · ${esc(r.label)}</option>`).join("")}
       </select>
+      <div class="view-toggle" id="gorunumToggle">
+        <button type="button" data-gorunum="liste" class="${adayGorunum === "liste" ? "active" : ""}">☰ Liste</button>
+        <button type="button" data-gorunum="pano" class="${adayGorunum === "pano" ? "active" : ""}">▦ Pano</button>
+      </div>
     </div>
     <div id="grupListesi"></div>`;
+
+    el("#gorunumToggle").querySelectorAll("button").forEach((b) => {
+      b.addEventListener("click", () => {
+        adayGorunum = b.dataset.gorunum;
+        el("#gorunumToggle").querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b));
+        draw();
+      });
+    });
 
   if (isAdmin) el("#yeniAdayBtn").addEventListener("click", () => openAdayForm());
 
@@ -1145,6 +1208,12 @@ function renderAdaylarPage(list, isAdmin) {
         + (uygunlar.length
             ? `<div class="stage-group-body" style="display:block">${uygunlar.map((o) => posKartHtml(o.a, o.p)).join("")}</div>`
             : `<div class="empty-state">Bu pozisyon için etiketlenmiş aday yok. Aday eklerken "Değerlendirilebileceği pozisyon(lar)" alanında bu rolü seçin.</div>`);
+    } else if (adayGorunum === "pano") {
+      const panoListe = gorunurListe.filter(eslesen);
+      const ipucu = isAdmin
+        ? `<div class="kan-hint">✋ Kartı sürükleyip aşamalar arasında taşıyın. Olumsuz / Tamamlandı / Vazgeçti aşamasına bırakınca karar formu açılır.</div>`
+        : `<div class="kan-hint">Adayların aşama akışı. Detay için karta tıklayın.</div>`;
+      html = ipucu + kanbanHtml(panoListe, isAdmin);
     } else {
       const gruplarHtml = AKIS_GRUPLARI
         .filter((g) => !g.sadeceAdmin || isAdmin)
@@ -1181,6 +1250,39 @@ function renderAdaylarPage(list, isAdmin) {
         if (aday) openAdayDetay(aday, isAdmin);
       });
     });
+
+    // --- Akış panosu: kart tıklama + (admin) sürükle-bırak ---
+    document.querySelectorAll(".kan-card[data-id]").forEach((card) => {
+      card.addEventListener("click", () => {
+        const aday = adaylar.find((x) => x.id === card.dataset.id);
+        if (aday) openAdayDetay(aday, isAdmin);
+      });
+    });
+    if (isAdmin) {
+      let surukID = null;
+      document.querySelectorAll(".kan-card[draggable=true]").forEach((card) => {
+        card.addEventListener("dragstart", (e) => {
+          surukID = card.dataset.id; card.classList.add("dragging");
+          e.dataTransfer.effectAllowed = "move";
+          try { e.dataTransfer.setData("text/plain", surukID); } catch (_) {}
+        });
+        card.addEventListener("dragend", () => {
+          surukID = null; card.classList.remove("dragging");
+          document.querySelectorAll(".kan-col").forEach((c) => c.classList.remove("drop-over"));
+        });
+      });
+      document.querySelectorAll(".kan-col[data-stage]").forEach((col) => {
+        col.addEventListener("dragover", (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; col.classList.add("drop-over"); });
+        col.addEventListener("dragleave", (e) => { if (!col.contains(e.relatedTarget)) col.classList.remove("drop-over"); });
+        col.addEventListener("drop", (e) => {
+          e.preventDefault(); col.classList.remove("drop-over");
+          const id = surukID || (e.dataTransfer ? e.dataTransfer.getData("text/plain") : "");
+          const hedef = col.dataset.stage;
+          const aday = adaylar.find((x) => x.id === id);
+          if (aday && aday.durum !== hedef) panoTasi(aday, hedef, isAdmin);
+        });
+      });
+    }
   }
   function adayCardHtml(a) {
     const st = DURUM_ETIKET[a.durum] || DURUM_ETIKET.gorusme_bekliyor;
@@ -1953,7 +2055,6 @@ function openAdayForm(onDoldur) {
         <div class="cv-ai-box" style="border:1px dashed var(--line,#c9d3dc);border-radius:12px;padding:14px;margin-bottom:18px;background:rgba(20,80,120,.03)">
           <div style="font-weight:700;font-size:13px;margin-bottom:6px">🤖 CV'den Otomatik Doldur</div>
           <div class="meta" style="margin-bottom:8px">Adayın PDF CV'sini yükle; yapay zeka bilgileri çıkarıp aşağıdaki alanları doldursun.</div>
-          <div class="meta" style="margin-bottom:8px;color:var(--bad,#c0392b);font-size:11px">⚠ CV, analiz için Google Gemini'ye gönderilir — KVKK gereği gerçek aday verisi için kurumsal onay/politika gerekir; test aşamasında örnek CV kullanın.</div>
           <div class="two-col" style="align-items:end">
             <div class="field"><label>CV (PDF)</label><input type="file" id="fCvPdf" accept="application/pdf"></div>
             <div class="field"><button type="button" class="btn btn-teal" id="cvDoldurBtn" style="width:100%">Yapay zeka ile doldur</button></div>
