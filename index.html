@@ -725,6 +725,82 @@
   .kan-hint{font-size:12px;color:var(--ink-mute);margin:0 0 12px;display:flex;align-items:center;gap:7px;}
   @media(max-width:860px){.kan-col{flex-basis:82vw;}}
 
+  /* kart üzerindeki canlı uyarı rozetleri */
+  .uy-badge{
+    display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;
+    padding:2px 7px;border-radius:20px;letter-spacing:-.005em;white-space:nowrap;line-height:1.5;
+    border:1px solid transparent;
+  }
+  .uy-badge::before{content:"";width:4px;height:4px;border-radius:50%;background:currentColor;}
+  .uy-bad{background:var(--bad-bg);color:var(--bad);border-color:var(--bad-line);}
+  .uy-warn{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-line);}
+  .uy-row{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;}
+  .card-rating{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--ink-soft);font-weight:600;}
+  .yildiz{letter-spacing:-1px;white-space:nowrap;}
+
+  /* =============================================================
+     AKTİVİTE ZAMAN ÇİZELGESİ (aday 360°)
+     ============================================================= */
+  .tl{position:relative;margin:2px 0 4px;padding-left:6px;}
+  .tl-item{position:relative;padding:0 0 15px 26px;}
+  .tl-item::before{
+    content:"";position:absolute;left:6px;top:16px;bottom:-4px;width:2px;background:var(--line);
+  }
+  .tl-item:last-child::before{display:none;}
+  .tl-dot{
+    position:absolute;left:0;top:3px;width:14px;height:14px;border-radius:50%;
+    background:#fff;border:2.5px solid var(--teal);box-shadow:0 0 0 3px var(--teal-50);z-index:1;
+  }
+  .tl-item.tl-bad .tl-dot{border-color:var(--bad);box-shadow:0 0 0 3px var(--bad-bg);}
+  .tl-item.tl-good .tl-dot{border-color:var(--good);box-shadow:0 0 0 3px var(--good-bg);}
+  .tl-when{font-size:11px;color:var(--ink-mute);font-weight:600;}
+  .tl-what{font-size:13px;font-weight:600;color:var(--ink);margin:1px 0 2px;letter-spacing:-.01em;}
+  .tl-who{font-size:11.5px;color:var(--ink-soft);}
+  .tl-note{font-size:12px;color:var(--ink-soft);margin-top:3px;background:var(--panel-alt);border:1px solid var(--line-soft);border-radius:8px;padding:6px 9px;line-height:1.5;}
+
+  /* =============================================================
+     DEĞERLENDİRME / PUANLAMA (scorecard · işbirliği)
+     ============================================================= */
+  .sc-summary{
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    background:linear-gradient(135deg,var(--teal-50),#fff);
+    border:1px solid var(--teal-100);border-radius:var(--r);padding:13px 16px;margin-bottom:12px;
+  }
+  .sc-summary .big{font-family:'Source Serif 4',Georgia,serif;font-size:30px;font-weight:700;color:var(--teal-deep);line-height:1;letter-spacing:-.02em;}
+  .sc-summary .lab{font-size:11.5px;color:var(--ink-soft);font-weight:600;}
+  .sc-item{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+    padding:12px 14px;margin-bottom:9px;box-shadow:var(--sh-1);
+  }
+  .sc-item .top{display:flex;align-items:center;gap:9px;margin-bottom:6px;}
+  .sc-item .who{font-size:12.5px;font-weight:700;color:var(--ink);}
+  .sc-item .role{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--teal-deep);background:var(--teal-50);border:1px solid var(--teal-100);border-radius:20px;padding:2px 8px;}
+  .sc-item .when{font-size:11px;color:var(--ink-mute);margin-left:auto;}
+  .sc-item .yorum{font-size:12.8px;color:var(--ink-soft);line-height:1.55;}
+  .sc-form{background:var(--panel-alt);border:1px dashed var(--line-strong);border-radius:var(--r);padding:14px 16px;margin-top:4px;}
+  .sc-stars-input{display:inline-flex;gap:3px;margin-bottom:9px;}
+  .sc-stars-input .star{font-size:26px;line-height:1;color:#d4dcd9;cursor:pointer;transition:transform .1s var(--ease),color .12s;}
+  .sc-stars-input .star:hover{transform:scale(1.15);}
+  .sc-stars-input .star.on{color:#e0a92e;}
+
+  /* =============================================================
+     DÖNÜŞÜM HUNİSİ (komuta merkezi)
+     ============================================================= */
+  .funnel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px 20px;box-shadow:var(--sh-1);margin-bottom:24px;}
+  .fn-row{display:flex;align-items:center;gap:13px;margin-bottom:11px;cursor:pointer;}
+  .fn-row:last-child{margin-bottom:0;}
+  .fn-ic{width:30px;height:30px;flex:none;border-radius:9px;background:var(--teal-50);border:1px solid var(--teal-100);display:flex;align-items:center;justify-content:center;font-size:14px;}
+  .fn-label{width:150px;flex:none;font-size:12.5px;font-weight:600;color:var(--ink);letter-spacing:-.01em;}
+  .fn-bar{flex:1;height:26px;background:var(--paper);border-radius:8px;overflow:hidden;position:relative;box-shadow:inset 0 1px 2px rgba(15,26,32,.06);}
+  .fn-fill{height:100%;border-radius:8px;background:linear-gradient(90deg,var(--teal-400),var(--teal) 60%,var(--teal-deep));min-width:3px;transition:width .6s var(--ease);}
+  .fn-row:hover .fn-fill{filter:brightness(1.06);}
+  .fn-count{width:44px;flex:none;text-align:right;font-family:'Source Serif 4',Georgia,serif;font-weight:700;font-size:17px;color:var(--teal-deep);font-variant-numeric:tabular-nums;}
+  .fn-conv{width:52px;flex:none;text-align:right;font-size:11px;color:var(--ink-mute);font-weight:600;}
+  .cc-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:18px;margin-bottom:8px;}
+  @media(max-width:900px){.cc-grid{grid-template-columns:1fr;}}
+  .cc-panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px 18px;box-shadow:var(--sh-1);}
+  .cc-panel h3{margin:0 0 12px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--teal-deep);font-family:'Inter',sans-serif;font-weight:700;}
+
   /* hareket azaltma tercihine saygı */
   @media (prefers-reduced-motion: reduce){
     *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;}

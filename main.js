@@ -833,6 +833,38 @@ function evrakOrani(aday) {
   if (!list.length) return 0;
   return Math.round((list.filter((e) => e.teslimAlindi).length / list.length) * 100);
 }
+// Bir adayın o an dikkat isteyen canlı uyarıları (kart rozetleri + genel bakış).
+function adayUyarilari(a) {
+  const bugun = bugunISO(); const u = [];
+  if (a.durum === "gorusme_bekliyor" && a.gorusmeTarihi && a.gorusmeTarihi <= bugun) u.push({ cls: "uy-bad", t: "Karar bekliyor" });
+  if ((a.durum === "evrak_bekliyor" || a.durum === "sgk_bekliyor") && a.iseBaslamaTarihi && a.iseBaslamaTarihi <= bugun && !a.sgkGirisYapildi) u.push({ cls: "uy-bad", t: "SGK gecikti" });
+  if (a.durum === "ise_basladi" && a.denemeSuresi && !a.denemeSuresi.degerlendirmeYapildiMi && gunFarki(a.denemeSuresi.bitisTarihi) !== null && gunFarki(a.denemeSuresi.bitisTarihi) <= 7) u.push({ cls: "uy-warn", t: "Deneme doluyor" });
+  return u;
+}
+// Scorecard: değerlendirme puan ortalaması + yıldız gösterimi.
+function puanOrtalama(a) {
+  const d = a.degerlendirmeler || [];
+  if (!d.length) return null;
+  return d.reduce((s, x) => s + (Number(x.puan) || 0), 0) / d.length;
+}
+function yildizHtml(n, size) {
+  size = size || 14; let h = "";
+  for (let i = 1; i <= 5; i++) { const dolu = n >= i - 0.5; h += `<span style="color:${dolu ? "#e0a92e" : "#d4dcd9"};font-size:${size}px">★</span>`; }
+  return `<span class="yildiz">${h}</span>`;
+}
+// Giriş yapan kişinin rol etiketi (değerlendirme imzası için).
+function rolEtiketi() {
+  if (!currentProfile) return "Kullanıcı";
+  if (currentProfile.role === "admin") return "İK";
+  return currentProfile.muduluk ? currentProfile.muduluk + " Müdürü" : "Müdür";
+}
+// Kart altı canlı rozet satırı: uyarılar + (varsa) ekip puanı.
+function uyRowHtml(a) {
+  const parts = adayUyarilari(a).map((x) => `<span class="uy-badge ${x.cls}">${x.t}</span>`);
+  const ort = puanOrtalama(a);
+  if (ort != null) parts.push(`<span class="card-rating">${yildizHtml(ort, 11)} ${ort.toFixed(1)}</span>`);
+  return parts.length ? `<div class="uy-row">${parts.join("")}</div>` : "";
+}
 
 // ---------------------------------------------------------------
 // State
@@ -1097,6 +1129,7 @@ function kanCardHtml(a, isAdmin) {
         </div>
       </div>
       ${chip ? `<div class="kan-card-chip">${chip}</div>` : ""}
+      ${uyRowHtml(a)}
     </div>`;
 }
 function kanbanHtml(list, isAdmin) {
@@ -1299,6 +1332,7 @@ function renderAdaylarPage(list, isAdmin) {
         <div class="main">
           <b>${esc(a.ad)} ${esc(a.soyad)}</b>
           <div class="meta">${esc(a.unvan || "")} · ${esc(a.departman || "")} · ${altBilgi}</div>
+          ${uyRowHtml(a)}
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:14px;">
@@ -1391,29 +1425,60 @@ function renderGenelBakisPage(adaylarList, talepList, isAdmin) {
       <div class="n">${n}</div><div class="l">${ic ? ic + " " : ""}${l}</div>
     </div>`;
 
+  const aktifAday = adaylarList.filter((a) => !["olumsuz", "vazgecti", "tamamlandi"].includes(a.durum)).length;
+
+  // Dönüşüm hunisi — süreçteki aday dağılımı ve görüşmeye kıyasla dönüşüm
+  const pipe = [
+    { key: "gorusme_bekliyor", ic: "🗓️", label: "Görüşme / Karar" },
+    { key: "evrak_bekliyor", ic: "📄", label: "Evrak" },
+    { key: "sgk_bekliyor", ic: "🏥", label: "SGK" },
+    { key: "ise_basladi", ic: "⏳", label: "Deneme Süresi" },
+    { key: "tamamlandi", ic: "✅", label: "İşe Alındı" }
+  ];
+  const fnSay = pipe.map((s) => adaylarList.filter((a) => a.durum === s.key).length);
+  const fnMax = Math.max(...fnSay, 1);
+  const fnTop = fnSay[0] || 0;
+  const funnelRows = pipe.map((s, i) => {
+    const n = fnSay[i]; const w = Math.round((n / fnMax) * 100);
+    const conv = i > 0 && fnTop > 0 ? `<span class="fn-conv">${Math.round((n / fnTop) * 100)}%</span>` : `<span class="fn-conv"></span>`;
+    return `<div class="fn-row" data-git="adaylar"><span class="fn-ic">${s.ic}</span><span class="fn-label">${s.label}</span><div class="fn-bar"><div class="fn-fill" style="width:${w}%"></div></div><span class="fn-count">${n}</span>${conv}</div>`;
+  }).join("");
+
+  const aksiyonItems = [
+    ...kararBekleyen.map((a) => `<div class="aday-card" data-gitaday="${a.id}"><div class="main"><b>${esc(a.ad)} ${esc(a.soyad)}</b><div class="meta">Görüşme geçti, karar bekliyor · ${esc(a.unvan || "")}</div></div><span class="status-badge st-gorusme">Karar Ver</span></div>`),
+    ...(isAdmin ? onayBekleyenTalep.map((t) => `<div class="aday-card" data-gittalep="${t.id}"><div class="main"><b>${esc(t.unvan)} × ${t.adet}</b><div class="meta">${esc(t.departman)} · ${esc(t.talepEdenKullanici || "")}</div></div><span class="status-badge st-gorusme">Talebi İncele</span></div>`) : []),
+    ...gecikenEvrakSgk.map((a) => `<div class="aday-card" data-gitaday="${a.id}"><div class="main"><b>${esc(a.ad)} ${esc(a.soyad)}</b><div class="meta">${a.durum === "evrak_bekliyor" ? "Evrak" : "SGK"} bekliyor, tarih geçti (${fmtTarih(a.iseBaslamaTarihi)})</div></div><span class="status-badge st-sgk">İncele</span></div>`),
+    ...denemeYaklasan.map((a) => `<div class="aday-card" data-gitaday="${a.id}"><div class="main"><b>${esc(a.ad)} ${esc(a.soyad)}</b><div class="meta">Deneme süresi ${fmtTarih(a.denemeSuresi.bitisTarihi)} tarihinde doluyor</div></div><span class="status-badge st-basladi">Değerlendir</span></div>`)
+  ];
+  const aksiyonHtml = aksiyonItems.length
+    ? `<div class="card-list">${aksiyonItems.join("")}</div>`
+    : `<div class="empty-state" style="padding:36px 20px">🎉 Bekleyen aksiyon yok — her şey güncel.</div>`;
+
   el("#pageWrap").innerHTML = `
     <div class="page-head">
       <div>
         <h1>Genel Bakış</h1>
-        <p>Bugün dikkat etmeniz gereken maddelerin özeti.</p>
+        <p>İşe alım sürecinin canlı komuta merkezi — dönüşüm hunisi, bekleyen aksiyonlar ve uyarılar.</p>
       </div>
     </div>
     <div class="stat-row">
+      ${kart(aktifAday, "Süreçteki Aktif Aday", "👥", "adaylar")}
       ${kart(kararBekleyen.length, "Karar Bekleyen Görüşme", "🗓️", "adaylar")}
       ${isAdmin ? kart(onayBekleyenTalep.length, "Onay Bekleyen Talep", "📋", "talepler") : ""}
       ${kart(gecikenEvrakSgk.length, "Evrak/SGK'da Gecikme", "⚠", "adaylar")}
-      ${kart(oryantasyonSurenler.length, "Devam Eden Oryantasyon", "🎯", "oryantasyon")}
       ${kart(denemeYaklasan.length, "Deneme Süresi Yaklaşan", "⏳", "adaylar")}
     </div>
-    ${!kararBekleyen.length && !onayBekleyenTalep.length && !gecikenEvrakSgk.length && !denemeYaklasan.length
-      ? `<div class="empty-state">🎉 Şu anda bekleyen bir aksiyon yok — her şey güncel.</div>`
-      : `
-      <div class="card-list">
-        ${kararBekleyen.map((a) => `<div class="aday-card" data-gitaday="${a.id}"><div class="main"><b>${esc(a.ad)} ${esc(a.soyad)}</b><div class="meta">Görüşme tarihi geçti, karar bekliyor (${esc(a.unvan || "")} · ${esc(a.departman || "")})</div></div><span class="status-badge st-gorusme">Karar Ver</span></div>`).join("")}
-        ${isAdmin ? onayBekleyenTalep.map((t) => `<div class="aday-card" data-gittalep="${t.id}"><div class="main"><b>${esc(t.unvan)} × ${t.adet}</b><div class="meta">${esc(t.departman)} · ${esc(t.talepEdenKullanici || "")}</div></div><span class="status-badge st-gorusme">Talebi İncele</span></div>`).join("") : ""}
-        ${gecikenEvrakSgk.map((a) => `<div class="aday-card" data-gitaday="${a.id}"><div class="main"><b>${esc(a.ad)} ${esc(a.soyad)}</b><div class="meta">${a.durum === "evrak_bekliyor" ? "Evrak" : "SGK"} bekliyor, işe başlama tarihi geçti (${fmtTarih(a.iseBaslamaTarihi)})</div></div><span class="status-badge st-sgk">İncele</span></div>`).join("")}
-        ${denemeYaklasan.map((a) => `<div class="aday-card" data-gitaday="${a.id}"><div class="main"><b>${esc(a.ad)} ${esc(a.soyad)}</b><div class="meta">Deneme süresi ${fmtTarih(a.denemeSuresi.bitisTarihi)} tarihinde doluyor</div></div><span class="status-badge st-basladi">Değerlendir</span></div>`).join("")}
-      </div>`}`;
+    <div class="cc-grid">
+      <div class="cc-panel">
+        <h3>Dönüşüm Hunisi</h3>
+        ${funnelRows}
+        <div style="margin-top:13px;font-size:11.5px;color:var(--ink-mute);line-height:1.5">Barlar süreçteki aday sayısını; sağdaki oran, görüşme aşamasına kıyasla dönüşümü gösterir.</div>
+      </div>
+      <div class="cc-panel">
+        <h3>Bugün Dikkat</h3>
+        ${aksiyonHtml}
+      </div>
+    </div>`;
 
   document.querySelectorAll("[data-git]").forEach((c) => c.addEventListener("click", () => { TAB = c.dataset.git; render(); }));
   document.querySelectorAll("[data-gitaday]").forEach((c) => c.addEventListener("click", () => {
@@ -2296,6 +2361,8 @@ function openAdayDetay(aday, isAdmin) {
     ${a.denemeSuresi ? denemeSuresiHtml(a) : ""}
     ` : ""}
 
+    ${scorecardHtml(a)}
+
     ${a.gecmis && a.gecmis.length ? gecmisHtml(a) : ""}
 
     <div class="section-title">Not</div>
@@ -2349,11 +2416,64 @@ function openAdayDetay(aday, isAdmin) {
   }
 
   function gecmisHtml(a) {
-    const satirlar = [...a.gecmis].reverse().map((g) => `
-      <div style="font-size:11.5px;color:var(--ink-soft);padding:6px 0;border-bottom:1px solid #eef1ef">
-        <b style="color:var(--ink)">${fmtTarih(g.tarih)}</b> — ${esc(g.kullanici || "")}${g.not ? ": " + esc(g.not) : ""}
+    const items = [...a.gecmis].reverse().map((g) => {
+      const dl = DURUM_ETIKET[g.yeniDurum];
+      const asama = dl ? dl.label : (g.yeniDurum || "Güncelleme");
+      const cls = g.yeniDurum === "olumsuz" ? "tl-bad" : (g.yeniDurum === "tamamlandi" ? "tl-good" : "");
+      return `
+        <div class="tl-item ${cls}">
+          <span class="tl-dot"></span>
+          <div class="tl-when">${fmtTarih(g.tarih)}</div>
+          <div class="tl-what">${esc(asama)}</div>
+          <div class="tl-who">${esc(g.kullanici || "—")}</div>
+          ${g.not ? `<div class="tl-note">${esc(g.not)}</div>` : ""}
+        </div>`;
+    }).join("");
+    return `<div class="section-title">Aktivite Zaman Çizelgesi</div><div class="tl">${items}</div>`;
+  }
+
+  function scInner(a) {
+    const list = a.degerlendirmeler || [];
+    const ort = puanOrtalama(a);
+    const summary = list.length
+      ? `<div class="sc-summary"><div class="big">${ort.toFixed(1)}</div><div>${yildizHtml(ort, 18)}<div class="lab">${list.length} değerlendirme · ekip görüşü</div></div></div>`
+      : `<div class="sc-summary"><div class="lab">Henüz değerlendirme yok — bu aday için ilk puanı ve görüşü siz bırakın.</div></div>`;
+    const items = list.slice().reverse().map((d) => `
+      <div class="sc-item">
+        <div class="top">${avatarHtml(d.kullanici || "?", 26)}<span class="who">${esc(d.kullanici || "—")}</span><span class="role">${esc(d.rol || "")}</span>${yildizHtml(d.puan || 0, 13)}<span class="when">${fmtTarih(d.tarih)}</span></div>
+        ${d.yorum ? `<div class="yorum">${esc(d.yorum)}</div>` : ""}
       </div>`).join("");
-    return `<div class="section-title">Süreç Geçmişi</div><div style="margin-bottom:4px">${satirlar}</div>`;
+    return `${summary}<div id="scList">${items}</div>
+      <div class="sc-form">
+        <div style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Değerlendirmeniz (${esc(rolEtiketi())})</div>
+        <div class="sc-stars-input" id="scStars">${[1, 2, 3, 4, 5].map((i) => `<span class="star" data-p="${i}">★</span>`).join("")}</div>
+        <textarea id="scYorum" rows="2" placeholder="Bu aday hakkındaki görüşünüz (opsiyonel)…"></textarea>
+        <button type="button" class="btn btn-teal btn-sm" id="scEkleBtn" style="margin-top:9px">Değerlendirme Ekle</button>
+      </div>`;
+  }
+  function scorecardHtml(a) {
+    return `<div class="section-title">Değerlendirmeler & Puanlama</div><div id="scWrap">${scInner(a)}</div>`;
+  }
+  function wireScorecard() {
+    let secPuan = 0;
+    const stars = document.querySelectorAll("#scStars .star");
+    stars.forEach((s) => s.addEventListener("click", () => {
+      secPuan = +s.dataset.p;
+      stars.forEach((x) => x.classList.toggle("on", +x.dataset.p <= secPuan));
+    }));
+    const btn = document.getElementById("scEkleBtn");
+    if (btn) btn.addEventListener("click", async () => {
+      if (!secPuan) { toast("Önce yıldız verin (1–5)."); return; }
+      const entry = { kullanici: currentProfile.adSoyad, rol: rolEtiketi(), puan: secPuan, yorum: (document.getElementById("scYorum").value || "").trim(), tarih: bugunISO() };
+      btn.disabled = true; btn.textContent = "Ekleniyor…";
+      try {
+        const yeni = [...(aday.degerlendirmeler || []), entry];
+        await setDoc(doc(db, "iseAlimAday", aday.id), { degerlendirmeler: yeni, guncellemeTarihi: serverTimestamp() }, { merge: true });
+        aday.degerlendirmeler = yeni; workingCopy.degerlendirmeler = yeni;
+        el("#scWrap").innerHTML = scInner(aday); wireScorecard();
+        toast("✓ Değerlendirmeniz eklendi.");
+      } catch (e) { toast("Eklenemedi: " + e.message); btn.disabled = false; btn.textContent = "Değerlendirme Ekle"; }
+    });
   }
 
   function evrakRowHtml(e, i) {
@@ -2480,6 +2600,7 @@ function openAdayDetay(aday, isAdmin) {
   let workingCopy = JSON.parse(JSON.stringify(aday));
 
   function wireDynamicEvents() {
+    wireScorecard();
     document.querySelectorAll("[data-evrak-check]").forEach((cb) => {
       cb.addEventListener("change", () => {
         const i = +cb.dataset.evrakCheck;
