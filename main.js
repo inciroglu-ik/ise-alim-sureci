@@ -952,10 +952,10 @@ function renderLogin(errMsg) {
   <div class="center-screen">
     <div class="login-card">
       <div class="login-brand">
-        <div class="mark">İA</div>
+        <span class="brand-logo lg">${LOGO_SVG}</span>
         <div>
-          <div class="name">İşe Alım Süreci</div>
-          <div class="sub">İnciroğlu Otomotiv · İnsan Kaynakları</div>
+          <div class="name">İnciroğlu İnsan Kaynakları</div>
+          <div class="sub">İşe Alım Platformu · İnciroğlu Otomotiv</div>
         </div>
       </div>
       <h1>Giriş Yap</h1>
@@ -989,6 +989,9 @@ function renderLogin(errMsg) {
 // ---------------------------------------------------------------
 // SHELL
 // ---------------------------------------------------------------
+// Marka amblemi — İnciroğlu İnsan Kaynakları (kişi + pirinç gelişim yayı).
+const LOGO_SVG = `<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="ikLogo" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2fb094"/><stop offset=".55" stop-color="#117a63"/><stop offset="1" stop-color="#0b5548"/></linearGradient></defs><rect width="40" height="40" rx="11" fill="url(#ikLogo)"/><rect x=".6" y=".6" width="38.8" height="38.8" rx="10.4" fill="none" stroke="rgba(255,255,255,.2)"/><circle cx="20" cy="14.6" r="5.1" fill="#fff"/><path d="M9.8 31.6c0-6 4.6-9.3 10.2-9.3s10.2 3.3 10.2 9.3z" fill="#fff"/><path d="M27.6 10.4c2.7 1.2 4.5 3.8 4.8 6.8" fill="none" stroke="#e6b45a" stroke-width="2.2" stroke-linecap="round"/></svg>`;
+const APP_VER = "v2.0";
 const ICONS = {
   people: `<svg width="16" height="16" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.4" fill="currentColor"/><path d="M2.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5" fill="currentColor" opacity=".85"/><circle cx="17.5" cy="8.5" r="2.6" fill="currentColor" opacity=".55"/><path d="M14.8 13.9c1-.6 2.1-.9 3-.9 2.8 0 5 2 5.2 5" fill="currentColor" opacity=".55"/></svg>`,
   genel: `<svg width="16" height="16" viewBox="0 0 24 24"><rect x="2.5" y="13" width="4.5" height="8.5" rx="1" fill="currentColor" opacity=".55"/><rect x="9.7" y="7" width="4.5" height="14.5" rx="1" fill="currentColor" opacity=".8"/><rect x="17" y="2.5" width="4.5" height="19" rx="1" fill="currentColor"/></svg>`,
@@ -1000,10 +1003,11 @@ function topbar() {
   return `
   <div class="topbar">
     <div class="brand">
-      <div class="mark">İA</div>
-      <div class="t">İşe Alım Süreci<small>İK Takip Paneli</small></div>
+      <span class="brand-logo">${LOGO_SVG}</span>
+      <div class="t">İnciroğlu İnsan Kaynakları<small>İşe Alım Platformu<span class="ver-badge">${APP_VER}</span></small></div>
     </div>
     <div class="who">
+      <span class="pill live" title="Veriler canlı olarak güncellenir">Canlı</span>
       <span class="pill">${currentProfile.role === "admin" ? "İK / Admin" : "Müdür"}</span>
       <span><b>${esc(currentProfile.adSoyad)}</b></span>
       <button class="btn btn-ghost btn-sm" id="pwBtn">Şifre Değiştir</button>
@@ -1944,13 +1948,62 @@ function rozetSpan(cls, text) { return `<span class="rozet ${cls}">${esc(text)}<
 
 function renderRaporlarPage(adaylarList, talepList, isAdmin) {
   const departmanlar = isAdmin ? DEPARTMAN_LISTESI : [currentProfile.muduluk].filter(Boolean);
+
+  // --- Canlı analitik ---
+  const toplam = adaylarList.length;
+  const iseAlinan = adaylarList.filter((a) => a.durum === "tamamlandi").length;
+  const aktif = adaylarList.filter((a) => !["olumsuz", "vazgecti", "tamamlandi"].includes(a.durum)).length;
+  const red = adaylarList.filter((a) => a.durum === "olumsuz").length;
+  const kararlanan = iseAlinan + red;
+  const redOrani = kararlanan ? Math.round((red / kararlanan) * 100) : 0;
+  const puanli = adaylarList.filter((a) => puanOrtalama(a) != null);
+  const ortPuan = puanli.length ? puanli.reduce((s, a) => s + puanOrtalama(a), 0) / puanli.length : null;
+
+  const durKeys = ["gorusme_bekliyor", "evrak_bekliyor", "sgk_bekliyor", "ise_basladi", "tamamlandi", "vazgecti", "olumsuz"];
+  const durMax = Math.max(...durKeys.map((k) => adaylarList.filter((a) => a.durum === k).length), 1);
+  const durumBars = durKeys.map((k) => {
+    const n = adaylarList.filter((a) => a.durum === k).length;
+    if (!n && (k === "olumsuz" || k === "vazgecti")) return "";
+    const g = AKIS_GRUPLARI.find((x) => x.key === k) || { ic: "•" };
+    return `<div class="fn-row"><span class="fn-ic">${g.ic}</span><span class="fn-label">${esc((DURUM_ETIKET[k] || {}).label || k)}</span><div class="fn-bar"><div class="fn-fill" style="width:${Math.round((n / durMax) * 100)}%"></div></div><span class="fn-count">${n}</span></div>`;
+  }).join("");
+
+  const depSay = {};
+  adaylarList.forEach((a) => { const d = a.departman || "—"; depSay[d] = (depSay[d] || 0) + 1; });
+  const depArr = Object.entries(depSay).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const depMax = Math.max(...depArr.map((x) => x[1]), 1);
+  const deptBars = depArr.length
+    ? depArr.map(([d, n]) => `<div class="fn-row"><span class="fn-label" style="width:170px">${esc(d)}</span><div class="fn-bar"><div class="fn-fill" style="width:${Math.round((n / depMax) * 100)}%"></div></div><span class="fn-count">${n}</span></div>`).join("")
+    : `<div style="color:var(--ink-mute);font-size:12.5px">Veri yok.</div>`;
+
+  const top = puanli.map((a) => ({ a, p: puanOrtalama(a) })).sort((x, y) => y.p - x.p).slice(0, 5);
+  const topHtml = top.length
+    ? top.map((o) => `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line-soft)">${avatarHtml(o.a.ad + " " + o.a.soyad, 30)}<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--ink)">${esc(o.a.ad)} ${esc(o.a.soyad)}<span style="color:var(--ink-soft);font-weight:400;font-size:11.5px"> · ${esc(o.a.unvan || "")}</span></span>${yildizHtml(o.p, 13)}<b style="color:var(--teal-deep);font-size:13px;min-width:26px;text-align:right">${o.p.toFixed(1)}</b></div>`).join("")
+    : `<div class="empty-state" style="padding:30px 18px">Henüz puanlanmış aday yok. Aday detayında yıldız verildikçe burada sıralanır.</div>`;
+
+  const analitikHtml = `
+    <div class="stat-row">
+      <div class="stat-card"><div class="n">${toplam}</div><div class="l">👥 Toplam Aday</div></div>
+      <div class="stat-card"><div class="n">${aktif}</div><div class="l">⏳ Aktif Süreç</div></div>
+      <div class="stat-card"><div class="n">${iseAlinan}</div><div class="l">✅ İşe Alınan</div></div>
+      <div class="stat-card"><div class="n">${redOrani}%</div><div class="l">✗ Red Oranı</div></div>
+      <div class="stat-card"><div class="n">${ortPuan == null ? "—" : ortPuan.toFixed(1)}</div><div class="l">★ Ort. Değerlendirme</div></div>
+    </div>
+    <div class="cc-grid">
+      <div class="cc-panel"><h3>Aşama Dağılımı</h3>${durumBars}</div>
+      <div class="cc-panel"><h3>Departman Bazında Aday</h3>${deptBars}</div>
+    </div>
+    <div class="cc-panel" style="margin-bottom:8px"><h3>En Yüksek Puanlı Adaylar</h3>${topHtml}</div>`;
+
   el("#pageWrap").innerHTML = `
     <div class="page-head">
       <div>
-        <h1>Raporlar</h1>
-        <p>CEO'ya veya üst yönetime doğrudan sunulabilecek, yazdırmaya/PDF'e hazır raporlar oluşturun.</p>
+        <h1>Raporlar & Analitik</h1>
+        <p>Sürecin canlı analitiği ve üst yönetime sunulabilecek, yazdırmaya/PDF'e hazır raporlar.</p>
       </div>
     </div>
+    ${analitikHtml}
+    <div class="section-title" style="margin-top:30px">Yazdırılabilir Rapor Oluştur</div>
     <div class="card-list" style="max-width:640px">
       <div class="aday-card" style="cursor:default;flex-direction:column;align-items:stretch;gap:12px">
         <div class="field" style="margin:0"><label>Rapor Türü</label>
