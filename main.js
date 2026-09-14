@@ -997,7 +997,8 @@ const ICONS = {
   genel: `<svg width="16" height="16" viewBox="0 0 24 24"><rect x="2.5" y="13" width="4.5" height="8.5" rx="1" fill="currentColor" opacity=".55"/><rect x="9.7" y="7" width="4.5" height="14.5" rx="1" fill="currentColor" opacity=".8"/><rect x="17" y="2.5" width="4.5" height="19" rx="1" fill="currentColor"/></svg>`,
   talep: `<svg width="16" height="16" viewBox="0 0 24 24"><rect x="3.5" y="2.5" width="17" height="19" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
   oryantasyon: `<svg width="16" height="16" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 12.5l2.6 2.6L16.5 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-  rapor: `<svg width="16" height="16" viewBox="0 0 24 24"><rect x="4" y="2.5" width="16" height="19" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 7.5h8M8 11.5h8M8 15.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M8 19h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".6"/></svg>`
+  rapor: `<svg width="16" height="16" viewBox="0 0 24 24"><rect x="4" y="2.5" width="16" height="19" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 7.5h8M8 11.5h8M8 15.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M8 19h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".6"/></svg>`,
+  denetim: `<svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 2.5l7.5 3v5.2c0 4.5-3 8.2-7.5 10.3-4.5-2.1-7.5-5.8-7.5-10.3V5.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.5 12l2.4 2.4 4.6-4.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 };
 function topbar() {
   return `
@@ -1084,7 +1085,8 @@ function render() {
     { key: "adaylar", label: "Aday Havuzu", ic: ICONS.people },
     { key: "talepler", label: "Personel Talepleri", ic: ICONS.talep },
     { key: "oryantasyon", label: "Oryantasyon", ic: ICONS.oryantasyon },
-    { key: "raporlar", label: "Raporlar", ic: ICONS.rapor }
+    { key: "raporlar", label: "Raporlar", ic: ICONS.rapor },
+    ...(isAdmin ? [{ key: "denetim", label: "Denetim İzi", ic: ICONS.denetim }] : [])
   ];
 
   root().innerHTML = `
@@ -1102,6 +1104,7 @@ function render() {
   else if (TAB === "oryantasyon") renderOryantasyonPage(gorulenAdaylar, isAdmin);
   else if (TAB === "raporlar") renderRaporlarPage(gorulenAdaylar, gorulenTalepler, isAdmin);
   else if (TAB === "genel") renderGenelBakisPage(gorulenAdaylar, gorulenTalepler, isAdmin);
+  else if (TAB === "denetim" && isAdmin) renderDenetimPage(gorulenAdaylar, gorulenTalepler);
   else renderAdaylarPage(gorulenAdaylar, isAdmin);
 }
 
@@ -1937,6 +1940,40 @@ function raporKapsayiciHtml(title, bodyHtml) {
   <div class="footer"><span>İnciroğlu Otomotiv — İç Kullanım / Gizli Belge</span><span>${fmtTarih(bugunISO())}</span></div>
   </body></html>`;
 }
+function teklifMektubuHtml(a, t) {
+  const bugun = fmtTarih(bugunISO());
+  return `
+    <div style="max-width:150mm;margin:0 auto;font-size:12.5px;line-height:1.7;color:#1c2530">
+      <div style="display:flex;align-items:center;gap:12px;border-bottom:2px solid #117a63;padding-bottom:14px;margin-bottom:22px">
+        <div style="width:44px;height:44px;border-radius:11px;background:linear-gradient(140deg,#2fb094,#0b5548);display:flex;align-items:center;justify-content:center">
+          <svg width="30" height="30" viewBox="0 0 40 40"><circle cx="20" cy="14.6" r="5.1" fill="#fff"/><path d="M9.8 31.6c0-6 4.6-9.3 10.2-9.3s10.2 3.3 10.2 9.3z" fill="#fff"/><path d="M27.6 10.4c2.7 1.2 4.5 3.8 4.8 6.8" fill="none" stroke="#e6b45a" stroke-width="2.2" stroke-linecap="round"/></svg>
+        </div>
+        <div>
+          <div style="font-family:'Source Serif 4',Georgia,serif;font-size:17px;font-weight:700;color:#0b5548">İnciroğlu Otomotiv</div>
+          <div style="font-size:11px;color:#56676f">İnsan Kaynakları — İş Teklifi</div>
+        </div>
+        <div style="margin-left:auto;font-size:11px;color:#56676f;text-align:right">Tarih: ${bugun}</div>
+      </div>
+      <h2 style="font-family:'Source Serif 4',Georgia,serif;font-size:19px;color:#0f1a20;margin:0 0 16px">İş Teklifi Mektubu</h2>
+      <p>Sayın <b>${esc(a.ad)} ${esc(a.soyad)}</b>,</p>
+      <p>İnciroğlu Otomotiv ailesine katılmanızdan memnuniyet duyarız. Yürüttüğümüz değerlendirme süreci sonucunda, aşağıda ayrıntıları belirtilen pozisyon için size iş teklifinde bulunmaktan mutluluk duyuyoruz.</p>
+      <table style="width:100%;border-collapse:collapse;margin:18px 0">
+        <tbody>
+          <tr><td style="padding:9px 12px;border:1px solid #e2e8e5;background:#f0f8f5;font-weight:700;width:42%">Pozisyon</td><td style="padding:9px 12px;border:1px solid #e2e8e5">${esc(t.pozisyon || a.unvan || "—")}</td></tr>
+          ${a.departman ? `<tr><td style="padding:9px 12px;border:1px solid #e2e8e5;background:#f0f8f5;font-weight:700">Departman / Marka</td><td style="padding:9px 12px;border:1px solid #e2e8e5">${esc(a.departman)}</td></tr>` : ""}
+          <tr><td style="padding:9px 12px;border:1px solid #e2e8e5;background:#f0f8f5;font-weight:700">Ücret / Paket</td><td style="padding:9px 12px;border:1px solid #e2e8e5">${esc(t.maas || "Görüşmede belirtilecektir")}</td></tr>
+          <tr><td style="padding:9px 12px;border:1px solid #e2e8e5;background:#f0f8f5;font-weight:700">İşe Başlama Tarihi</td><td style="padding:9px 12px;border:1px solid #e2e8e5">${t.baslamaTarihi ? fmtTarih(t.baslamaTarihi) : "Karşılıklı belirlenecektir"}</td></tr>
+        </tbody>
+      </table>
+      ${t.not ? `<p>${esc(t.not)}</p>` : ""}
+      <p>Bu teklif; işe başlangıçta imzalanacak iş sözleşmesi, özlük evraklarının tamamlanması ve şirket politikalarına uyum şartına bağlıdır. Teklifi kabul etmeniz hâlinde, İnsan Kaynakları birimimiz sizinle başlangıç sürecine dair iletişime geçecektir.</p>
+      <p>Aramıza katılmanızı sabırsızlıkla bekliyoruz.</p>
+      <div style="margin-top:34px;display:flex;justify-content:space-between;gap:40px">
+        <div style="flex:1"><div style="border-top:1px solid #1c2530;padding-top:6px;font-size:11.5px">İnsan Kaynakları<br>İnciroğlu Otomotiv</div></div>
+        <div style="flex:1"><div style="border-top:1px solid #1c2530;padding-top:6px;font-size:11.5px">Aday Onayı (Ad-Soyad / İmza / Tarih)<br>${esc(a.ad)} ${esc(a.soyad)}</div></div>
+      </div>
+    </div>`;
+}
 function raporAcVeYazdir(html, title) {
   const win = window.open("", "_blank");
   if (!win) { toast("⚠ Açılır pencere engellendi. Tarayıcı ayarlarından izin verin."); return; }
@@ -1945,6 +1982,65 @@ function raporAcVeYazdir(html, title) {
   setTimeout(() => { try { win.print(); } catch (_) {} }, 350);
 }
 function rozetSpan(cls, text) { return `<span class="rozet ${cls}">${esc(text)}</span>`; }
+
+function renderDenetimPage(adaylarList, talepList) {
+  const olaylar = [];
+  adaylarList.forEach((a) => (a.gecmis || []).forEach((g) => {
+    const dl = DURUM_ETIKET[g.yeniDurum];
+    olaylar.push({
+      tarih: g.tarih || "", kim: g.kullanici || "—",
+      ne: g.olay || (dl ? dl.label : (g.yeniDurum || "Güncelleme")),
+      not: g.not || "", aday: a.ad + " " + a.soyad, adayId: a.id, terminal: g.yeniDurum
+    });
+  }));
+  olaylar.sort((x, y) => (y.tarih || "").localeCompare(x.tarih || ""));
+
+  const bugun = bugunISO();
+  const haftaOnce = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+  const bugunSayi = olaylar.filter((o) => o.tarih === bugun).length;
+  const haftaSayi = olaylar.filter((o) => o.tarih >= haftaOnce).length;
+  const kullanicilar = Array.from(new Set(olaylar.map((o) => o.kim))).sort((a, b) => a.localeCompare(b, "tr"));
+
+  el("#pageWrap").innerHTML = `
+    <div class="page-head">
+      <div><h1>Denetim İzi</h1><p>Sistemde yapılan tüm işlemler — kim, ne zaman, hangi aday üzerinde ne yaptı. Kurumsal hafıza ve şeffaflık için tam kayıt.</p></div>
+    </div>
+    <div class="stat-row">
+      <div class="stat-card"><div class="n">${olaylar.length}</div><div class="l">Toplam İşlem</div></div>
+      <div class="stat-card"><div class="n">${bugunSayi}</div><div class="l">Bugün</div></div>
+      <div class="stat-card"><div class="n">${haftaSayi}</div><div class="l">Son 7 Gün</div></div>
+      <div class="stat-card"><div class="n">${kullanicilar.length}</div><div class="l">Aktif Kullanıcı</div></div>
+    </div>
+    <div class="toolbar">
+      <input type="text" id="denAra" placeholder="Aday, işlem veya not içinde ara…" style="min-width:260px">
+      <select id="denKisi"><option value="">Tüm kullanıcılar</option>${kullanicilar.map((k) => `<option>${esc(k)}</option>`).join("")}</select>
+    </div>
+    <div class="cc-panel"><div class="tl" id="denList"></div></div>`;
+
+  function ciz() {
+    const term = el("#denAra").value.trim().toLocaleLowerCase("tr");
+    const kisi = el("#denKisi").value;
+    const filt = olaylar.filter((o) => (!kisi || o.kim === kisi) && (!term || (o.aday + " " + o.ne + " " + o.not).toLocaleLowerCase("tr").includes(term))).slice(0, 400);
+    el("#denList").innerHTML = filt.length ? filt.map((o) => {
+      const cls = o.terminal === "olumsuz" ? "tl-bad" : (o.terminal === "tamamlandi" ? "tl-good" : "");
+      return `
+        <div class="tl-item ${cls}" data-id="${o.adayId}" style="cursor:pointer">
+          <span class="tl-dot"></span>
+          <div class="tl-when">${fmtTarih(o.tarih)}</div>
+          <div class="tl-what">${esc(o.ne)} — <span style="color:var(--teal-deep)">${esc(o.aday)}</span></div>
+          <div class="tl-who">${esc(o.kim)}</div>
+          ${o.not ? `<div class="tl-note">${esc(o.not)}</div>` : ""}
+        </div>`;
+    }).join("") : `<div class="empty-state">Kayıt bulunamadı.</div>`;
+    document.querySelectorAll("#denList .tl-item[data-id]").forEach((it) => it.addEventListener("click", () => {
+      const a = adaylar.find((x) => x.id === it.dataset.id);
+      if (a) openAdayDetay(a, true);
+    }));
+  }
+  ciz();
+  el("#denAra").addEventListener("input", ciz);
+  el("#denKisi").addEventListener("change", ciz);
+}
 
 function renderRaporlarPage(adaylarList, talepList, isAdmin) {
   const departmanlar = isAdmin ? DEPARTMAN_LISTESI : [currentProfile.muduluk].filter(Boolean);
@@ -1958,6 +2054,25 @@ function renderRaporlarPage(adaylarList, talepList, isAdmin) {
   const redOrani = kararlanan ? Math.round((red / kararlanan) * 100) : 0;
   const puanli = adaylarList.filter((a) => puanOrtalama(a) != null);
   const ortPuan = puanli.length ? puanli.reduce((s, a) => s + puanOrtalama(a), 0) / puanli.length : null;
+
+  // Ortalama işe alım süresi (ilk kayıt → işe başlama), gün
+  const sureler = [];
+  adaylarList.forEach((a) => {
+    if ((a.durum === "tamamlandi" || a.durum === "ise_basladi") && a.gecmis && a.gecmis.length) {
+      const ilk = a.gecmis[0].tarih, bas = a.iseBaslamaTarihi || a.gecmis[a.gecmis.length - 1].tarih;
+      if (ilk && bas) { const d = Math.round((new Date(bas) - new Date(ilk)) / 864e5); if (isFinite(d) && d >= 0 && d < 400) sureler.push(d); }
+    }
+  });
+  const ortSure = sureler.length ? Math.round(sureler.reduce((s, x) => s + x, 0) / sureler.length) : null;
+
+  // Kaynak etkinliği
+  const kaynakSay = {};
+  adaylarList.forEach((a) => { const k = a.kaynak || "Belirtilmemiş"; kaynakSay[k] = (kaynakSay[k] || 0) + 1; });
+  const kaynakArr = Object.entries(kaynakSay).sort((a, b) => b[1] - a[1]);
+  const kaynakMax = Math.max(...kaynakArr.map((x) => x[1]), 1);
+  const kaynakBars = kaynakArr.length
+    ? kaynakArr.map(([k, n]) => `<div class="fn-row"><span class="fn-label" style="width:200px">${esc(k)}</span><div class="fn-bar"><div class="fn-fill" style="width:${Math.round((n / kaynakMax) * 100)}%"></div></div><span class="fn-count">${n}</span></div>`).join("")
+    : `<div style="color:var(--ink-mute);font-size:12.5px">Veri yok.</div>`;
 
   const durKeys = ["gorusme_bekliyor", "evrak_bekliyor", "sgk_bekliyor", "ise_basladi", "tamamlandi", "vazgecti", "olumsuz"];
   const durMax = Math.max(...durKeys.map((k) => adaylarList.filter((a) => a.durum === k).length), 1);
@@ -1988,12 +2103,16 @@ function renderRaporlarPage(adaylarList, talepList, isAdmin) {
       <div class="stat-card"><div class="n">${iseAlinan}</div><div class="l">✅ İşe Alınan</div></div>
       <div class="stat-card"><div class="n">${redOrani}%</div><div class="l">✗ Red Oranı</div></div>
       <div class="stat-card"><div class="n">${ortPuan == null ? "—" : ortPuan.toFixed(1)}</div><div class="l">★ Ort. Değerlendirme</div></div>
+      <div class="stat-card"><div class="n">${ortSure == null ? "—" : ortSure}${ortSure == null ? "" : "<span style='font-size:15px'> gün</span>"}</div><div class="l">⏱ Ort. İşe Alım Süresi</div></div>
     </div>
     <div class="cc-grid">
       <div class="cc-panel"><h3>Aşama Dağılımı</h3>${durumBars}</div>
       <div class="cc-panel"><h3>Departman Bazında Aday</h3>${deptBars}</div>
     </div>
-    <div class="cc-panel" style="margin-bottom:8px"><h3>En Yüksek Puanlı Adaylar</h3>${topHtml}</div>`;
+    <div class="cc-grid" style="margin-top:18px">
+      <div class="cc-panel"><h3>Kaynak Etkinliği</h3>${kaynakBars}</div>
+      <div class="cc-panel"><h3>En Yüksek Puanlı Adaylar</h3>${topHtml}</div>
+    </div>`;
 
   el("#pageWrap").innerHTML = `
     <div class="page-head">
@@ -2389,6 +2508,7 @@ function openAdayDetay(aday, isAdmin) {
       <div class="field"><label>Telefon</label><input type="text" id="dTelefon" value="${esc(a.telefon || "")}" ${isAdmin ? "" : "disabled"}></div>
       <div class="field"><label>E-posta</label><input type="email" id="dEmail" value="${esc(a.email || "")}" ${isAdmin ? "" : "disabled"}></div>
     </div>
+    ${kaynakEtiketHtml(a)}
     ${!gorusmeAsamasinda && !olumsuz ? `<div class="field"><label>İşe Başlama Tarihi</label><input type="date" id="dTarih" value="${esc(a.iseBaslamaTarihi || "")}" ${isAdmin ? "" : "disabled"}></div>` : ""}
 
     ${gorusmeAsamasinda ? gorusmeHtml(a) : ""}
@@ -2415,6 +2535,14 @@ function openAdayDetay(aday, isAdmin) {
     ` : ""}
 
     ${scorecardHtml(a)}
+
+    <div class="section-title">Planlı Mülakatlar</div>
+    <div id="mulakatWrap">${mulakatInner(a)}</div>
+
+    ${!olumsuz ? `<div class="section-title">Teklif</div><div id="teklifWrap">${teklifInner(a)}</div>` : ""}
+
+    <div class="section-title">İletişim Geçmişi</div>
+    <div id="iletisimWrap">${iletisimInner(a)}</div>
 
     ${a.gecmis && a.gecmis.length ? gecmisHtml(a) : ""}
 
@@ -2471,7 +2599,7 @@ function openAdayDetay(aday, isAdmin) {
   function gecmisHtml(a) {
     const items = [...a.gecmis].reverse().map((g) => {
       const dl = DURUM_ETIKET[g.yeniDurum];
-      const asama = dl ? dl.label : (g.yeniDurum || "Güncelleme");
+      const asama = g.olay || (dl ? dl.label : (g.yeniDurum || "Güncelleme"));
       const cls = g.yeniDurum === "olumsuz" ? "tl-bad" : (g.yeniDurum === "tamamlandi" ? "tl-good" : "");
       return `
         <div class="tl-item ${cls}">
@@ -2628,6 +2756,141 @@ function openAdayDetay(aday, isAdmin) {
     ${!kilitli && canEditSurec ? `<button class="btn btn-teal btn-sm" id="denemeKesinlestirBtn" type="button">Değerlendirmeyi Kesinleştir</button>` : ""}`;
   }
 
+  const KAYNAK_OPT = ["Web Başvurusu", "Referans", "İlan (Kariyer.net vb.)", "LinkedIn", "Doğrudan Başvuru", "İK Havuzu", "Diğer"];
+  const MULAKAT_TUR = ["Telefon", "Yüz Yüze", "Video", "Teknik", "Panel"];
+  const ILETISIM_TUR = ["Telefon", "E-posta", "WhatsApp / SMS", "Yüz Yüze", "Diğer"];
+
+  function kaynakEtiketHtml(a) {
+    return `
+    <div class="two-col">
+      <div class="field"><label>Aday Kaynağı</label>
+        <select id="dKaynak" ${isAdmin ? "" : "disabled"}>
+          <option value="">— Belirtilmemiş —</option>
+          ${KAYNAK_OPT.map((k) => `<option ${a.kaynak === k ? "selected" : ""}>${esc(k)}</option>`).join("")}
+        </select>
+      </div>
+      <div class="field"><label>Etiketler</label><div id="etiketWrap">${etiketInner(a)}</div></div>
+    </div>`;
+  }
+  function etiketInner(a) {
+    const t = a.etiketler || [];
+    return `<div class="tag-box">
+      ${t.map((x, i) => `<span class="tagchip">${esc(x)}${isAdmin ? `<button type="button" data-etsil="${i}" title="Kaldır">×</button>` : ""}</span>`).join("") || `<span style="color:var(--ink-mute);font-size:12px">Etiket yok</span>`}
+      ${isAdmin ? `<span class="tagadd"><input type="text" id="etInput" placeholder="+ etiket" maxlength="24"><button type="button" id="etEkle">Ekle</button></span>` : ""}
+    </div>`;
+  }
+  function mulakatInner(a) {
+    const m = (a.mulakatlar || []).slice().reverse();
+    const list = m.length ? m.map((x) => `
+      <div class="evrak-row" style="flex-direction:column;align-items:stretch;gap:4px">
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+          <b style="font-size:13px;color:var(--ink)">${esc(x.tur || "Mülakat")} · ${fmtTarih(x.tarih)}${x.saat ? " " + esc(x.saat) : ""}</b>
+          <span style="font-size:11.5px;color:var(--ink-soft)">${esc(x.gorusmeciler || "")}</span>
+        </div>
+        ${x.notlar ? `<div style="font-size:12px;color:var(--ink-soft)">${esc(x.notlar)}</div>` : ""}
+      </div>`).join("") : `<div style="color:var(--ink-mute);font-size:12.5px;margin-bottom:8px">Henüz planlı mülakat yok.</div>`;
+    const form = isAdmin ? `
+      <div class="mini-form">
+        <div class="two-col">
+          <div class="field" style="margin:0"><label>Tarih</label><input type="date" id="mkTarih"></div>
+          <div class="field" style="margin:0"><label>Saat</label><input type="time" id="mkSaat"></div>
+        </div>
+        <div class="two-col">
+          <div class="field" style="margin:8px 0 0"><label>Tür</label><select id="mkTur">${MULAKAT_TUR.map((t) => `<option>${t}</option>`).join("")}</select></div>
+          <div class="field" style="margin:8px 0 0"><label>Görüşmeci(ler)</label><input type="text" id="mkKisiler" placeholder="ör. Birol Caner, İK"></div>
+        </div>
+        <div class="field" style="margin:8px 0 0"><label>Not (opsiyonel)</label><input type="text" id="mkNot"></div>
+        <button type="button" class="btn btn-teal btn-sm" id="mkEkle" style="margin-top:9px">Mülakat Planla</button>
+      </div>` : "";
+    return list + form;
+  }
+  function teklifInner(a) {
+    const t = a.teklif || {};
+    const dur = t.durum || "";
+    const durEt = { hazirlandi: ["Hazırlandı", "st-evrak"], iletildi: ["İletildi", "st-gorusme"], kabul: ["Kabul Edildi", "st-tamam"], red: ["Reddedildi", "st-olumsuz"] };
+    const rozet = dur && durEt[dur] ? `<span class="status-badge ${durEt[dur][1]}">${durEt[dur][0]}</span>` : "";
+    return `
+      ${rozet ? `<div style="margin-bottom:10px">${rozet}</div>` : ""}
+      <div class="two-col">
+        <div class="field" style="margin:0"><label>Teklif Pozisyonu</label><input type="text" id="tkPoz" value="${esc(t.pozisyon || a.unvan || "")}" ${isAdmin ? "" : "disabled"}></div>
+        <div class="field" style="margin:0"><label>Ücret / Paket</label><input type="text" id="tkMaas" value="${esc(t.maas || "")}" placeholder="ör. net maaş + prim" ${isAdmin ? "" : "disabled"}></div>
+      </div>
+      <div class="two-col">
+        <div class="field" style="margin:8px 0 0"><label>Başlama Tarihi</label><input type="date" id="tkBaslama" value="${esc(t.baslamaTarihi || "")}" ${isAdmin ? "" : "disabled"}></div>
+        <div class="field" style="margin:8px 0 0"><label>Durum</label>
+          <select id="tkDurum" ${isAdmin ? "" : "disabled"}>
+            <option value="">—</option>
+            ${Object.keys(durEt).map((k) => `<option value="${k}" ${dur === k ? "selected" : ""}>${durEt[k][0]}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <div class="field" style="margin:8px 0 0"><label>Not</label><input type="text" id="tkNot" value="${esc(t.not || "")}" ${isAdmin ? "" : "disabled"}></div>
+      ${isAdmin ? `<div style="margin-top:11px;display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn btn-teal btn-sm" id="tkKaydet">Teklifi Kaydet</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="tkYazdir">🖨 Teklif Mektubu</button>
+      </div>` : ""}`;
+  }
+  function iletisimInner(a) {
+    const l = (a.iletisim || []).slice().reverse();
+    const list = l.length ? l.map((x) => `
+      <div class="evrak-row" style="flex-direction:column;align-items:stretch;gap:3px">
+        <div style="display:flex;justify-content:space-between;gap:8px"><b style="font-size:12.5px">${esc(x.tur || "")}</b><span style="font-size:11px;color:var(--ink-soft)">${fmtTarih(x.tarih)} · ${esc(x.kullanici || "")}</span></div>
+        <div style="font-size:12.5px;color:var(--ink-soft)">${esc(x.ozet || "")}</div>
+      </div>`).join("") : `<div style="color:var(--ink-mute);font-size:12.5px;margin-bottom:8px">Henüz iletişim kaydı yok.</div>`;
+    const form = isAdmin ? `
+      <div class="mini-form">
+        <div class="two-col">
+          <div class="field" style="margin:0"><label>Tür</label><select id="ilTur">${ILETISIM_TUR.map((t) => `<option>${t}</option>`).join("")}</select></div>
+          <div class="field" style="margin:0"><label>Özet</label><input type="text" id="ilOzet" placeholder="ör. Görüşme daveti iletildi"></div>
+        </div>
+        <button type="button" class="btn btn-teal btn-sm" id="ilEkle" style="margin-top:9px">İletişim Kaydı Ekle</button>
+      </div>` : "";
+    return list + form;
+  }
+  async function ekleGecmisli(patch, olay) {
+    const gecmis = [...(aday.gecmis || []), { tarih: bugunISO(), eskiDurum: aday.durum, yeniDurum: aday.durum, olay, kullanici: currentProfile.adSoyad, not: patch._not || "" }];
+    const temiz = { ...patch }; delete temiz._not;
+    await persist({ ...temiz, gecmis });
+    aday.gecmis = gecmis; Object.assign(aday, temiz); if (workingCopy) Object.assign(workingCopy, temiz);
+  }
+  function wireEklentiler() {
+    const etEkle = document.getElementById("etEkle");
+    if (etEkle) etEkle.addEventListener("click", async () => {
+      const v = (document.getElementById("etInput").value || "").trim(); if (!v) return;
+      const yeni = [...(aday.etiketler || []), v];
+      try { await persist({ etiketler: yeni }); aday.etiketler = yeni; if (workingCopy) workingCopy.etiketler = yeni; el("#etiketWrap").innerHTML = etiketInner(aday); wireEklentiler(); } catch (e) { toast("Eklenemedi: " + e.message); }
+    });
+    document.querySelectorAll("[data-etsil]").forEach((b) => b.addEventListener("click", async () => {
+      const i = +b.dataset.etsil; const yeni = (aday.etiketler || []).filter((_, x) => x !== i);
+      try { await persist({ etiketler: yeni }); aday.etiketler = yeni; if (workingCopy) workingCopy.etiketler = yeni; el("#etiketWrap").innerHTML = etiketInner(aday); wireEklentiler(); } catch (e) { toast("Silinemedi: " + e.message); }
+    }));
+    const mkEkle = document.getElementById("mkEkle");
+    if (mkEkle) mkEkle.addEventListener("click", async () => {
+      const tarih = el("#mkTarih").value; if (!tarih) { toast("Mülakat tarihi girin."); return; }
+      const kayit = { tarih, saat: el("#mkSaat").value, tur: el("#mkTur").value, gorusmeciler: el("#mkKisiler").value.trim(), notlar: el("#mkNot").value.trim() };
+      const yeni = [...(aday.mulakatlar || []), kayit]; mkEkle.disabled = true;
+      try { await ekleGecmisli({ mulakatlar: yeni, _not: `${kayit.tur} — ${fmtTarih(tarih)}${kayit.saat ? " " + kayit.saat : ""}` }, "Mülakat planlandı"); el("#mulakatWrap").innerHTML = mulakatInner(aday); wireEklentiler(); toast("✓ Mülakat planlandı."); } catch (e) { toast("Eklenemedi: " + e.message); mkEkle.disabled = false; }
+    });
+    const tkKaydet = document.getElementById("tkKaydet");
+    if (tkKaydet) tkKaydet.addEventListener("click", async () => {
+      const teklif = { pozisyon: el("#tkPoz").value.trim(), maas: el("#tkMaas").value.trim(), baslamaTarihi: el("#tkBaslama").value, durum: el("#tkDurum").value, not: el("#tkNot").value.trim(), guncelleyen: currentProfile.adSoyad, tarih: bugunISO() };
+      tkKaydet.disabled = true;
+      try { await ekleGecmisli({ teklif, _not: `Teklif${teklif.durum ? " (" + teklif.durum + ")" : ""} ${teklif.maas || ""}`.trim() }, "Teklif güncellendi"); el("#teklifWrap").innerHTML = teklifInner(aday); wireEklentiler(); toast("✓ Teklif kaydedildi."); } catch (e) { toast("Kaydedilemedi: " + e.message); tkKaydet.disabled = false; }
+    });
+    const tkYazdir = document.getElementById("tkYazdir");
+    if (tkYazdir) tkYazdir.addEventListener("click", () => {
+      const t = { pozisyon: el("#tkPoz").value.trim(), maas: el("#tkMaas").value.trim(), baslamaTarihi: el("#tkBaslama").value, not: el("#tkNot").value.trim() };
+      raporAcVeYazdir(teklifMektubuHtml(aday, t), "Teklif Mektubu");
+    });
+    const ilEkle = document.getElementById("ilEkle");
+    if (ilEkle) ilEkle.addEventListener("click", async () => {
+      const ozet = el("#ilOzet").value.trim(); if (!ozet) { toast("Kısa bir özet girin."); return; }
+      const kayit = { tarih: bugunISO(), tur: el("#ilTur").value, ozet, kullanici: currentProfile.adSoyad };
+      const yeni = [...(aday.iletisim || []), kayit]; ilEkle.disabled = true;
+      try { await ekleGecmisli({ iletisim: yeni, _not: `${kayit.tur}: ${ozet}` }, "İletişim kaydı"); el("#iletisimWrap").innerHTML = iletisimInner(aday); wireEklentiler(); toast("✓ İletişim kaydı eklendi."); } catch (e) { toast("Eklenemedi: " + e.message); ilEkle.disabled = false; }
+    });
+  }
+
   overlay.innerHTML = `
     <div class="drawer">
       <div class="drawer-head">
@@ -2654,6 +2917,7 @@ function openAdayDetay(aday, isAdmin) {
 
   function wireDynamicEvents() {
     wireScorecard();
+    wireEklentiler();
     document.querySelectorAll("[data-evrak-check]").forEach((cb) => {
       cb.addEventListener("change", () => {
         const i = +cb.dataset.evrakCheck;
@@ -2790,7 +3054,8 @@ function openAdayDetay(aday, isAdmin) {
       bolum: el("#dBolum").value,
       telefon: el("#dTelefon").value.trim(),
       email: el("#dEmail").value.trim(),
-      notlar: el("#dNot").value.trim()
+      notlar: el("#dNot").value.trim(),
+      kaynak: el("#dKaynak") ? el("#dKaynak").value : (aday.kaynak || "")
     };
     // Görüşme aşamasındayken "Kaydet", karar butonlarına dokunmadan sadece
     // notları/bilgileri günceller — karar yalnızca Olumlu/Olumsuz butonlarıyla verilir.

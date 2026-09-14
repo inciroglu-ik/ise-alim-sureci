@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>İnciroğlu İnsan Kaynakları · İş Başvurusu</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232fb094'/%3E%3Cstop offset='.55' stop-color='%23117a63'/%3E%3Cstop offset='1' stop-color='%230b5548'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='40' height='40' rx='11' fill='url(%23g)'/%3E%3Ccircle cx='20' cy='14.5' r='5.1' fill='white'/%3E%3Cpath d='M9.7 31.5c0-6 4.6-9.2 10.3-9.2s10.3 3.2 10.3 9.2z' fill='white'/%3E%3Cpath d='M27.5 10.5c2.6 1.2 4.3 3.7 4.6 6.6' fill='none' stroke='%23e6b45a' stroke-width='2.1' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0f1a20;--ink-soft:#56676f;--ink-mute:#8b9aa1;
+    --paper:#f2f5f4;--panel:#ffffff;--panel-alt:#fafcfb;
+    --line:#e2e8e5;--line-soft:#eef2f0;--line-strong:#cfdad5;
+    --teal-400:#2fb094;--teal:#117a63;--teal-deep:#0b5548;--teal-900:#06342c;
+    --teal-50:#f0f8f5;--teal-100:#dcefe9;--teal-200:#bde0d5;
+    --brass:#a56d16;--bad:#9c2b2b;--bad-bg:#fbe8e8;--bad-line:#efc9c9;--good:#2f6b45;
+    --r-sm:9px;--r:13px;--r-lg:18px;--r-xl:24px;--ease:cubic-bezier(.2,.7,.3,1);
+    --sh-teal:0 8px 22px -12px rgba(17,122,99,.55);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Inter',system-ui,sans-serif;font-size:14px;color:var(--ink);background:var(--paper);
+    background-image:radial-gradient(900px 480px at 100% -8%,rgba(17,122,99,.07),transparent 62%),radial-gradient(700px 420px at -8% 100%,rgba(17,122,99,.05),transparent 60%);
+    -webkit-font-smoothing:antialiased;}
+  h1,h2,.serif{font-family:'Source Serif 4',Georgia,serif;letter-spacing:-.012em;}
+  .hero{background:linear-gradient(150deg,#073b32 0%,var(--teal-deep) 48%,#10745f 100%);color:#fff;padding:0;position:relative;overflow:hidden;}
+  .hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:56px 56px;-webkit-mask-image:radial-gradient(75% 75% at 50% 0%,#000,transparent 100%);mask-image:radial-gradient(75% 75% at 50% 0%,#000,transparent 100%);}
+  .hero-in{position:relative;max-width:720px;margin:0 auto;padding:34px 24px 30px;}
+  .brand{display:flex;align-items:center;gap:12px;margin-bottom:26px;}
+  .brand .logo{width:44px;height:44px;flex:none;filter:drop-shadow(0 6px 16px rgba(3,32,26,.4));}
+  .brand .logo svg{width:100%;height:100%;display:block;}
+  .brand .nm{font-size:15px;font-weight:700;line-height:1.2;}
+  .brand .nm small{display:block;font-weight:500;font-size:11.5px;color:#9fc7bb;margin-top:2px;}
+  .hero h1{font-size:30px;margin:0 0 8px;font-weight:700;}
+  .hero p{margin:0;color:#cfe6de;font-size:14.5px;line-height:1.6;max-width:56ch;}
+  .wrap{max-width:720px;margin:-18px auto 60px;padding:0 24px;position:relative;z-index:2;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-xl);box-shadow:0 2px 8px rgba(3,32,26,.08),0 40px 90px -50px rgba(3,32,26,.5);padding:30px 30px 26px;}
+  .sec{font-size:11px;font-weight:700;color:var(--teal-deep);text-transform:uppercase;letter-spacing:.08em;margin:22px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line);position:relative;}
+  .sec::after{content:"";position:absolute;left:0;bottom:-1px;width:30px;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--teal),var(--teal-400));}
+  .sec:first-child{margin-top:0;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:560px){.grid{grid-template-columns:1fr;}}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:10.5px;font-weight:700;color:var(--ink-soft);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em;}
+  .field label .req{color:var(--bad);}
+  input,select,textarea{width:100%;font-family:inherit;font-size:14px;padding:11px 13px;border:1px solid var(--line);border-radius:var(--r-sm);background:#fff;color:var(--ink);box-shadow:inset 0 1px 2px rgba(15,26,32,.035);transition:border-color .16s,box-shadow .16s;}
+  select{appearance:none;-webkit-appearance:none;padding-right:34px;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' fill='none' stroke='%2356676f' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}
+  textarea{resize:vertical;min-height:84px;}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3.5px rgba(17,122,99,.14);}
+  input.err,select.err{border-color:var(--bad);box-shadow:0 0 0 3px var(--bad-bg);}
+  .kvkk{display:flex;gap:10px;align-items:flex-start;background:var(--teal-50);border:1px solid var(--teal-100);border-radius:var(--r);padding:13px 15px;margin-top:6px;font-size:12.5px;color:var(--ink-soft);line-height:1.55;}
+  .kvkk input{width:17px;height:17px;flex:none;margin-top:1px;accent-color:var(--teal);}
+  .btn{width:100%;margin-top:20px;border:none;border-radius:var(--r-sm);padding:14px;font-family:inherit;font-weight:700;font-size:15px;color:#fff;cursor:pointer;background:linear-gradient(180deg,var(--teal),#0e6c58);box-shadow:var(--sh-teal);transition:transform .12s,box-shadow .18s,background .16s;}
+  .btn:hover:not(:disabled){background:linear-gradient(180deg,#13876d,var(--teal-deep));}
+  .btn:active{transform:translateY(1px);}
+  .btn:disabled{opacity:.6;cursor:default;}
+  .foot{text-align:center;color:var(--ink-mute);font-size:12px;margin-top:22px;line-height:1.6;}
+  .errmsg{background:var(--bad-bg);color:var(--bad);border:1px solid var(--bad-line);border-radius:var(--r-sm);padding:11px 14px;font-size:13px;margin-top:14px;display:none;}
+  .done{text-align:center;padding:30px 10px;}
+  .done .ic{width:76px;height:76px;border-radius:50%;background:linear-gradient(140deg,var(--teal-400),var(--teal-deep));display:flex;align-items:center;justify-content:center;margin:0 auto 20px;box-shadow:var(--sh-teal);}
+  .done h2{font-size:24px;margin:0 0 10px;color:var(--teal-deep);}
+  .done p{color:var(--ink-soft);font-size:14.5px;line-height:1.65;max-width:44ch;margin:0 auto;}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;}}
+</style>
+</head>
+<body>
+<div class="hero"><div class="hero-in">
+  <div class="brand">
+    <span class="logo"><svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2fb094"/><stop offset=".55" stop-color="#117a63"/><stop offset="1" stop-color="#0b5548"/></linearGradient></defs><rect width="40" height="40" rx="11" fill="url(#lg)"/><rect x=".6" y=".6" width="38.8" height="38.8" rx="10.4" fill="none" stroke="rgba(255,255,255,.25)"/><circle cx="20" cy="14.6" r="5.1" fill="#fff"/><path d="M9.8 31.6c0-6 4.6-9.3 10.2-9.3s10.2 3.3 10.2 9.3z" fill="#fff"/><path d="M27.6 10.4c2.7 1.2 4.5 3.8 4.8 6.8" fill="none" stroke="#e6b45a" stroke-width="2.2" stroke-linecap="round"/></svg></span>
+    <div class="nm">İnciroğlu İnsan Kaynakları<small>İşe Alım Platformu · İnciroğlu Otomotiv</small></div>
+  </div>
+  <h1>Ekibimize Katılın</h1>
+  <p>BMW, FIAT, HONDA, Peugeot, Alfa Romeo ve deniz/yat kolumuzda kariyer fırsatları. Başvurunuzu bırakın; İnsan Kaynakları ekibimiz sizinle iletişime geçsin.</p>
+</div></div>
+
+<div class="wrap">
+  <div class="card" id="card">
+    <form id="form" novalidate>
+      <div class="sec">Kişisel Bilgiler</div>
+      <div class="grid">
+        <div class="field"><label>Ad <span class="req">*</span></label><input id="ad" autocomplete="given-name"></div>
+        <div class="field"><label>Soyad <span class="req">*</span></label><input id="soyad" autocomplete="family-name"></div>
+      </div>
+      <div class="grid">
+        <div class="field"><label>Telefon <span class="req">*</span></label><input id="telefon" inputmode="tel" autocomplete="tel" placeholder="05xx xxx xx xx"></div>
+        <div class="field"><label>E-posta</label><input id="email" type="email" autocomplete="email"></div>
+      </div>
+      <div class="grid">
+        <div class="field"><label>Yaş</label><input id="yas" inputmode="numeric"></div>
+        <div class="field"><label>Yaşadığınız İl / İlçe</label><input id="yer"></div>
+      </div>
+
+      <div class="sec">Başvuru</div>
+      <div class="grid">
+        <div class="field"><label>Başvurduğunuz Pozisyon <span class="req">*</span></label>
+          <select id="pozisyon">
+            <option value="">Seçiniz…</option>
+            <option>Satış Danışmanı</option>
+            <option>Servis Danışmanı</option>
+            <option>Yedek Parça Danışmanı</option>
+            <option>Ön Muhasebe / Muhasebe</option>
+            <option>İnsan Kaynakları</option>
+            <option>Resepsiyon / Ön Büro</option>
+            <option>Teknisyen / Usta</option>
+            <option>Kaporta / Boya</option>
+            <option>Yıkama / Detailing</option>
+            <option>Deniz / Yat (Kaptan, Hostes, Gemici, Aşçı)</option>
+            <option>Diğer</option>
+          </select>
+        </div>
+        <div class="field"><label>İlgilendiğiniz Marka / Departman</label>
+          <select id="departman">
+            <option value="">Farketmez</option>
+            <option>BMW</option><option>MINI</option><option>FIAT</option><option>ALFA ROMEO</option>
+            <option>HONDA</option><option>PEUGEOT</option><option>CITROEN</option><option>OPEL</option>
+            <option>2. EL</option><option>DENİZ / YAT</option><option>MERKEZ / İDARİ</option>
+          </select>
+        </div>
+      </div>
+      <div class="field"><label>Toplam Deneyiminiz</label>
+        <select id="deneyimYil">
+          <option value="">Seçiniz…</option>
+          <option>Deneyimsiz / Yeni Mezun</option><option>1 yıldan az</option><option>1–3 yıl</option><option>3–5 yıl</option><option>5–10 yıl</option><option>10+ yıl</option>
+        </select>
+      </div>
+      <div class="field"><label>Deneyim Özeti — çalıştığınız yerler, roller ve süreler</label>
+        <textarea id="deneyim" placeholder="Örn: 2020–2024 X Otomotiv'de Satış Danışmanı; 2018–2020 Y'de …"></textarea>
+      </div>
+      <div class="field"><label>Eklemek İstedikleriniz (opsiyonel)</label>
+        <textarea id="mesaj" placeholder="Kısa bir ön yazı, güçlü yönleriniz, maaş beklentiniz vb."></textarea>
+      </div>
+
+      <label class="kvkk"><input type="checkbox" id="kvkk"><span>Başvuru sürecinde paylaştığım kişisel verilerimin, İnciroğlu Otomotiv İnsan Kaynakları tarafından yalnızca işe alım değerlendirmesi amacıyla işlenmesini kabul ediyorum.</span></label>
+
+      <div class="errmsg" id="errmsg"></div>
+      <button type="submit" class="btn" id="gonder">Başvurumu Gönder</button>
+      <div class="foot">İnciroğlu Otomotiv · 40 yıldır güvenle. Başvurunuz İnsan Kaynakları ekibine iletilecektir.</div>
+    </form>
+  </div>
+</div>
+
+<script type="module">
+  import { app } from "./firebase-config.js";
+  import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+  const db = getFirestore(app);
+
+  const el = (id) => document.getElementById(id);
+  const bugunISO = () => { const d = new Date(); return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); };
+  const zorunlu = ["ad", "soyad", "telefon", "pozisyon"];
+
+  el("form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const err = el("errmsg"); err.style.display = "none";
+    let eksik = false;
+    zorunlu.forEach((id) => { const v = el(id).value.trim(); el(id).classList.toggle("err", !v); if (!v) eksik = true; });
+    if (eksik) { err.textContent = "Lütfen yıldızlı (*) alanları doldurun."; err.style.display = "block"; return; }
+    if (!el("kvkk").checked) { err.textContent = "Devam etmek için KVKK onayını işaretleyin."; err.style.display = "block"; return; }
+
+    const btn = el("gonder"); btn.disabled = true; btn.textContent = "Gönderiliyor…";
+    const ad = el("ad").value.trim(), soyad = el("soyad").value.trim();
+    const yasNum = parseInt(el("yas").value, 10);
+    const kayit = {
+      ad, soyad,
+      telefon: el("telefon").value.trim(),
+      email: el("email").value.trim(),
+      yas: isNaN(yasNum) ? null : yasNum,
+      yer: el("yer").value.trim(),
+      unvan: el("pozisyon").value,
+      departman: el("departman").value,
+      deneyimYil: el("deneyimYil").value,
+      deneyim: el("deneyim").value.trim(),
+      notlar: el("mesaj").value.trim(),
+      durum: "gorusme_bekliyor",
+      kaynak: "Web Başvurusu",
+      basvuruTarihi: bugunISO(),
+      evraklar: [],
+      degerlendirmeler: [],
+      etiketler: [],
+      gecmis: [{ tarih: bugunISO(), eskiDurum: null, yeniDurum: "gorusme_bekliyor", kullanici: "Web Başvurusu", not: "Aday kariyer sayfasından başvurdu" }],
+      olusturmaTarihi: serverTimestamp(),
+      guncellemeTarihi: serverTimestamp()
+    };
+    try {
+      await addDoc(collection(db, "iseAlimAday"), kayit);
+      el("card").innerHTML = `
+        <div class="done">
+          <div class="ic"><svg width="40" height="40" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <h2>Başvurunuz Alındı</h2>
+          <p>Teşekkür ederiz ${ad}. Başvurunuz İnsan Kaynakları ekibimize ulaştı. Değerlendirme sonrası uygun pozisyonlar için sizinle iletişime geçeceğiz.</p>
+        </div>`;
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (ex) {
+      btn.disabled = false; btn.textContent = "Başvurumu Gönder";
+      err.textContent = "Başvuru gönderilemedi: " + ex.message + " — lütfen tekrar deneyin.";
+      err.style.display = "block";
+    }
+  });
+</script>
+</body>
+</html>
