@@ -900,6 +900,38 @@ function uygunlukKarar(pct){ if(pct==null) return {t:"—",c:"st-vazgecti"}; if(
 function tumAssessmentler(){ const out = []; adaylar.forEach((a) => (a.assessmentler || []).forEach((x) => out.push(Object.assign({}, x, { adayId: a.id, adayAd: (a.ad + " " + a.soyad).trim(), adayDepartman: a.departman || "" })))); return out; }
 function adayAssessmentlari(adayId){ const a = adaylar.find((x) => x.id === adayId); if(!a) return []; return (a.assessmentler || []).map((x) => Object.assign({}, x, { adayId, adayAd: (a.ad + " " + a.soyad).trim(), adayDepartman: a.departman || "" })).sort((p, q) => (q.olusturmaTarihi_s || "").localeCompare(p.olusturmaTarihi_s || "")); }
 
+// --- NORM & KALİBRE STEN (SPICA modeli: sten = ort 5.5, SD 2, normal dağılım) ---
+// Pozisyon yetkinlik ağırlıkları (sinav.html POZ.agirlik ile birebir) — Profil Uyum hesabı.
+const POZ_AGIRLIK = {
+  satis_danismani: { musteri:.18, ikna:.20, sonuc:.18, dayaniklilik:.12, iletisim:.12, analitik:.10, detay:.10 },
+  servis_danismani: { musteri:.18, detay:.18, dayaniklilik:.16, iletisim:.14, analitik:.12, sonuc:.12, planlama:.10 },
+  mis: { musteri:.22, iletisim:.18, dayaniklilik:.14, planlama:.14, detay:.12, ekip:.10, analitik:.10 },
+  resepsiyonist: { musteri:.20, iletisim:.18, planlama:.16, detay:.14, dayaniklilik:.12, hafiza:.10, ekip:.10 },
+  satis_muduru: { liderlik:.22, planlama:.16, analitik:.16, sonuc:.14, ikna:.12, ekip:.12, iletisim:.08 },
+  servis_muduru: { liderlik:.20, planlama:.18, analitik:.16, detay:.14, ekip:.12, musteri:.12, sonuc:.08 }
+};
+// Bu sayının altında GEÇİCİ (referans) norm; üstünde İnciroğlu'nun KENDİ normu devreye girer.
+const NORM_MIN = 25;
+// Yeterli veri birikene kadar geçici referans dağılım (sten tanımıyla uyumlu kalibrasyon).
+const PRIOR_MEAN = 55, PRIOR_SD = 16;
+// Bir pozisyonun tamamlanmış sonuçlarından boyut-bazlı norm (ortalama/SD/n) — canlı, veri arttıkça büyür.
+function assessNorm(pozKey){
+  const list = tumAssessmentler().filter((a) => a.durum === "tamamlandi" && a.pozisyon === pozKey);
+  const acc = {};
+  list.forEach((a) => { const b = a.boyutlar || {}; for(const k in b){ if(b[k] != null){ (acc[k] = acc[k] || []).push(b[k]); } } });
+  const norm = {};
+  for(const k in acc){ const v = acc[k]; const m = v.reduce((s,x)=>s+x,0)/v.length; const sd = Math.sqrt(v.reduce((s,x)=>s+(x-m)*(x-m),0)/v.length); norm[k] = { mean:m, sd:sd, n:v.length }; }
+  return { N: list.length, norm };
+}
+// Ham yüzde -> sten (1-10): z-skoru üzerinden. Yeterli norm varsa kendi dağılımımız, yoksa referans.
+function stenFromRaw(raw, dimNorm){
+  if(raw == null) return null;
+  let mean = PRIOR_MEAN, sd = PRIOR_SD;
+  if(dimNorm && dimNorm.n >= NORM_MIN && dimNorm.sd >= 1){ mean = dimNorm.mean; sd = dimNorm.sd; }
+  const z = (raw - mean) / (sd || 1);
+  return Math.max(1, Math.min(10, Math.round(5.5 + 2 * z)));
+}
+
 onAuthStateChanged(auth, async (user) => {
   if (unsubAday) unsubAday();
   if (unsubTalep) unsubTalep();
@@ -2118,21 +2150,33 @@ function renderDenetimPage(adaylarList, talepList) {
 
 let assessTab = "ilet";
 function assessSonucKarti(a, detay) {
-  const kr = uygunlukKarar(a.uygunluk);
+  const pozKey = a.pozisyon;
+  const nrm = assessNorm(pozKey);
+  const agirlik = POZ_AGIRLIK[pozKey] || {};
   const boyutlar = a.boyutlar || {};
-  const keys = Object.keys(boyutlar).filter((k) => boyutlar[k] != null).sort((x, y) => boyutlar[y] - boyutlar[x]);
+  // her boyut için norma göre sten
+  const stenler = {};
+  Object.keys(boyutlar).forEach((k) => { if (boyutlar[k] != null) stenler[k] = stenFromRaw(boyutlar[k], nrm.norm[k]); });
+  // Profil Uyum = pozisyon ağırlıklarıyla sten ortalaması (100'lük); ağırlık yoksa ham uygunluğa düş
+  let us = 0, ws = 0;
+  for (const d in agirlik) { if (stenler[d] != null) { us += (stenler[d] / 10 * 100) * agirlik[d]; ws += agirlik[d]; } }
+  const uygunluk = ws > 0 ? Math.round(us / ws) : (a.uygunluk != null ? a.uygunluk : null);
+  const kr = uygunlukKarar(uygunluk);
+  const kalibre = nrm.N >= NORM_MIN;
+  const normRozet = `<span style="font-size:10px;font-weight:600;color:${kalibre ? 'var(--good)' : 'var(--ink-mute)'};background:${kalibre ? 'var(--good-bg)' : '#eef1f0'};border:1px solid ${kalibre ? 'var(--good-line)' : '#dde3e1'};border-radius:20px;padding:2px 9px;white-space:nowrap">${kalibre ? '📊 İnciroğlu normu' : '📋 Geçici norm'} · ${nrm.N} kişi</span>`;
+  const keys = Object.keys(stenler).sort((x, y) => stenler[y] - stenler[x]);
   const bars = keys.map((k) => {
-    const on = stenOf(boyutlar[k]) || 1;
+    const on = stenler[k] || 1;
     const cells = [1,2,3,4,5,6,7,8,9,10].map((n) => `<span class="sc ${n===on?'on':(n<on?'fill':'')}">${n===on?on:''}</span>`).join("");
     return `<div class="sten-row"><span class="sten-name">${esc(BOYUT_AD[k]||k)}</span><div class="sten-scale">${cells}</div></div>`;
   }).join("");
   return `
     <div class="assess-head">
-      <div><div class="ah-poz">${esc(a.pozisyonAd||ASSESS_POZ_AD[a.pozisyon]||a.pozisyon||"")}</div><div class="ah-sub">${esc(a.adayAd||"")}${a.tamamlanmaTarihi?" · "+fmtTarih(a.tamamlanmaTarihi):""}</div></div>
-      <div class="ah-uyum"><div class="ah-pct">%${a.uygunluk!=null?a.uygunluk:"—"}</div><div class="ah-lbl">Profil Uyum</div></div>
+      <div><div class="ah-poz">${esc(a.pozisyonAd||ASSESS_POZ_AD[a.pozisyon]||a.pozisyon||"")}</div><div class="ah-sub">${esc(a.adayAd||"")}${a.tamamlanmaTarihi?" · "+fmtTarih(a.tamamlanmaTarihi):""} · ${normRozet}</div></div>
+      <div class="ah-uyum"><div class="ah-pct">%${uygunluk!=null?uygunluk:"—"}</div><div class="ah-lbl">Profil Uyum</div></div>
       <span class="status-badge ${kr.c}" style="font-size:12px">${kr.t}</span>
     </div>
-    ${detay ? `<div class="sten-wrap">${bars||`<div style="color:var(--ink-mute);font-size:13px">Yetkinlik verisi bulunamadı.</div>`}</div>` : ""}`;
+    ${detay ? `<div class="sten-wrap">${bars||`<div style="color:var(--ink-mute);font-size:13px">Yetkinlik verisi bulunamadı.</div>`}</div>${!kalibre?`<div style="font-size:11px;color:var(--ink-mute);margin-top:10px;line-height:1.5">ℹ️ Şu an <b>geçici referans norma</b> göre puanlanıyor. Bu pozisyonda tamamlanan sınav sayısı <b>${NORM_MIN}</b>'e ulaşınca sten ve Profil Uyum, İnciroğlu'nun <b>kendi aday dağılımına</b> göre otomatik olarak yeniden hesaplanır.</div>`:''}` : ""}`;
 }
 async function assessIlet(aday, pozKey) {
   const token = assessToken();
