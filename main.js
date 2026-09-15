@@ -873,10 +873,8 @@ let currentUid = null;
 let currentProfile = null;
 let adaylar = [];
 let talepler = [];
-let assessmentlar = [];
 let unsubAday = null;
 let unsubTalep = null;
-let unsubAssess = null;
 
 // Pozisyon bazlı değerlendirme sınavı (SPICA/DYT modeli). Anahtarlar sinav.html POZ ile birebir.
 const ASSESS_POZ = [
@@ -895,15 +893,16 @@ const BOYUT_AD = {
   planlama:"Planlama & Organizasyon", hafiza:"Görsel Hafıza & Dikkat"
 };
 function assessToken(){ return "as_" + Date.now().toString(36) + Math.random().toString(36).slice(2,10); }
-function assessLink(token){ return location.origin + location.pathname.replace(/[^/]*$/,"") + "sinav.html?t=" + token; }
+function assessLink(adayId, token){ return location.origin + location.pathname.replace(/[^/]*$/,"") + "sinav.html?a=" + adayId + "&t=" + token; }
 function stenOf(pct){ if(pct==null) return null; return Math.max(1, Math.min(10, Math.round(pct/10))); }
 function uygunlukKarar(pct){ if(pct==null) return {t:"—",c:"st-vazgecti"}; if(pct>=70) return {t:"UYGUN",c:"st-tamam"}; if(pct>=55) return {t:"DEĞERLENDİRİLEBİLİR",c:"st-basladi"}; if(pct>=40) return {t:"SINIRDA",c:"st-sgk"}; return {t:"UYGUN DEĞİL",c:"st-olumsuz"}; }
-function adayAssessmentlari(adayId){ return assessmentlar.filter((a) => a.adayId === adayId).sort((x,y)=>(y.olusturmaTarihi_s||"").localeCompare(x.olusturmaTarihi_s||"")); }
+// Sınav verisi adayın KENDİ kaydında (iseAlimAday.assessmentler) tutulur — ayrı koleksiyon/kural gerekmez.
+function tumAssessmentler(){ const out = []; adaylar.forEach((a) => (a.assessmentler || []).forEach((x) => out.push(Object.assign({}, x, { adayId: a.id, adayAd: (a.ad + " " + a.soyad).trim(), adayDepartman: a.departman || "" })))); return out; }
+function adayAssessmentlari(adayId){ const a = adaylar.find((x) => x.id === adayId); if(!a) return []; return (a.assessmentler || []).map((x) => Object.assign({}, x, { adayId, adayAd: (a.ad + " " + a.soyad).trim(), adayDepartman: a.departman || "" })).sort((p, q) => (q.olusturmaTarihi_s || "").localeCompare(p.olusturmaTarihi_s || "")); }
 
 onAuthStateChanged(auth, async (user) => {
   if (unsubAday) unsubAday();
   if (unsubTalep) unsubTalep();
-  if (unsubAssess) unsubAssess();
   if (!user) {
     currentUid = null;
     currentProfile = null;
@@ -921,7 +920,6 @@ onAuthStateChanged(auth, async (user) => {
     currentProfile = snap.data();
     subscribeAdaylar();
     subscribeTalepler();
-    subscribeAssessment();
   } catch (e) {
     console.error(e);
     renderLogin("Giriş sırasında bir hata oluştu: " + e.message);
@@ -952,20 +950,6 @@ function subscribeAdaylar() {
     console.error(err);
     root().innerHTML = `<div class="center-screen"><div class="login-card"><h1>Veri okunamadı</h1><p class="hint">${esc(err.message)}</p></div></div>`;
   });
-}
-
-function subscribeAssessment() {
-  // Değerlendirme sınavı sonuçları yalnızca İK'da görünür (aday da giremez).
-  if (currentProfile.role !== "admin") { assessmentlar = []; return; }
-  unsubAssess = onSnapshot(collection(db, "iseAlimAssessment"), (qs) => {
-    assessmentlar = [];
-    qs.forEach((d) => {
-      const x = d.data();
-      const ts = x.olusturmaTarihi && x.olusturmaTarihi.toDate ? x.olusturmaTarihi.toDate().toISOString() : (x.tamamlanmaTarihi || "");
-      assessmentlar.push({ id: d.id, olusturmaTarihi_s: ts, ...x });
-    });
-    render();
-  }, (err) => { console.error("Assessment okunamadı:", err); });
 }
 
 function subscribeTalepler() {
@@ -2105,11 +2089,11 @@ function assessSonucKarti(a, detay) {
 }
 async function assessIlet(aday, pozKey) {
   const token = assessToken();
-  await setDoc(doc(db, "iseAlimAssessment", token), {
-    adayId: aday.id, adayAd: (aday.ad + " " + aday.soyad).trim(), adayDepartman: aday.departman || "",
-    pozisyon: pozKey, pozisyonAd: ASSESS_POZ_AD[pozKey] || pozKey, durum: "bekliyor",
-    ileten: currentProfile.adSoyad || "İK", olusturmaTarihi: serverTimestamp()
-  });
+  const yeni = [...(aday.assessmentler || []), {
+    token, pozisyon: pozKey, pozisyonAd: ASSESS_POZ_AD[pozKey] || pozKey, durum: "bekliyor",
+    ileten: currentProfile.adSoyad || "İK", olusturmaTarihi_s: new Date().toISOString()
+  }];
+  await setDoc(doc(db, "iseAlimAday", aday.id), { assessmentler: yeni, guncellemeTarihi: serverTimestamp() }, { merge: true });
   return token;
 }
 function linkKutu(link) {
@@ -2126,8 +2110,8 @@ function assessAdayInner(aday) {
   const bek = mine.filter((m) => m.durum !== "tamamlandi");
   const varsayilan = ASSESS_POZ.find((p) => (aday.unvan || "").toLocaleLowerCase("tr").includes(p.ad.split(" ")[0].toLocaleLowerCase("tr")));
   let html = "";
-  if (tamam.length) html += tamam.map((m) => `<div class="assess-card click adaySonuc" style="margin-bottom:10px" data-tok="${m.id}">${assessSonucKarti(m, false)}</div>`).join("");
-  if (bek.length) html += bek.map((m) => `<div style="margin-bottom:10px"><span class="assess-pill ap-bek">Sınav bekliyor · ${esc(m.pozisyonAd || "")}</span>${linkKutu(assessLink(m.id))}</div>`).join("");
+  if (tamam.length) html += tamam.map((m) => `<div class="assess-card click adaySonuc" style="margin-bottom:10px" data-tok="${m.token}">${assessSonucKarti(m, false)}</div>`).join("");
+  if (bek.length) html += bek.map((m) => `<div style="margin-bottom:10px"><span class="assess-pill ap-bek">Sınav bekliyor · ${esc(m.pozisyonAd || "")}</span>${linkKutu(assessLink(aday.id, m.token))}</div>`).join("");
   html += `<div class="mini-form">
       <div style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">${mine.length ? "Yeni Sınav Gönder" : "Değerlendirme Sınavı Gönder"}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -2140,8 +2124,9 @@ function assessAdayInner(aday) {
 }
 
 function renderAssessmentPage(adaylarList) {
-  const tamamlanan = assessmentlar.filter((a) => a.durum === "tamamlandi").sort((x, y) => (y.tamamlanmaTarihi || "").localeCompare(x.tamamlanmaTarihi || ""));
-  const bekleyen = assessmentlar.filter((a) => a.durum !== "tamamlandi");
+  const tumAss = tumAssessmentler();
+  const tamamlanan = tumAss.filter((a) => a.durum === "tamamlandi").sort((x, y) => (y.tamamlanmaTarihi || "").localeCompare(x.tamamlanmaTarihi || ""));
+  const bekleyen = tumAss.filter((a) => a.durum !== "tamamlandi");
   const aktifAdaylar = adaylarList.filter((a) => a.durum !== "olumsuz" && a.durum !== "vazgecti");
   el("#pageWrap").innerHTML = `
     <div class="page-head"><div><h1>Assessment — Değerlendirme Sınavları</h1><p>Pozisyon bazlı yetkinlik sınavı gönderin (SPICA / Durumsal Yargı modeli) ve sonuçları sten (1-10) + Profil Uyum ile görün. Sonuçlar yalnızca İK'ya görünür.</p></div></div>
@@ -2177,7 +2162,7 @@ function renderAssessmentPage(adaylarList) {
     list.querySelectorAll(".asUret").forEach((b) => b.addEventListener("click", async () => {
       const id = b.dataset.id; const aday = adaylar.find((x) => x.id === id); const poz = list.querySelector(`.asPoz[data-id="${id}"]`).value;
       b.disabled = true; b.textContent = "Üretiliyor…";
-      try { const token = await assessIlet(aday, poz); list.querySelector(`.asLink[data-id="${id}"]`).innerHTML = linkKutu(assessLink(token)) + `<div style="font-size:11.5px;color:var(--ink-soft);margin-top:5px">✓ Link üretildi. Adaya iletin.</div>`; b.textContent = "✓ Üretildi"; wireKopyala(); }
+      try { const token = await assessIlet(aday, poz); list.querySelector(`.asLink[data-id="${id}"]`).innerHTML = linkKutu(assessLink(id, token)) + `<div style="font-size:11.5px;color:var(--ink-soft);margin-top:5px">✓ Link üretildi. Adaya iletin.</div>`; b.textContent = "✓ Üretildi"; wireKopyala(); }
       catch (e) { toast("Üretilemedi: " + e.message); b.disabled = false; b.textContent = "🔗 Sınav Linki Üret"; }
     }));
   } else {
@@ -3044,13 +3029,13 @@ function openAdayDetay(aday, isAdmin) {
       const poz = el("#asAdayPoz").value; asUret.disabled = true; asUret.textContent = "Üretiliyor…";
       try {
         const token = await assessIlet(aday, poz);
-        el("#asAdayLink").innerHTML = linkKutu(assessLink(token)) + `<div style="font-size:11.5px;color:var(--ink-soft);margin-top:5px">✓ Link üretildi. Adaya iletin — sonuç geldiğinde burada ve Assessment sayfasında görünür.</div>`;
+        el("#asAdayLink").innerHTML = linkKutu(assessLink(aday.id, token)) + `<div style="font-size:11.5px;color:var(--ink-soft);margin-top:5px">✓ Link üretildi. Adaya iletin — sonuç geldiğinde burada ve Assessment sayfasında görünür.</div>`;
         await ekleGecmisli({ _not: `${ASSESS_POZ_AD[poz] || poz} sınavı iletildi` }, "Assessment iletildi");
         asUret.textContent = "✓ İletildi"; wireKopyala();
       } catch (e) { toast("Üretilemedi: " + e.message); asUret.disabled = false; asUret.textContent = "🔗 Assessment İlet"; }
     });
     document.querySelectorAll("#assessWrap .adaySonuc").forEach((c) => c.addEventListener("click", () => {
-      const tok = c.dataset.tok; const m = assessmentlar.find((x) => x.id === tok); if (!m) return;
+      const tok = c.dataset.tok; const m = (aday.assessmentler || []).find((x) => x.token === tok); if (!m) return;
       const open = c.classList.toggle("open"); c.innerHTML = assessSonucKarti(m, open);
     }));
     wireKopyala();

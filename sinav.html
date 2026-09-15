@@ -501,7 +501,7 @@ const POZ = {
 };
 
 /* ============ DURUM ============ */
-let AS = null, TOKEN = null, POZID = null, P = null;
+let AS = null, TOKEN = null, ADAYID = null, POZID = null, P = null;
 let cevaplar = {}; // her modülün ham cevapları
 let puan = {};     // boyut → toplam puan
 let puanMax = {};  // boyut → maksimum
@@ -513,12 +513,15 @@ function addPuan(dim, val, max){ if(!dim) return; puan[dim]=(puan[dim]||0)+val; 
 /* ---- yükleme ---- */
 async function boot(){
   const params = new URLSearchParams(location.search);
-  TOKEN = params.get("t");
-  if(!TOKEN){ return mesaj("Geçersiz Bağlantı","Bu sınav bağlantısı eksik görünüyor. Lütfen İnsan Kaynakları ekibinden gelen bağlantıyı kullanın."); }
+  ADAYID = params.get("a"); TOKEN = params.get("t");
+  if(!ADAYID || !TOKEN){ return mesaj("Geçersiz Bağlantı","Bu sınav bağlantısı eksik görünüyor. Lütfen İnsan Kaynakları ekibinden gelen bağlantıyı kullanın."); }
   try{
-    const snap = await getDoc(doc(db,"iseAlimAssessment",TOKEN));
+    const snap = await getDoc(doc(db,"iseAlimAday",ADAYID));
     if(!snap.exists()){ return mesaj("Bağlantı Bulunamadı","Bu sınav bağlantısı geçersiz veya süresi dolmuş. Lütfen İnsan Kaynakları ile iletişime geçin."); }
-    AS = snap.data();
+    const aday = snap.data();
+    AS = (aday.assessmentler || []).find((x) => x.token === TOKEN);
+    if(!AS){ return mesaj("Bağlantı Bulunamadı","Bu sınav bağlantısı geçersiz veya süresi dolmuş. Lütfen İnsan Kaynakları ile iletişime geçin."); }
+    AS.adayAd = (((aday.ad||"")+" "+(aday.soyad||"")).trim());
     if(AS.durum==="tamamlandi"){ return mesaj("Sınav Tamamlandı","Bu değerlendirme daha önce tamamlanmış görünüyor. Katılımınız için teşekkür ederiz."); }
     POZID = AS.pozisyon; P = POZ[POZID];
     if(!P){ return mesaj("Hazırlık Sürüyor","Bu pozisyon için sınav içeriği henüz hazır değil. Lütfen İnsan Kaynakları ile iletişime geçin."); }
@@ -723,16 +726,13 @@ async function finish(){
   let us=0, wsum=0;
   for(const d in P.agirlik){ if(boyut[d]!=null){ us += boyut[d]*P.agirlik[d]; wsum += P.agirlik[d]; } }
   const uygunluk = wsum>0 ? Math.round(us/wsum) : null;
-  const sonuc = {
-    durum:"tamamlandi",
-    tamamlanmaTarihi: new Date().toISOString().slice(0,10),
-    boyutlar: boyut,
-    uygunluk,
-    cevaplar,
-    guncellemeTarihi: serverTimestamp()
-  };
   try{
-    await setDoc(doc(db,"iseAlimAssessment",TOKEN), sonuc, {merge:true});
+    const snap = await getDoc(doc(db,"iseAlimAday",ADAYID));
+    const aday = snap.exists() ? snap.data() : {};
+    const arr = (aday.assessmentler || []).map((x) => x.token === TOKEN
+      ? Object.assign({}, x, { durum:"tamamlandi", tamamlanmaTarihi:new Date().toISOString().slice(0,10), boyutlar:boyut, uygunluk:uygunluk, cevaplar:cevaplar })
+      : x);
+    await setDoc(doc(db,"iseAlimAday",ADAYID), { assessmentler:arr, guncellemeTarihi:serverTimestamp() }, {merge:true});
   }catch(e){ /* yine de teşekkür göster */ }
   app$.innerHTML = `<div class="card center">
     <div class="done-ic"><svg width="42" height="42" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
