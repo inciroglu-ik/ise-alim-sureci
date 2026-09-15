@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>İnciroğlu İnsan Kaynakları · Değerlendirme Sınavı</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232fb094'/%3E%3Cstop offset='.55' stop-color='%23117a63'/%3E%3Cstop offset='1' stop-color='%230b5548'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='40' height='40' rx='11' fill='url(%23g)'/%3E%3Ccircle cx='20' cy='14.5' r='5.1' fill='white'/%3E%3Cpath d='M9.7 31.5c0-6 4.6-9.2 10.3-9.2s10.3 3.2 10.3 9.2z' fill='white'/%3E%3Cpath d='M27.5 10.5c2.6 1.2 4.3 3.7 4.6 6.6' fill='none' stroke='%23e6b45a' stroke-width='2.1' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0f1a20;--ink-soft:#56676f;--ink-mute:#8b9aa1;
+    --paper:#f2f5f4;--panel:#ffffff;--panel-alt:#fafcfb;
+    --line:#e2e8e5;--line-strong:#cfdad5;
+    --teal-400:#2fb094;--teal:#117a63;--teal-deep:#0b5548;--teal-900:#06342c;
+    --teal-50:#f0f8f5;--teal-100:#dcefe9;--teal-200:#bde0d5;
+    --brass:#a56d16;--good:#2f6b45;--good-bg:#e6f3ea;--warn:#95541a;--warn-bg:#fbeedd;
+    --bad:#9c2b2b;--bad-bg:#fbe8e8;--bad-line:#efc9c9;
+    --r-sm:9px;--r:13px;--r-lg:18px;--r-xl:24px;--ease:cubic-bezier(.2,.7,.3,1);--sh-teal:0 8px 22px -12px rgba(17,122,99,.55);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Inter',system-ui,sans-serif;font-size:15px;color:var(--ink);background:var(--paper);
+    background-image:radial-gradient(900px 480px at 100% -8%,rgba(17,122,99,.07),transparent 62%),radial-gradient(700px 420px at -8% 100%,rgba(17,122,99,.05),transparent 60%);-webkit-font-smoothing:antialiased;}
+  h1,h2,h3,.serif{font-family:'Source Serif 4',Georgia,serif;letter-spacing:-.012em;}
+  .top{background:linear-gradient(100deg,var(--teal-900),var(--teal-deep) 60%,#0d6252);color:#fff;padding:0;position:sticky;top:0;z-index:20;box-shadow:0 6px 24px -12px rgba(3,32,26,.7);}
+  .top-in{max-width:820px;margin:0 auto;padding:13px 22px;display:flex;align-items:center;gap:12px;}
+  .top .logo{width:34px;height:34px;flex:none;filter:drop-shadow(0 3px 8px rgba(3,32,26,.4));}
+  .top .logo svg{width:100%;height:100%;display:block;}
+  .top .nm{font-size:14px;font-weight:700;line-height:1.2;}
+  .top .nm small{display:block;font-weight:500;font-size:10.5px;color:#9fc7bb;margin-top:1px;}
+  .top .timer{margin-left:auto;display:flex;align-items:center;gap:8px;font-variant-numeric:tabular-nums;font-weight:700;font-size:15px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);border-radius:20px;padding:5px 13px;}
+  .top .timer.warn{background:rgba(156,43,43,.35);border-color:rgba(255,180,180,.4);color:#ffe0e0;}
+  .top .timer .dot{width:7px;height:7px;border-radius:50%;background:#4fe0bd;animation:pulse 1s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .wrap{max-width:820px;margin:0 auto;padding:26px 22px 70px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-xl);box-shadow:0 2px 8px rgba(3,32,26,.06),0 30px 70px -45px rgba(3,32,26,.4);padding:30px 32px;}
+  .prog{display:flex;gap:5px;margin-bottom:22px;}
+  .prog .seg{flex:1;height:5px;border-radius:20px;background:var(--line);overflow:hidden;}
+  .prog .seg.done{background:var(--teal);}
+  .prog .seg.cur{background:linear-gradient(90deg,var(--teal),var(--teal-200));}
+  .mod-tag{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:700;color:var(--teal-deep);text-transform:uppercase;letter-spacing:.06em;background:var(--teal-50);border:1px solid var(--teal-100);border-radius:20px;padding:5px 12px;margin-bottom:16px;}
+  h1{font-size:27px;margin:0 0 10px;}
+  h2{font-size:21px;margin:0 0 8px;}
+  .lead{color:var(--ink-soft);font-size:15px;line-height:1.65;margin:0 0 18px;}
+  .q{font-size:18px;font-weight:600;line-height:1.5;margin:6px 0 18px;}
+  .q .sub{display:block;font-size:13px;color:var(--ink-soft);font-weight:500;margin-top:6px;}
+  .opts{display:flex;flex-direction:column;gap:10px;}
+  .opt{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border:1.5px solid var(--line);border-radius:var(--r);background:#fff;cursor:pointer;transition:border-color .14s,background .14s,transform .1s;font-size:15px;line-height:1.45;}
+  .opt:hover{border-color:var(--teal-200);background:var(--teal-50);}
+  .opt.sel{border-color:var(--teal);background:var(--teal-50);box-shadow:0 0 0 3px rgba(17,122,99,.12);}
+  .opt .key{width:26px;height:26px;flex:none;border-radius:8px;background:var(--paper);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:var(--ink-soft);}
+  .opt.sel .key{background:var(--teal);color:#fff;border-color:var(--teal);}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:none;border-radius:var(--r-sm);padding:13px 26px;font-family:inherit;font-weight:700;font-size:15px;color:#fff;cursor:pointer;background:linear-gradient(180deg,var(--teal),#0e6c58);box-shadow:var(--sh-teal);transition:transform .12s,box-shadow .18s,background .16s;}
+  .btn:hover:not(:disabled){background:linear-gradient(180deg,#13876d,var(--teal-deep));}
+  .btn:active{transform:translateY(1px);}
+  .btn:disabled{opacity:.5;cursor:default;}
+  .btn-ghost{background:#fff;color:var(--ink);border:1px solid var(--line-strong);box-shadow:none;}
+  .btn-ghost:hover:not(:disabled){background:var(--panel-alt);}
+  .foot-row{display:flex;justify-content:space-between;align-items:center;margin-top:24px;gap:12px;}
+  .qcount{font-size:13px;color:var(--ink-mute);font-weight:600;}
+  .qtimer{height:6px;border-radius:20px;background:var(--line);overflow:hidden;margin-bottom:22px;}
+  .qtimer > div{height:100%;background:linear-gradient(90deg,var(--teal-400),var(--teal));transition:width 1s linear;}
+  .qtimer.warn > div{background:linear-gradient(90deg,#d88,var(--bad));}
+  /* görsel hafıza ızgara */
+  .grid{display:grid;gap:8px;margin:8px auto 6px;width:max-content;}
+  .cell{width:62px;height:62px;border-radius:12px;background:var(--panel-alt);border:2px solid var(--line);transition:background .12s,border-color .12s,transform .1s;}
+  .cell.on{background:linear-gradient(140deg,var(--teal-400),var(--teal-deep));border-color:var(--teal-deep);box-shadow:var(--sh-teal);}
+  .cell.pick{cursor:pointer;}
+  .cell.pick:hover{border-color:var(--teal-200);}
+  .cell.sel{background:linear-gradient(140deg,#8fd7c6,var(--teal));border-color:var(--teal);}
+  .center{text-align:center;}
+  .countbig{font-family:'Source Serif 4',serif;font-size:72px;font-weight:700;color:var(--teal-deep);line-height:1;}
+  /* likert */
+  .lik{display:flex;gap:8px;justify-content:space-between;margin-top:12px;}
+  .lik button{flex:1;padding:11px 4px;border:1.5px solid var(--line);border-radius:10px;background:#fff;font-family:inherit;font-weight:700;font-size:14px;color:var(--ink-soft);cursor:pointer;transition:.12s;}
+  .lik button.sel{background:var(--teal);color:#fff;border-color:var(--teal);}
+  .lik-lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-mute);margin-top:6px;}
+  .badge{display:inline-block;font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px;background:var(--teal-50);color:var(--teal-deep);border:1px solid var(--teal-100);}
+  .info-box{background:var(--teal-50);border:1px solid var(--teal-100);border-radius:var(--r);padding:14px 16px;font-size:13.5px;color:var(--ink-soft);line-height:1.6;margin:16px 0;}
+  .mlist{display:grid;gap:10px;margin:16px 0 4px;}
+  .mrow{display:flex;align-items:center;gap:13px;padding:12px 15px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel-alt);}
+  .mrow .n{width:30px;height:30px;flex:none;border-radius:9px;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;}
+  .mrow b{font-size:14.5px;}
+  .mrow .d{font-size:12.5px;color:var(--ink-soft);margin-top:1px;}
+  .mrow .t{margin-left:auto;font-size:12px;color:var(--ink-mute);font-weight:600;white-space:nowrap;}
+  .done-ic{width:84px;height:84px;border-radius:50%;background:linear-gradient(140deg,var(--teal-400),var(--teal-deep));display:flex;align-items:center;justify-content:center;margin:0 auto 22px;box-shadow:var(--sh-teal);}
+  @media(max-width:560px){.card{padding:22px 18px;}.cell{width:52px;height:52px;}}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;}}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <span class="logo"><svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2fb094"/><stop offset=".55" stop-color="#117a63"/><stop offset="1" stop-color="#0b5548"/></linearGradient></defs><rect width="40" height="40" rx="11" fill="url(#lg)"/><circle cx="20" cy="14.6" r="5.1" fill="#fff"/><path d="M9.8 31.6c0-6 4.6-9.3 10.2-9.3s10.2 3.3 10.2 9.3z" fill="#fff"/><path d="M27.6 10.4c2.7 1.2 4.5 3.8 4.8 6.8" fill="none" stroke="#e6b45a" stroke-width="2.2" stroke-linecap="round"/></svg></span>
+  <div class="nm">İnciroğlu İnsan Kaynakları<small>Değerlendirme Sınavı</small></div>
+  <div class="timer" id="timer" hidden><span class="dot"></span><span id="timerTxt">--:--</span></div>
+</div></div>
+<div class="wrap"><div id="app"><div class="card center"><h2>Yükleniyor…</h2></div></div></div>
+
+<script type="module">
+import { app } from "./firebase-config.js";
+import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+const db = getFirestore(app);
+const $ = (id) => document.getElementById(id);
+const app$ = $("app");
+const esc = (s) => String(s==null?"":s).replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+/* ============ BOYUTLAR ============ */
+const BOYUT_AD = {
+  musteri:"Müşteri Odaklılık", ikna:"İkna & Etkileme", sonuc:"Sonuç Motivasyonu",
+  dayaniklilik:"Dayanıklılık & Stres", detay:"Detay & Doğruluk", ekip:"Ekip & İş Birliği",
+  liderlik:"Liderlik & Koçluk", analitik:"Analitik Muhakeme", iletisim:"İletişim",
+  planlama:"Planlama & Organizasyon", hafiza:"Görsel Hafıza & Dikkat"
+};
+
+/* ============ ORTAK BİLİŞSEL HAVUZ ============ */
+// dim: hangi boyuta katkı. ans: doğru şık indeksi.
+const BILISSEL = [
+  // sayısal → analitik
+  {t:"Bir aracın liste fiyatı 900.000 ₺'dir. %15 indirim sonrası fiyatı kaç ₺'dir?",o:["765.000","780.000","750.000","810.000"],a:0,dim:"analitik"},
+  {t:"Bir danışman 5 günde 20 araç sattı. Aynı hızla 8 günde kaç araç satar?",o:["28","30","32","36"],a:2,dim:"analitik"},
+  {t:"2, 6, 12, 20, 30, ? — dizideki sonraki sayı nedir?",o:["40","42","44","36"],a:1,dim:"analitik"},
+  {t:"Bir servis 3 saatte 9 araca bakıyor. 12 araç kaç saatte tamamlanır?",o:["3","4","5","6"],a:1,dim:"analitik"},
+  {t:"Bir ürünün maliyeti 400₺, satış fiyatı 500₺. Kâr marjı (satış üzerinden) yüzde kaçtır?",o:["%25","%20","%15","%10"],a:1,dim:"analitik"},
+  {t:"Hedefin %120'sine ulaşan bir ekip 60 araç sattıysa, hedef kaç araçtı?",o:["48","50","52","72"],a:1,dim:"analitik"},
+  {t:"7, 14, 28, 56, ? — sonraki sayı nedir?",o:["84","98","112","120"],a:2,dim:"analitik"},
+  {t:"Bir aracın KDV hariç fiyatı 800.000₺. %20 KDV dahil fiyatı kaçtır?",o:["940.000","960.000","980.000","1.000.000"],a:1,dim:"analitik"},
+  // sözel → iletisim
+  {t:"'Müşteri : Memnuniyet' ilişkisine en yakın olan hangisidir?",o:["Öğrenci : Sınav","Hasta : İyileşme","Yazar : Kalem","Şoför : Trafik"],a:1,dim:"iletisim"},
+  {t:"'Titiz' kelimesinin zıt anlamlısı hangisidir?",o:["Dikkatli","Özensiz","Düzenli","Planlı"],a:1,dim:"iletisim"},
+  {t:"'İtiraz' kelimesine anlamca en yakın olan hangisidir?",o:["Onay","Karşı çıkış","Öneri","Teşekkür"],a:1,dim:"iletisim"},
+  {t:"'Şeffaflık : Güven' ilişkisine en yakın olan hangisidir?",o:["Gizlilik : Şüphe","Hız : Yorgunluk","Renk : Ses","Para : Mutluluk"],a:0,dim:"iletisim"},
+  {t:"'İkna etmek' ifadesine en yakın olan hangisidir?",o:["Zorlamak","Razı etmek","Emretmek","Reddetmek"],a:1,dim:"iletisim"},
+  {t:"'Empati' aşağıdakilerden hangisiyle en çok ilişkilidir?",o:["Kendini karşıdakinin yerine koymak","Hızlı konuşmak","Fiyat düşürmek","Not tutmak"],a:0,dim:"iletisim"},
+  // soyut/mantık → analitik
+  {t:"A, C, F, J, ? — harf dizisinde sonraki hangisidir? (aradaki boşluk 1,2,3,… artıyor)",o:["N","O","M","P"],a:1,dim:"analitik"},
+  {t:"Bütün danışmanlar eğitim aldı. Ali eğitim almadı. Buna göre kesin olan nedir?",o:["Ali danışman olabilir","Ali danışman değildir","Ali müdürdür","Bilinemez"],a:1,dim:"analitik"},
+  {t:"◐ ◑ ◒ ◓ döngüsü tekrar ediyor. 10. sembol hangisidir? (1=◐)",o:["◐","◑","◒","◓"],a:1,dim:"analitik"},
+  {t:"Bir kutuda 3 kırmızı, 2 mavi top var. Rastgele çekilen topun kırmızı olma olasılığı nedir?",o:["2/5","3/5","1/2","1/5"],a:1,dim:"analitik"},
+  {t:"1, 1, 2, 3, 5, 8, ? — sonraki sayı nedir?",o:["11","12","13","15"],a:2,dim:"analitik"},
+  {t:"Eğer 'hızlı servis → memnun müşteri' ve 'memnun müşteri → tekrar geliş' ise, hızlı servis neye yol açar?",o:["Tekrar geliş","Şikâyet","Fiyat artışı","İşten çıkış"],a:0,dim:"analitik"}
+];
+
+/* ============ ORTAK ENVANTER (çalışma stili · Likert 1-5) ============ */
+// ters: true ise puan tersine çevrilir. dim: katkı boyutu.
+const ENVANTER = [
+  {t:"Zor bir müşteriyle karşılaştığımda sakinliğimi korurum.",dim:"dayaniklilik"},
+  {t:"İşleri son ana bırakmadan planlı ilerlemeyi severim.",dim:"planlama"},
+  {t:"Bir işi bitirmeden bırakmak beni rahatsız eder.",dim:"sonuc"},
+  {t:"Detaylara ve doğruluğa çok önem veririm.",dim:"detay"},
+  {t:"İnsanları bir fikre ikna etmekte iyiyimdir.",dim:"ikna"},
+  {t:"Başkalarının duygularını kolayca fark ederim.",dim:"musteri"},
+  {t:"Ekip içinde çalışmak bana enerji verir.",dim:"ekip"},
+  {t:"Baskı altında bile performansım düşmez.",dim:"dayaniklilik"},
+  {t:"Hedef konulduğunda onu aşmaya çalışırım.",dim:"sonuc"},
+  {t:"Bir sorun çıktığında hızlıca çözüm üretirim.",dim:"analitik"},
+  {t:"Karşımdaki kişiyi dinlemeye gerçekten zaman ayırırım.",dim:"iletisim"},
+  {t:"Belirsizlik beni geriyor, net kurallarla çalışmayı yeğlerim.",dim:"planlama"},
+  {t:"Başkalarını yönlendirmek ve motive etmek bana doğal gelir.",dim:"liderlik"},
+  {t:"Eleştiri aldığımda savunmaya geçmeden değerlendiririm.",dim:"dayaniklilik"}
+];
+
+/* ============ POZİSYONLAR ============ */
+// agirlik: uygunluk skorunun boyut ağırlıkları. sjt: senaryolar. sim: simülasyon.
+const POZ = {
+  satis_danismani:{
+    ad:"Satış Danışmanı",
+    agirlik:{musteri:.18,ikna:.20,sonuc:.18,dayaniklilik:.12,iletisim:.12,analitik:.10,detay:.10},
+    sjt:[
+      {t:"Bir müşteri aracı beğendi ama 'düşüneceğim' deyip çıkmak istiyor. En doğru yaklaşım hangisidir?",o:[
+        {t:"'Tabii, buyurun' deyip uğurlarım.",p:{musteri:0,ikna:0,sonuc:0}},
+        {t:"Kararını neyin zorlaştırdığını nazikçe sorup endişesini gidermeye çalışırım.",p:{musteri:2,ikna:2,sonuc:2}},
+        {t:"Hemen ek indirim teklif ederim.",p:{ikna:1,sonuc:1,musteri:0}},
+        {t:"'Bu fiyat yarın geçerli değil' diye baskı yaparım.",p:{ikna:0,musteri:0,sonuc:1}}
+      ]},
+      {t:"Müşteri rakip bayiden daha ucuz fiyat aldığını söylüyor. Ne yaparsınız?",o:[
+        {t:"'O zaman oradan alın' derim.",p:{musteri:0,ikna:0}},
+        {t:"Sunduğumuz değeri (servis, garanti, teslimat) somut örneklerle anlatırım.",p:{musteri:2,ikna:2,sonuc:1}},
+        {t:"Fiyatı hemen o seviyeye çekerim.",p:{ikna:1,sonuc:0,musteri:1}},
+        {t:"Rakibi kötülerim.",p:{ikna:0,musteri:0}}
+      ]},
+      {t:"Aynı anda iki müşteri ilgi bekliyor, siz birindeyken diğeri sabırsızlanıyor. En iyisi?",o:[
+        {t:"İlk müşteriyi bırakıp ikinciye koşarım.",p:{musteri:0,planlama:0}},
+        {t:"İkinciye göz teması + 'hemen yanınızdayım' deyip ilkini kısa sürede yönlendiririm.",p:{musteri:2,iletisim:2,planlama:1}},
+        {t:"İkinci müşteriyi görmezden gelirim.",p:{musteri:0}},
+        {t:"Bir meslektaşımdan yardım istemeden ikisini de bekletirim.",p:{musteri:1,ekip:0}}
+      ]},
+      {t:"Ay sonu hedefinize 2 araç kaldı ve tek gününüz var. Davranışınız?",o:[
+        {t:"Şansa bırakırım.",p:{sonuc:0}},
+        {t:"Sıcak müşteri listemi arayıp fırsatları netleştiririm, randevuları sıkılaştırırım.",p:{sonuc:2,planlama:2,ikna:1}},
+        {t:"Müşterilere gerçek dışı vaatler veririm.",p:{sonuc:1,musteri:0}},
+        {t:"Müdürden hedefi düşürmesini isterim.",p:{sonuc:0,dayaniklilik:0}}
+      ]},
+      {t:"Teslim ettiğiniz araçta müşteri küçük bir çizik fark etti ve çok sinirli. Ne yaparsınız?",o:[
+        {t:"'Teslimde yoktu' diye tartışırım.",p:{musteri:0,dayaniklilik:0}},
+        {t:"Önce özür dileyip sakinleştirir, çözümü (rötuş/servis) hemen başlatırım.",p:{musteri:2,dayaniklilik:2,iletisim:1}},
+        {t:"Sorunu görmezden gelirim.",p:{musteri:0}},
+        {t:"Suçu başka birime atarım.",p:{musteri:0,ekip:0}}
+      ]}
+    ],
+    sim:{baslik:"Satış Görüşmesi Simülasyonu",
+      giris:"Showroom'a genç bir aile geldi. Bütçeleri sınırlı, güvenlik onlar için öncelik. İlk çocukları yeni doğmuş.",
+      adimlar:[
+        {durum:"Aile içeri girdi ve çekingen duruyor. İlk hamleniz?",o:[
+          {t:"Sıcak bir karşılama + 'nasıl yardımcı olabilirim?' diye açık uçlu soru.",p:{musteri:2,iletisim:2}},
+          {t:"Doğrudan en pahalı aracı tanıtmaya başlarım.",p:{ikna:0,musteri:0}},
+          {t:"Kendi işime devam eder, onlar isteyince gelirim.",p:{musteri:0}}]},
+        {durum:"İhtiyaçlarını dinlediniz: güvenli, ekonomik bir aile aracı. Sıradaki adım?",o:[
+          {t:"Güvenlik donanımı yüksek, yakıt-ekonomik 2 modeli ihtiyaçlarına bağlayarak sunarım.",p:{musteri:2,ikna:2,sonuc:1}},
+          {t:"Stokta ne varsa hepsini tek tek gösteririm.",p:{planlama:0,musteri:0}},
+          {t:"Bütçeyi zorlayan üst donanıma yönlendiririm.",p:{ikna:0,musteri:0}}]},
+        {durum:"Beğendiler ama fiyat konusunda tereddütlüler. En iyi hamle?",o:[
+          {t:"Uygun kredi/kampanya seçeneklerini + toplam sahip olma maliyetini net anlatırım.",p:{ikna:2,analitik:1,musteri:1}},
+          {t:"'Bu fiyata bulamazsınız' derim.",p:{ikna:0}},
+          {t:"Konuyu kapatıp kartvizit veririm.",p:{sonuc:0}}]},
+        {durum:"Karar aşamasındalar. Kapanış için?",o:[
+          {t:"Küçük bir test sürüşü + net bir sonraki adım (ör. yarın teslim planı) öneririm.",p:{sonuc:2,ikna:1,musteri:1}},
+          {t:"Baskı yapıp 'hemen imzalayın' derim.",p:{sonuc:1,musteri:0}},
+          {t:"'Düşünün, beklerim' deyip bırakırım.",p:{sonuc:0}}]}
+      ]}
+  },
+  servis_danismani:{
+    ad:"Servis Danışmanı",
+    agirlik:{musteri:.18,detay:.18,dayaniklilik:.16,iletisim:.14,analitik:.12,sonuc:.12,planlama:.10},
+    sjt:[
+      {t:"Müşteri aracını almaya geldi ama iş henüz bitmedi. Nasıl yönetirsiniz?",o:[
+        {t:"'Bitmedi, bekleyin' derim.",p:{musteri:0,iletisim:0}},
+        {t:"Durumu dürüstçe açıklar, net bir süre verir ve seçenek (bekleme/ikame) sunarım.",p:{musteri:2,iletisim:2,detay:1}},
+        {t:"Bitmiş gibi teslim ederim.",p:{detay:0,musteri:0}},
+        {t:"Atölyeyi suçlarım.",p:{ekip:0,musteri:0}}
+      ]},
+      {t:"Onarım maliyeti tahmini aştı. Ne yaparsınız?",o:[
+        {t:"Habersiz ekstra işlem yapıp faturaya eklerim.",p:{detay:0,musteri:0}},
+        {t:"İşlem yapmadan önce müşteriyi arar, onayını alırım.",p:{musteri:2,detay:2,iletisim:1}},
+        {t:"Farkı kendim karşılarım.",p:{detay:0,sonuc:0}},
+        {t:"Küçük göstererek geçiştiririm.",p:{musteri:0}}
+      ]},
+      {t:"Çok sinirli bir müşteri 'aynı arıza yine çıktı' diye bağırıyor. İlk tepkiniz?",o:[
+        {t:"Ben de sesimi yükseltirim.",p:{dayaniklilik:0,musteri:0}},
+        {t:"Sakin kalır, dinler, özür diler ve kaydı inceleyip çözüm sözü veririm.",p:{dayaniklilik:2,musteri:2,detay:1}},
+        {t:"'Garanti dışı' deyip kapatırım.",p:{musteri:0}},
+        {t:"Başka danışmana yönlendiririm.",p:{musteri:0,ekip:0}}
+      ]},
+      {t:"İş emrinde küçük bir tutarsızlık fark ettiniz (parça kodu). Ne yaparsınız?",o:[
+        {t:"Önemsemem, geçerim.",p:{detay:0}},
+        {t:"Durur, doğrular ve düzeltirim; yanlış parça takılmasını önlerim.",p:{detay:2,analitik:1,musteri:1}},
+        {t:"Ustaya sözlü söyleyip geçerim.",p:{detay:1}},
+        {t:"Sonra bakarım deyip unuturum.",p:{detay:0}}
+      ]},
+      {t:"Yoğun bir gün: 3 araç aynı anda hazır, herkes acele ediyor. Nasıl önceliklendirirsiniz?",o:[
+        {t:"Rastgele ilerlerim.",p:{planlama:0}},
+        {t:"Randevu saati, aciliyet ve müşteri durumuna göre sıralar, herkesi bilgilendiririm.",p:{planlama:2,musteri:1,iletisim:1}},
+        {t:"En çok bağıranı öne alırım.",p:{planlama:0,musteri:1}},
+        {t:"Hepsini bekletir, sıra beklerim.",p:{planlama:1,musteri:0}}
+      ]}
+    ],
+    sim:{baslik:"Şikâyet Çözümü Simülasyonu",
+      giris:"Bir müşteri, 3 gün önce serviste bakım yaptırdığı aracının aynı sorunu tekrar yaşadığını söyleyerek öfkeyle geldi.",
+      adimlar:[
+        {durum:"Müşteri yüksek sesle şikâyet ediyor, diğer müşteriler bakıyor. İlk hamle?",o:[
+          {t:"Sakin bir tonla dinler, onu daha sessiz bir alana alır ve özür dilerim.",p:{dayaniklilik:2,musteri:2}},
+          {t:"'Bağırmayın' derim.",p:{dayaniklilik:0,musteri:0}},
+          {t:"Görmezden gelip sıradaki işe dönerim.",p:{musteri:0}}]},
+        {durum:"Sakinleşti. Sıradaki adım?",o:[
+          {t:"Servis geçmişini açıp ne yapıldığını inceler, sorunu birlikte netleştiririm.",p:{detay:2,analitik:1,musteri:1}},
+          {t:"Hemen 'sizin kullanım hatanız' derim.",p:{musteri:0}},
+          {t:"Tahminle bir parça öneririm.",p:{detay:0}}]},
+        {durum:"Aynı arızanın tekrarladığı doğrulandı. Ne teklif edersiniz?",o:[
+          {t:"Ücretsiz tekrar inceleme + net süre + ikame araç seçeneği sunarım.",p:{musteri:2,sonuc:1,planlama:1}},
+          {t:"Yine ücret talep ederim.",p:{musteri:0}},
+          {t:"'Bir dahaki sefere bakarız' derim.",p:{musteri:0,sonuc:0}}]},
+        {durum:"Sorun çözüldü, müşteri gidiyor. Son dokunuş?",o:[
+          {t:"Takip araması sözü verir, memnuniyetini teyit ederim.",p:{musteri:2,detay:1}},
+          {t:"Bir şey yapmam.",p:{musteri:0}},
+          {t:"Anket doldurmasını zorlarım.",p:{musteri:0}}]}
+      ]}
+  },
+  mis:{
+    ad:"MİS (Müşteri İlişkileri Sorumlusu)",
+    agirlik:{musteri:.22,iletisim:.18,dayaniklilik:.14,planlama:.14,detay:.12,ekip:.10,analitik:.10},
+    sjt:[
+      {t:"Memnuniyet anketinde düşük puan veren bir müşteriyi ararsınız. Açılışınız?",o:[
+        {t:"'Neden düşük verdiniz?' diye savunmacı sorarım.",p:{musteri:0,iletisim:0}},
+        {t:"Teşekkür eder, geri bildirimini önemsediğimi belirtir, sorunu anlamaya çalışırım.",p:{musteri:2,iletisim:2}},
+        {t:"Aramam.",p:{musteri:0,sonuc:0}},
+        {t:"Puanı düzeltmesini rica ederim.",p:{musteri:0}}
+      ]},
+      {t:"Bir müşteri sözü verilen geri dönüşü alamadığı için kızgın. Ne yaparsınız?",o:[
+        {t:"İlgili birimi suçlarım.",p:{ekip:0,musteri:0}},
+        {t:"Sorumluluğu üstlenir, özür diler ve takibi bizzat üstlenip geri dönüş sözü veririm.",p:{musteri:2,dayaniklilik:1,planlama:1}},
+        {t:"'Yoğunduk' derim.",p:{musteri:0}},
+        {t:"Konuyu ertelerim.",p:{planlama:0,musteri:0}}
+      ]},
+      {t:"Aynı gün 15 müşteri araması + 3 şikâyet takibi var. Nasıl yönetirsiniz?",o:[
+        {t:"Gelen sırayla, plansız ilerlerim.",p:{planlama:0}},
+        {t:"Aciliyet/önem sırasına dizer, şikâyetleri önceliklendirir, hepsini takip listesine alırım.",p:{planlama:2,detay:1,musteri:1}},
+        {t:"Sadece kolay olanları yaparım.",p:{planlama:0,sonuc:0}},
+        {t:"Yardım istemeden hepsini yetiştirmeye çalışıp yarıda bırakırım.",p:{planlama:1,ekip:0}}
+      ]},
+      {t:"Bir müşteri açıkça haksız bir talepte bulunuyor. Yaklaşımınız?",o:[
+        {t:"Sertçe reddederim.",p:{musteri:0,iletisim:0}},
+        {t:"Empatiyle dinler, sınırı nazikçe açıklar ve alternatif çözüm sunarım.",p:{musteri:2,iletisim:2,dayaniklilik:1}},
+        {t:"Ne isterse kabul ederim.",p:{musteri:1,detay:0}},
+        {t:"Konuyu başkasına devrederim.",p:{ekip:0,musteri:0}}
+      ]},
+      {t:"Bir müşteri şikâyetinin kök nedenini araştırıyorsunuz. En doğru yol?",o:[
+        {t:"İlk akla geleni neden sayarım.",p:{analitik:0,detay:0}},
+        {t:"Kayıtları ve süreç adımlarını inceleyip tekrarı önleyecek nedeni bulurum.",p:{analitik:2,detay:2,planlama:1}},
+        {t:"Müşteriyi suçlarım.",p:{musteri:0}},
+        {t:"Araştırmadan kapatırım.",p:{detay:0}}
+      ]}
+    ],
+    sim:{baslik:"Memnuniyetsiz Müşteri Simülasyonu",
+      giris:"Uzun süredir sizinle çalışan sadık bir müşteri, son deneyiminden hayal kırıklığına uğradığını ve başka markaya geçmeyi düşündüğünü söylüyor.",
+      adimlar:[
+        {durum:"Müşteri kırgın ama sakin anlatıyor. İlk yaklaşımınız?",o:[
+          {t:"Dikkatle dinler, sadakatine teşekkür eder, yaşadığını ciddiye aldığımı gösteririm.",p:{musteri:2,iletisim:2}},
+          {t:"Hemen kampanya teklif ederim.",p:{ikna:1,musteri:0}},
+          {t:"'Herkes hata yapar' derim.",p:{musteri:0}}]},
+        {durum:"Sorunun kaynağını anlamak için ne yaparsınız?",o:[
+          {t:"Açık uçlu sorularla süreci adım adım netleştiririm.",p:{analitik:2,iletisim:1,detay:1}},
+          {t:"Varsayımla ilerlerim.",p:{detay:0}},
+          {t:"Konuyu değiştiririm.",p:{musteri:0}}]},
+        {durum:"Somut bir aksama tespit edildi. Ne önerirsiniz?",o:[
+          {t:"Net bir telafi + tekrarını önleyecek adımı paylaşırım.",p:{musteri:2,planlama:1,sonuc:1}},
+          {t:"Sadece özür dilerim.",p:{musteri:1}},
+          {t:"Sorunu küçümserim.",p:{musteri:0}}]},
+        {durum:"Müşteriyi elde tutmak için son adım?",o:[
+          {t:"Kişisel takip sözü + belirli bir tarihte geri dönüş planlarım.",p:{musteri:2,planlama:1,detay:1}},
+          {t:"'Görüşürüz' deyip kapatırım.",p:{sonuc:0}},
+          {t:"Abartılı vaatler veririm.",p:{musteri:0,detay:0}}]}
+      ]}
+  },
+  resepsiyonist:{
+    ad:"Resepsiyonist",
+    agirlik:{musteri:.20,iletisim:.18,planlama:.16,detay:.14,dayaniklilik:.12,hafiza:.10,ekip:.10},
+    sjt:[
+      {t:"Telefon çalıyor, aynı anda bir ziyaretçi karşınızda bekliyor. Ne yaparsınız?",o:[
+        {t:"Telefonu görmezden gelirim.",p:{musteri:1,detay:0}},
+        {t:"Ziyaretçiye göz teması + 'hemen dönüyorum' der, telefonu kısa yanıtlar, sonra ilgilenirim.",p:{musteri:2,planlama:2,iletisim:1}},
+        {t:"Ziyaretçiyi bekletip uzun telefon görüşmesi yaparım.",p:{musteri:0,planlama:0}},
+        {t:"İkisini de yarıda bırakırım.",p:{planlama:0}}
+      ]},
+      {t:"Bir ziyaretçi randevusu olmadan bir yöneticiyle görüşmek istiyor. Yaklaşımınız?",o:[
+        {t:"Doğrudan içeri alırım.",p:{detay:0,planlama:0}},
+        {t:"Nazikçe bilgi alır, yöneticiyi bilgilendirir ve uygunluğa göre yönlendiririm.",p:{musteri:2,detay:1,planlama:1,iletisim:1}},
+        {t:"'Olmaz' deyip geri çeviririm.",p:{musteri:0}},
+        {t:"Beklemeye alıp unuturum.",p:{detay:0,musteri:0}}
+      ]},
+      {t:"Bekleme alanında öfkeli bir misafir sesini yükseltti. İlk hamle?",o:[
+        {t:"Ben de gerginleşirim.",p:{dayaniklilik:0,musteri:0}},
+        {t:"Sakin ve güler yüzlü kalır, ilgilenir ve doğru kişiye hızlıca yönlendiririm.",p:{dayaniklilik:2,musteri:2,iletisim:1}},
+        {t:"Görmezden gelirim.",p:{musteri:0}},
+        {t:"Güvenliği çağırırım (ilk adımda).",p:{musteri:0,dayaniklilik:1}}
+      ]},
+      {t:"Aynı anda kargo teslimi, telefon ve misafir kaydı var. Nasıl sıralarsınız?",o:[
+        {t:"Rastgele.",p:{planlama:0}},
+        {t:"Misafiri karşılar, kargoyu imzalayıp bırakır, telefonu kısa yönetir — hepsini akışta tutarım.",p:{planlama:2,detay:1,musteri:1}},
+        {t:"Sadece kargoyla ilgilenirim.",p:{planlama:0,musteri:0}},
+        {t:"Panikler, birini düşürürüm.",p:{dayaniklilik:0,planlama:0}}
+      ]},
+      {t:"Bir isim/telefon notunu iletmeniz gerekiyor. Doğruluk için?",o:[
+        {t:"Aklımda tutar, sonra iletirim.",p:{detay:0,hafiza:1}},
+        {t:"Anında not alır, ismi/numarayı teyit eder ve doğru kişiye iletirim.",p:{detay:2,iletisim:1,planlama:1}},
+        {t:"Yaklaşık iletirim.",p:{detay:0}},
+        {t:"İletmeyi unuturum.",p:{detay:0}}
+      ]}
+    ],
+    sim:{baslik:"Çoklu Görev Karşılama Simülasyonu",
+      giris:"Yoğun bir sabah. Girişte aynı anda birden çok iş üst üste geliyor; sakin ve düzenli kalmanız gerekiyor.",
+      adimlar:[
+        {durum:"Bir VIP misafir geldi, tam o an telefon çaldı. İlk hamle?",o:[
+          {t:"Misafiri güler yüzle karşılar, 'bir saniye izninizle' deyip telefonu kısa yanıtlarım.",p:{musteri:2,planlama:2}},
+          {t:"Telefonu bırakır, misafiri es geçerim.",p:{planlama:0}},
+          {t:"İkisini de bekletirim.",p:{musteri:0}}]},
+        {durum:"Telefondaki kişi acil bir mesaj bırakmak istiyor. Ne yaparsınız?",o:[
+          {t:"Not alır, ismi ve numarayı teyit ederim.",p:{detay:2,iletisim:1}},
+          {t:"Aklımda tutmaya çalışırım.",p:{detay:0,hafiza:1}},
+          {t:"'Sonra arayın' derim.",p:{musteri:0}}]},
+        {durum:"Misafiri ilgili yöneticiye yönlendireceksiniz ama yönetici toplantıda. En iyisi?",o:[
+          {t:"Misafiri bilgilendirir, bekleme/alternatif sunar ve yöneticiye haber bırakırım.",p:{musteri:2,planlama:1,iletisim:1}},
+          {t:"Öylece bekletirim.",p:{musteri:0}},
+          {t:"Geri gönderirim.",p:{musteri:0}}]},
+        {durum:"Gün sonunda bıraktığınız mesajı iletmeyi hatırlıyor musunuz? Doğru davranış?",o:[
+          {t:"Not listemi kontrol eder, tüm mesajların iletildiğinden emin olurum.",p:{detay:2,planlama:1,hafiza:1}},
+          {t:"Hatırladıklarımı iletirim.",p:{detay:0}},
+          {t:"Ertesi güne bırakırım.",p:{planlama:0}}]}
+      ]}
+  },
+  satis_muduru:{
+    ad:"Satış Müdürü",
+    agirlik:{liderlik:.22,planlama:.16,analitik:.16,sonuc:.14,ikna:.12,ekip:.12,iletisim:.08},
+    sjt:[
+      {t:"Ekibinizden bir danışman 3 aydır hedefin altında. İlk yaklaşımınız?",o:[
+        {t:"Herkesin önünde uyarırım.",p:{liderlik:0,ekip:0}},
+        {t:"Birebir görüşüp nedenleri anlar, birlikte gelişim planı ve hedef koyarım.",p:{liderlik:2,ekip:1,planlama:1}},
+        {t:"Hemen işten çıkarırım.",p:{liderlik:0}},
+        {t:"Görmezden gelirim.",p:{liderlik:0,sonuc:0}}
+      ]},
+      {t:"Ay ortasında ekip hedefin %40 gerisinde. Ne yaparsınız?",o:[
+        {t:"Panikleyip herkese baskı yaparım.",p:{liderlik:0,dayaniklilik:0}},
+        {t:"Veriyi analiz eder, tıkanan noktayı bulur, kaynağı yeniden dağıtır ve net aksiyon planı veririm.",p:{analitik:2,planlama:2,liderlik:1,sonuc:1}},
+        {t:"Hedefi düşürürüm.",p:{sonuc:0}},
+        {t:"Beklerim, kendiliğinden düzelir.",p:{sonuc:0,liderlik:0}}
+      ]},
+      {t:"İki güçlü danışmanınız bir müşteri/prim yüzünden çatışıyor. Çözümünüz?",o:[
+        {t:"Taraf tutarım.",p:{ekip:0,liderlik:0}},
+        {t:"İkisini dinler, adil ve şeffaf bir kural koyar, ilişkiyi onarırım.",p:{liderlik:2,ekip:2,iletisim:1}},
+        {t:"Görmezden gelirim.",p:{ekip:0}},
+        {t:"İkisini de cezalandırırım.",p:{liderlik:0,ekip:0}}
+      ]},
+      {t:"Üst yönetim gerçekçi olmayan bir hedef verdi. Tavrınız?",o:[
+        {t:"İtiraz etmeden ekibe aynen dayatırım.",p:{liderlik:0,ekip:0}},
+        {t:"Veriyle gerekçelendirip müzakere eder, ekibi de motive edecek gerçekçi bir plana çeviririm.",p:{analitik:1,liderlik:2,ikna:1,planlama:1}},
+        {t:"Reddederim.",p:{sonuc:0}},
+        {t:"Ekibe 'imkânsız' derim.",p:{liderlik:0,sonuc:0}}
+      ]},
+      {t:"Yeni bir danışmanı hızla yetiştirmeniz gerekiyor. En etkili yol?",o:[
+        {t:"Kendi başına öğrensin.",p:{liderlik:0}},
+        {t:"Yapılandırılmış oryantasyon + gölgeleme + düzenli geri bildirimle koçluk yaparım.",p:{liderlik:2,planlama:1,ekip:1}},
+        {t:"Sadece hedef veririm.",p:{liderlik:0,sonuc:1}},
+        {t:"En zor müşteriyle başlatırım.",p:{liderlik:0}}
+      ]}
+    ],
+    sim:{baslik:"Gelen Kutusu (In-Basket) Simülasyonu",
+      giris:"Pazartesi 08:30. Gelen kutunuzda üst üste konular var; sınırlı zamanda önceliklendirmeniz gerekiyor.",
+      adimlar:[
+        {durum:"Aynı anda: (a) kızgın bir VIP müşteri şikâyeti, (b) aylık rapor talebi, (c) ekip toplantısı hatırlatması. İlk hangisi?",o:[
+          {t:"Önce VIP müşteri şikâyetini ele alır, sonra diğerlerini planlarım.",p:{liderlik:2,planlama:2,musteri:1}},
+          {t:"Önce raporu yazarım.",p:{planlama:0}},
+          {t:"Toplantıyı iptal ederim.",p:{liderlik:0}}]},
+        {durum:"Bir danışman izin isterken, aynı gün büyük bir teslimat var. Kararınız?",o:[
+          {t:"Ekip kapasitesini kontrol eder, teslimatı riske atmadan adil bir çözüm bulurum.",p:{planlama:2,liderlik:1,ekip:1}},
+          {t:"Direkt reddederim.",p:{ekip:0}},
+          {t:"Düşünmeden onaylarım.",p:{planlama:0}}]},
+        {durum:"Satış verisi bir modelde ciddi düşüş gösteriyor. Ne yaparsınız?",o:[
+          {t:"Nedenini analiz eder (stok, fiyat, rakip), veriye dayalı aksiyon alırım.",p:{analitik:2,sonuc:1,planlama:1}},
+          {t:"Şansa bağlarım.",p:{analitik:0}},
+          {t:"Danışmanları suçlarım.",p:{liderlik:0,ekip:0}}]},
+        {durum:"Gün sonu ekip motivasyonu düşük. Kapanış hamleniz?",o:[
+          {t:"Kısa bir toplantıyla başarıları takdir eder, net hedef ve destek sözü veririm.",p:{liderlik:2,ekip:2,iletisim:1}},
+          {t:"Bir şey yapmam.",p:{liderlik:0}},
+          {t:"Sadece eksikleri sayarım.",p:{liderlik:0,ekip:0}}]}
+      ]}
+  },
+  servis_muduru:{
+    ad:"Servis Müdürü",
+    agirlik:{liderlik:.20,planlama:.18,analitik:.16,detay:.14,ekip:.12,musteri:.12,sonuc:.08},
+    sjt:[
+      {t:"Atölyede iş yoğunluğu kapasiteyi aştı, teslimler gecikiyor. İlk adım?",o:[
+        {t:"Herkese 'daha hızlı çalışın' derim.",p:{liderlik:0,planlama:0}},
+        {t:"İş akışını analiz eder, darboğazı bulur, kaynak/planı yeniden düzenler ve müşterileri bilgilendiririm.",p:{analitik:2,planlama:2,liderlik:1,musteri:1}},
+        {t:"Randevu almayı durdururum.",p:{planlama:1,sonuc:0}},
+        {t:"Beklerim.",p:{liderlik:0}}
+      ]},
+      {t:"Tekrarlayan bir kalite hatası (yanlış parça) fark ettiniz. Yaklaşımınız?",o:[
+        {t:"Ustayı azarlarım.",p:{liderlik:0,ekip:0}},
+        {t:"Kök nedeni araştırır, süreç/kontrol adımı ekler ve ekibi eğitirim.",p:{analitik:2,detay:2,liderlik:1,planlama:1}},
+        {t:"Görmezden gelirim.",p:{detay:0}},
+        {t:"Tek seferlik kabul ederim.",p:{detay:0}}
+      ]},
+      {t:"Bir teknisyen sürekli geç kalıyor ve ekibi etkiliyor. Çözüm?",o:[
+        {t:"Herkesin önünde ceza veririm.",p:{liderlik:0,ekip:0}},
+        {t:"Birebir konuşur, nedeni anlar, beklenti ve sonuçları net koyar, takip ederim.",p:{liderlik:2,ekip:1,planlama:1}},
+        {t:"Görmezden gelirim.",p:{liderlik:0}},
+        {t:"Hemen işten çıkarırım.",p:{liderlik:0}}
+      ]},
+      {t:"Bir müşteri onarım kalitesinden şikâyetçi ve iş garanti kapsamında tartışmalı. Tavrınız?",o:[
+        {t:"Katı biçimde reddederim.",p:{musteri:0}},
+        {t:"Teknik incelemeyi yapar, adil ve şeffaf bir karar verir, müşteriyi bilgilendiririm.",p:{musteri:2,detay:1,analitik:1,liderlik:1}},
+        {t:"Ne olursa olsun ücretsiz yaparım.",p:{musteri:1,sonuc:0}},
+        {t:"Konuyu ustaya bırakırım.",p:{liderlik:0,ekip:0}}
+      ]},
+      {t:"Servis bütçesi sapma veriyor (fazla mesai + parça maliyeti). Ne yaparsınız?",o:[
+        {t:"Görmezden gelirim.",p:{planlama:0,analitik:0}},
+        {t:"Kalemleri analiz eder, verimsizliği bulur ve kaliteyi düşürmeden maliyet planı çıkarırım.",p:{analitik:2,planlama:2,sonuc:1}},
+        {t:"Rastgele kısıtlama yaparım.",p:{planlama:0}},
+        {t:"Fiyatları yükseltirim.",p:{musteri:0}}
+      ]}
+    ],
+    sim:{baslik:"Operasyon & Gelen Kutusu Simülasyonu",
+      giris:"Yoğun bir servis günü. Aynı anda operasyonel kararlar, ekip ve müşteri konuları masanızda.",
+      adimlar:[
+        {durum:"Aynı anda: (a) hatalı onarım şikâyeti, (b) yedek parça tedarik gecikmesi, (c) 2 teknisyen raporlu. Öncelik?",o:[
+          {t:"Kapasiteyi yeniden planlar, kritik müşteriyi bilgilendirir, parça için alternatif ararım.",p:{planlama:2,analitik:1,liderlik:1,musteri:1}},
+          {t:"Sadece şikâyetle ilgilenirim.",p:{planlama:0}},
+          {t:"Günü iptal ederim.",p:{sonuc:0}}]},
+        {durum:"Bir teknisyen 'bu işi yetiştiremem' diyor. Yaklaşımınız?",o:[
+          {t:"İşi böler, destek verir, gerçekçi bir teslim süresi belirlerim.",p:{liderlik:2,planlama:1,ekip:1}},
+          {t:"'Bahane istemem' derim.",p:{liderlik:0,ekip:0}},
+          {t:"İşi iptal ederim.",p:{sonuc:0}}]},
+        {durum:"Kalite kontrolde bir araçta eksik işlem çıktı. Ne yaparsınız?",o:[
+          {t:"Teslim etmeden düzeltir, kontrol adımını gözden geçiririm.",p:{detay:2,analitik:1,musteri:1}},
+          {t:"Küçükse teslim ederim.",p:{detay:0,musteri:0}},
+          {t:"Sonra bakarım.",p:{detay:0}}]},
+        {durum:"Gün sonu: ekip yorgun ama yarın da yoğun. Kapanış?",o:[
+          {t:"Emeği takdir eder, yarının planını net paylaşır, desteği hatırlatırım.",p:{liderlik:2,ekip:2,planlama:1}},
+          {t:"Sessizce dağıtırım.",p:{liderlik:0}},
+          {t:"Sadece hataları sayarım.",p:{liderlik:0,ekip:0}}]}
+      ]}
+  }
+};
+
+/* ============ DURUM ============ */
+let AS = null, TOKEN = null, POZID = null, P = null;
+let cevaplar = {}; // her modülün ham cevapları
+let puan = {};     // boyut → toplam puan
+let puanMax = {};  // boyut → maksimum
+let modUI = { list:[], idx:0 };
+let genelTimer = null, genelKalan = 0;
+
+function addPuan(dim, val, max){ if(!dim) return; puan[dim]=(puan[dim]||0)+val; puanMax[dim]=(puanMax[dim]||0)+max; }
+
+/* ---- yükleme ---- */
+async function boot(){
+  const params = new URLSearchParams(location.search);
+  TOKEN = params.get("t");
+  if(!TOKEN){ return mesaj("Geçersiz Bağlantı","Bu sınav bağlantısı eksik görünüyor. Lütfen İnsan Kaynakları ekibinden gelen bağlantıyı kullanın."); }
+  try{
+    const snap = await getDoc(doc(db,"iseAlimAssessment",TOKEN));
+    if(!snap.exists()){ return mesaj("Bağlantı Bulunamadı","Bu sınav bağlantısı geçersiz veya süresi dolmuş. Lütfen İnsan Kaynakları ile iletişime geçin."); }
+    AS = snap.data();
+    if(AS.durum==="tamamlandi"){ return mesaj("Sınav Tamamlandı","Bu değerlendirme daha önce tamamlanmış görünüyor. Katılımınız için teşekkür ederiz."); }
+    POZID = AS.pozisyon; P = POZ[POZID];
+    if(!P){ return mesaj("Hazırlık Sürüyor","Bu pozisyon için sınav içeriği henüz hazır değil. Lütfen İnsan Kaynakları ile iletişime geçin."); }
+    intro();
+  }catch(e){ mesaj("Bir Sorun Oluştu","Sınav yüklenirken bir hata oluştu: "+e.message+". Lütfen sayfayı yenileyin."); }
+}
+
+function mesaj(baslik, metin){
+  $("timer").hidden = true;
+  app$.innerHTML = `<div class="card center"><div class="done-ic"><svg width="42" height="42" viewBox="0 0 24 24"><path d="M12 8v5M12 16.5v.01M12 3l9 16H3z" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><h1>${esc(baslik)}</h1><p class="lead" style="max-width:46ch;margin:0 auto">${esc(metin)}</p></div>`;
+}
+
+/* ---- intro ---- */
+function intro(){
+  const mods = [
+    {ad:"Bilişsel Hız & Muhakeme",d:"Sayısal, sözel ve mantıksal sorular — süreyle yarışın.",t:"~10 dk"},
+    {ad:"Görsel Hafıza & Dikkat",d:"Kısa süre gösterilen deseni hatırlayın.",t:"~5 dk"},
+    {ad:"Durumsal Muhakeme",d:"Gerçek iş senaryolarında en doğru tepkiyi seçin.",t:"~8 dk"},
+    {ad:P.sim.baslik,d:"Adım adım ilerleyen bir simülasyon.",t:"~8 dk"},
+    {ad:"Çalışma Stili Envanteri",d:"Kendinizi en iyi yansıtan ifadeleri işaretleyin.",t:"~6 dk"}
+  ];
+  app$.innerHTML = `<div class="card">
+    <span class="badge">${esc(P.ad)} · Değerlendirme</span>
+    <h1 style="margin-top:14px">Merhaba${AS.adayAd?", "+esc(AS.adayAd.split(" ")[0]):""} 👋</h1>
+    <p class="lead">İnciroğlu Otomotiv İnsan Kaynakları değerlendirme sınavına hoş geldiniz. Bu sınav <b>${esc(P.ad)}</b> pozisyonu için yetkinliklerinizi ölçer. Yaklaşık <b>35–45 dakika</b> sürer ve <b>5 bölümden</b> oluşur.</p>
+    <div class="info-box"><b>Başlamadan önce:</b> Sessiz bir ortamda, tek seferde tamamlayın. Bazı bölümler <b>süreyle yarışır</b> ve geri dönüş yoktur — her soruya odaklanın. İnternet bağlantınızın açık olduğundan emin olun.</div>
+    <div class="mlist">${mods.map((m,i)=>`<div class="mrow"><span class="n">${i+1}</span><div><b>${esc(m.ad)}</b><div class="d">${esc(m.d)}</div></div><span class="t">${esc(m.t)}</span></div>`).join("")}</div>
+    <div class="foot-row"><span class="qcount">Toplam 5 bölüm</span><button class="btn" id="basla">Sınava Başla →</button></div>
+  </div>`;
+  $("basla").onclick = startExam;
+}
+
+/* ---- sınav akışı ---- */
+function startExam(){
+  cevaplar={}; puan={}; puanMax={};
+  // genel süre 45 dk
+  genelKalan = 45*60;
+  $("timer").hidden = false; tickGenel();
+  genelTimer = setInterval(tickGenel, 1000);
+  modUI.list = ["bilissel","hafiza","sjt","sim","envanter"];
+  modUI.idx = 0;
+  runMod();
+}
+function tickGenel(){
+  const m=Math.floor(genelKalan/60), s=genelKalan%60;
+  $("timerTxt").textContent = (m<10?"0":"")+m+":"+(s<10?"0":"")+s;
+  $("timer").classList.toggle("warn", genelKalan<=120);
+  if(genelKalan<=0){ clearInterval(genelTimer); return finish(); }
+  genelKalan--;
+}
+function progHtml(active){
+  return `<div class="prog">${modUI.list.map((_,i)=>`<div class="seg ${i<active?'done':i===active?'cur':''}"></div>`).join("")}</div>`;
+}
+function runMod(){
+  if(modUI.idx>=modUI.list.length){ return finish(); }
+  const m = modUI.list[modUI.idx];
+  if(m==="bilissel") return modBilissel();
+  if(m==="hafiza") return modHafiza();
+  if(m==="sjt") return modSJT();
+  if(m==="sim") return modSim();
+  if(m==="envanter") return modEnvanter();
+}
+function nextMod(){ modUI.idx++; runMod(); }
+
+/* ---- Modül 1: Bilişsel (süreli, soru başına 45sn) ---- */
+function modBilissel(){
+  const sorular = shuffle(BILISSEL.slice()).slice(0,14);
+  cevaplar.bilissel=[];
+  let i=0, qTimer=null;
+  function q(){
+    if(i>=sorular.length){ if(qTimer) clearInterval(qTimer); return nextMod(); }
+    const s=sorular[i]; let kalan=45, sel=null;
+    app$.innerHTML = `<div class="card">${progHtml(0)}
+      <span class="mod-tag">⚡ Bölüm 1 · Bilişsel Hız & Muhakeme</span>
+      <div class="qtimer" id="qt"><div style="width:100%"></div></div>
+      <div class="q">${esc(s.t)}</div>
+      <div class="opts">${s.o.map((o,k)=>`<div class="opt" data-k="${k}"><span class="key">${String.fromCharCode(65+k)}</span><span>${esc(o)}</span></div>`).join("")}</div>
+      <div class="foot-row"><span class="qcount">Soru ${i+1} / ${sorular.length}</span><button class="btn" id="ileri" disabled>İleri →</button></div>`;
+    document.querySelectorAll(".opt").forEach(el=>el.onclick=()=>{ sel=+el.dataset.k; document.querySelectorAll(".opt").forEach(x=>x.classList.toggle("sel",x===el)); $("ileri").disabled=false; });
+    $("ileri").onclick = ()=>ver();
+    function ver(){
+      if(qTimer) clearInterval(qTimer);
+      const dogru = sel===s.a;
+      cevaplar.bilissel.push({q:s.t,sel,dogru});
+      addPuan(s.dim, dogru?2:0, 2);
+      i++; q();
+    }
+    qTimer=setInterval(()=>{ kalan--; const w=Math.max(0,kalan/45*100); const b=$("qt"); if(b){ b.firstChild.style.width=w+"%"; b.classList.toggle("warn",kalan<=10);} if(kalan<=0){ clearInterval(qTimer); ver(); } },1000);
+  }
+  q();
+}
+
+/* ---- Modül 2: Görsel Hafıza (ızgara-hatırlama, 4 tur) ---- */
+function modHafiza(){
+  cevaplar.hafiza=[]; let tur=0; const turlar=[{n:3,k:4},{n:4,k:4},{n:5,k:5},{n:6,k:5}];
+  function run(){
+    if(tur>=turlar.length){ return nextMod(); }
+    const {n,k}=turlar[tur]; const toplam=k*k;
+    const acik = shuffle([...Array(toplam).keys()]).slice(0,n);
+    // göster
+    app$.innerHTML = `<div class="card center">${progHtml(1)}
+      <span class="mod-tag">🧠 Bölüm 2 · Görsel Hafıza & Dikkat</span>
+      <div class="q" style="text-align:center">Deseni ezberleyin — birazdan kaybolacak</div>
+      <div class="grid" style="grid-template-columns:repeat(${k},1fr)">${[...Array(toplam)].map((_,x)=>`<div class="cell ${acik.includes(x)?'on':''}"></div>`).join("")}</div>
+      <div class="qcount" style="margin-top:14px">Tur ${tur+1} / ${turlar.length} · ${n} kare</div>`;
+    const sure = 2500 + n*350;
+    setTimeout(()=>sor(acik,k,toplam), sure);
+  }
+  function sor(acik,k,toplam){
+    let sec=[];
+    app$.innerHTML = `<div class="card center">${progHtml(1)}
+      <span class="mod-tag">🧠 Bölüm 2 · Görsel Hafıza & Dikkat</span>
+      <div class="q" style="text-align:center">Işıklı olan kareleri işaretleyin</div>
+      <div class="grid" style="grid-template-columns:repeat(${k},1fr)">${[...Array(toplam)].map((_,x)=>`<div class="cell pick" data-x="${x}"></div>`).join("")}</div>
+      <div class="foot-row" style="justify-content:center;margin-top:20px"><button class="btn" id="onayla">Onayla →</button></div>`;
+    document.querySelectorAll(".cell.pick").forEach(el=>el.onclick=()=>{ const x=+el.dataset.x; if(sec.includes(x)){ sec=sec.filter(v=>v!==x); el.classList.remove("sel"); } else { sec.push(x); el.classList.add("sel"); } });
+    $("onayla").onclick=()=>{
+      const dogruSayi = sec.filter(x=>acik.includes(x)).length;
+      const yanlis = sec.filter(x=>!acik.includes(x)).length;
+      const net = Math.max(0, dogruSayi - yanlis);
+      addPuan("hafiza", net, acik.length);
+      addPuan("detay", net>=acik.length?1:0, 1);
+      cevaplar.hafiza.push({acik:acik.length,dogru:dogruSayi,yanlis});
+      tur++; run();
+    };
+  }
+  run();
+}
+
+/* ---- Modül 3: SJT ---- */
+function modSJT(){
+  const list=P.sjt; cevaplar.sjt=[]; let i=0;
+  function q(){
+    if(i>=list.length){ return nextMod(); }
+    const s=list[i]; let sel=null;
+    app$.innerHTML = `<div class="card">${progHtml(2)}
+      <span class="mod-tag">🧭 Bölüm 3 · Durumsal Muhakeme</span>
+      <div class="q">${esc(s.t)}<span class="sub">Bu durumda en doğru bulduğunuz tepkiyi seçin.</span></div>
+      <div class="opts">${s.o.map((o,k)=>`<div class="opt" data-k="${k}"><span class="key">${String.fromCharCode(65+k)}</span><span>${esc(o.t)}</span></div>`).join("")}</div>
+      <div class="foot-row"><span class="qcount">Senaryo ${i+1} / ${list.length}</span><button class="btn" id="ileri" disabled>İleri →</button></div>`;
+    document.querySelectorAll(".opt").forEach(el=>el.onclick=()=>{ sel=+el.dataset.k; document.querySelectorAll(".opt").forEach(x=>x.classList.toggle("sel",x===el)); $("ileri").disabled=false; });
+    $("ileri").onclick=()=>{
+      const o=s.o[sel]; const maxP=maxOf(s.o);
+      for(const dim in maxP){ addPuan(dim, (o.p&&o.p[dim])||0, maxP[dim]); }
+      cevaplar.sjt.push({q:s.t,sel}); i++; q();
+    };
+  }
+  q();
+}
+function maxOf(opts){ const m={}; opts.forEach(o=>{ for(const d in (o.p||{})){ m[d]=Math.max(m[d]||0,o.p[d]); } }); return m; }
+
+/* ---- Modül 4: Simülasyon ---- */
+function modSim(){
+  const sim=P.sim; cevaplar.sim=[]; let i=0;
+  // giriş
+  app$.innerHTML = `<div class="card">${progHtml(3)}
+    <span class="mod-tag">🎬 Bölüm 4 · ${esc(sim.baslik)}</span>
+    <div class="info-box" style="font-size:14.5px;color:var(--ink)"><b>Senaryo:</b> ${esc(sim.giris)}</div>
+    <p class="lead">Aşağıdaki adımlarda gerçek bir durumu adım adım yöneteceksiniz. Her adımda en doğru hamleyi seçin.</p>
+    <div class="foot-row"><span class="qcount">${sim.adimlar.length} adım</span><button class="btn" id="simBas">Başla →</button></div>`;
+  $("simBas").onclick=()=>adim();
+  function adim(){
+    if(i>=sim.adimlar.length){ return nextMod(); }
+    const a=sim.adimlar[i]; let sel=null;
+    app$.innerHTML = `<div class="card">${progHtml(3)}
+      <span class="mod-tag">🎬 Bölüm 4 · ${esc(sim.baslik)}</span>
+      <div class="q">${esc(a.durum)}</div>
+      <div class="opts">${a.o.map((o,k)=>`<div class="opt" data-k="${k}"><span class="key">${String.fromCharCode(65+k)}</span><span>${esc(o.t)}</span></div>`).join("")}</div>
+      <div class="foot-row"><span class="qcount">Adım ${i+1} / ${sim.adimlar.length}</span><button class="btn" id="ileri" disabled>İleri →</button></div>`;
+    document.querySelectorAll(".opt").forEach(el=>el.onclick=()=>{ sel=+el.dataset.k; document.querySelectorAll(".opt").forEach(x=>x.classList.toggle("sel",x===el)); $("ileri").disabled=false; });
+    $("ileri").onclick=()=>{ const o=a.o[sel]; const mp=maxOf(a.o); for(const d in mp){ addPuan(d,(o.p&&o.p[d])||0,mp[d]); } cevaplar.sim.push(sel); i++; adim(); };
+  }
+}
+
+/* ---- Modül 5: Envanter (Likert) ---- */
+function modEnvanter(){
+  const list=shuffle(ENVANTER.slice()); cevaplar.envanter=[]; let i=0;
+  function q(){
+    if(i>=list.length){ return finish(); }
+    const s=list[i]; let sel=null;
+    app$.innerHTML = `<div class="card">${progHtml(4)}
+      <span class="mod-tag">🗂️ Bölüm 5 · Çalışma Stili Envanteri</span>
+      <div class="q" style="margin-bottom:6px">${esc(s.t)}</div>
+      <div class="lik" id="lik">${[1,2,3,4,5].map(v=>`<button data-v="${v}">${v}</button>`).join("")}</div>
+      <div class="lik-lbl"><span>Kesinlikle katılmıyorum</span><span>Kesinlikle katılıyorum</span></div>
+      <div class="foot-row"><span class="qcount">İfade ${i+1} / ${list.length}</span><button class="btn" id="ileri" disabled>İleri →</button></div>`;
+    document.querySelectorAll("#lik button").forEach(b=>b.onclick=()=>{ sel=+b.dataset.v; document.querySelectorAll("#lik button").forEach(x=>x.classList.toggle("sel",x===b)); $("ileri").disabled=false; });
+    $("ileri").onclick=()=>{ const val=s.ters?(6-sel):sel; addPuan(s.dim,(val-1)/4*2,2); cevaplar.envanter.push({q:s.t,v:sel}); i++; q(); };
+  }
+  q();
+}
+
+/* ---- bitiş & skorlama ---- */
+async function finish(){
+  if(genelTimer) clearInterval(genelTimer);
+  $("timer").hidden = true;
+  app$.innerHTML = `<div class="card center"><h2>Sonuçlar hesaplanıyor…</h2><p class="lead">Lütfen bekleyin, kaydediyoruz.</p></div>`;
+  // boyut yüzdeleri
+  const boyut = {};
+  for(const d in puanMax){ boyut[d] = puanMax[d]>0 ? Math.round(puan[d]/puanMax[d]*100) : null; }
+  // uygunluk skoru (pozisyon ağırlıkları)
+  let us=0, wsum=0;
+  for(const d in P.agirlik){ if(boyut[d]!=null){ us += boyut[d]*P.agirlik[d]; wsum += P.agirlik[d]; } }
+  const uygunluk = wsum>0 ? Math.round(us/wsum) : null;
+  const sonuc = {
+    durum:"tamamlandi",
+    tamamlanmaTarihi: new Date().toISOString().slice(0,10),
+    boyutlar: boyut,
+    uygunluk,
+    cevaplar,
+    guncellemeTarihi: serverTimestamp()
+  };
+  try{
+    await setDoc(doc(db,"iseAlimAssessment",TOKEN), sonuc, {merge:true});
+  }catch(e){ /* yine de teşekkür göster */ }
+  app$.innerHTML = `<div class="card center">
+    <div class="done-ic"><svg width="42" height="42" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <h1>Sınav Tamamlandı 🎉</h1>
+    <p class="lead" style="max-width:48ch;margin:0 auto">Teşekkür ederiz${AS.adayAd?", "+esc(AS.adayAd.split(" ")[0]):""}. Değerlendirmeniz İnsan Kaynakları ekibimize ulaştı. Sonuçlar İK tarafından incelenecek ve süreçle ilgili sizinle iletişime geçilecektir.</p>
+    <p class="lead" style="color:var(--ink-mute);font-size:13px;margin-top:16px">Bu sekmeyi kapatabilirsiniz.</p>
+  </div>`;
+}
+
+/* ---- yardımcı ---- */
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+boot();
+</script>
+</body>
+</html>

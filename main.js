@@ -873,12 +873,37 @@ let currentUid = null;
 let currentProfile = null;
 let adaylar = [];
 let talepler = [];
+let assessmentlar = [];
 let unsubAday = null;
 let unsubTalep = null;
+let unsubAssess = null;
+
+// Pozisyon bazlı değerlendirme sınavı (SPICA/DYT modeli). Anahtarlar sinav.html POZ ile birebir.
+const ASSESS_POZ = [
+  { key: "satis_danismani", ad: "Satış Danışmanı" },
+  { key: "servis_danismani", ad: "Servis Danışmanı" },
+  { key: "mis", ad: "MİS (Müşteri İlişkileri Sorumlusu)" },
+  { key: "resepsiyonist", ad: "Resepsiyonist" },
+  { key: "satis_muduru", ad: "Satış Müdürü" },
+  { key: "servis_muduru", ad: "Servis Müdürü" }
+];
+const ASSESS_POZ_AD = Object.fromEntries(ASSESS_POZ.map((p) => [p.key, p.ad]));
+const BOYUT_AD = {
+  musteri:"Müşteri Odaklılık", ikna:"İkna Yeteneği & İletişim", iletisim:"İletişim Becerisi",
+  sonuc:"Sonuca Ulaşma Azmi", dayaniklilik:"Dayanıklılık & Stres Yönetimi", detay:"Detay & Doğruluk (Dikkat)",
+  ekip:"Takım Çalışmasına Yatkınlık", liderlik:"Liderlik & Koçluk", analitik:"Analitik Muhakeme",
+  planlama:"Planlama & Organizasyon", hafiza:"Görsel Hafıza & Dikkat"
+};
+function assessToken(){ return "as_" + Date.now().toString(36) + Math.random().toString(36).slice(2,10); }
+function assessLink(token){ return location.origin + location.pathname.replace(/[^/]*$/,"") + "sinav.html?t=" + token; }
+function stenOf(pct){ if(pct==null) return null; return Math.max(1, Math.min(10, Math.round(pct/10))); }
+function uygunlukKarar(pct){ if(pct==null) return {t:"—",c:"st-vazgecti"}; if(pct>=70) return {t:"UYGUN",c:"st-tamam"}; if(pct>=55) return {t:"DEĞERLENDİRİLEBİLİR",c:"st-basladi"}; if(pct>=40) return {t:"SINIRDA",c:"st-sgk"}; return {t:"UYGUN DEĞİL",c:"st-olumsuz"}; }
+function adayAssessmentlari(adayId){ return assessmentlar.filter((a) => a.adayId === adayId).sort((x,y)=>(y.olusturmaTarihi_s||"").localeCompare(x.olusturmaTarihi_s||"")); }
 
 onAuthStateChanged(auth, async (user) => {
   if (unsubAday) unsubAday();
   if (unsubTalep) unsubTalep();
+  if (unsubAssess) unsubAssess();
   if (!user) {
     currentUid = null;
     currentProfile = null;
@@ -896,6 +921,7 @@ onAuthStateChanged(auth, async (user) => {
     currentProfile = snap.data();
     subscribeAdaylar();
     subscribeTalepler();
+    subscribeAssessment();
   } catch (e) {
     console.error(e);
     renderLogin("Giriş sırasında bir hata oluştu: " + e.message);
@@ -926,6 +952,20 @@ function subscribeAdaylar() {
     console.error(err);
     root().innerHTML = `<div class="center-screen"><div class="login-card"><h1>Veri okunamadı</h1><p class="hint">${esc(err.message)}</p></div></div>`;
   });
+}
+
+function subscribeAssessment() {
+  // Değerlendirme sınavı sonuçları yalnızca İK'da görünür (aday da giremez).
+  if (currentProfile.role !== "admin") { assessmentlar = []; return; }
+  unsubAssess = onSnapshot(collection(db, "iseAlimAssessment"), (qs) => {
+    assessmentlar = [];
+    qs.forEach((d) => {
+      const x = d.data();
+      const ts = x.olusturmaTarihi && x.olusturmaTarihi.toDate ? x.olusturmaTarihi.toDate().toISOString() : (x.tamamlanmaTarihi || "");
+      assessmentlar.push({ id: d.id, olusturmaTarihi_s: ts, ...x });
+    });
+    render();
+  }, (err) => { console.error("Assessment okunamadı:", err); });
 }
 
 function subscribeTalepler() {
@@ -998,7 +1038,8 @@ const ICONS = {
   talep: `<svg width="16" height="16" viewBox="0 0 24 24"><rect x="3.5" y="2.5" width="17" height="19" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
   oryantasyon: `<svg width="16" height="16" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 12.5l2.6 2.6L16.5 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   rapor: `<svg width="16" height="16" viewBox="0 0 24 24"><rect x="4" y="2.5" width="16" height="19" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 7.5h8M8 11.5h8M8 15.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M8 19h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".6"/></svg>`,
-  denetim: `<svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 2.5l7.5 3v5.2c0 4.5-3 8.2-7.5 10.3-4.5-2.1-7.5-5.8-7.5-10.3V5.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.5 12l2.4 2.4 4.6-4.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+  denetim: `<svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 2.5l7.5 3v5.2c0 4.5-3 8.2-7.5 10.3-4.5-2.1-7.5-5.8-7.5-10.3V5.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.5 12l2.4 2.4 4.6-4.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  assessment: `<svg width="16" height="16" viewBox="0 0 24 24"><path d="M9 3h6a1 1 0 0 1 1 1v1h2a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2V4a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 4.5h6V6H9z" fill="currentColor"/><path d="M8 11l2 2 3.5-3.8M8 16h5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 };
 function topbar() {
   return `
@@ -1086,7 +1127,8 @@ function render() {
     { key: "talepler", label: "Personel Talepleri", ic: ICONS.talep },
     { key: "oryantasyon", label: "Oryantasyon", ic: ICONS.oryantasyon },
     { key: "raporlar", label: "Raporlar", ic: ICONS.rapor },
-    ...(isAdmin ? [{ key: "denetim", label: "Denetim İzi", ic: ICONS.denetim }] : [])
+    ...(isAdmin ? [{ key: "denetim", label: "Denetim İzi", ic: ICONS.denetim }] : []),
+    ...(isAdmin ? [{ key: "assessment", label: "Assessment", ic: ICONS.assessment }] : [])
   ];
 
   root().innerHTML = `
@@ -1105,6 +1147,7 @@ function render() {
   else if (TAB === "raporlar") renderRaporlarPage(gorulenAdaylar, gorulenTalepler, isAdmin);
   else if (TAB === "genel") renderGenelBakisPage(gorulenAdaylar, gorulenTalepler, isAdmin);
   else if (TAB === "denetim" && isAdmin) renderDenetimPage(gorulenAdaylar, gorulenTalepler);
+  else if (TAB === "assessment" && isAdmin) renderAssessmentPage(gorulenAdaylar);
   else renderAdaylarPage(gorulenAdaylar, isAdmin);
 }
 
@@ -2042,6 +2085,109 @@ function renderDenetimPage(adaylarList, talepList) {
   el("#denKisi").addEventListener("change", ciz);
 }
 
+let assessTab = "ilet";
+function assessSonucKarti(a, detay) {
+  const kr = uygunlukKarar(a.uygunluk);
+  const boyutlar = a.boyutlar || {};
+  const keys = Object.keys(boyutlar).filter((k) => boyutlar[k] != null).sort((x, y) => boyutlar[y] - boyutlar[x]);
+  const bars = keys.map((k) => {
+    const on = stenOf(boyutlar[k]) || 1;
+    const cells = [1,2,3,4,5,6,7,8,9,10].map((n) => `<span class="sc ${n===on?'on':(n<on?'fill':'')}">${n===on?on:''}</span>`).join("");
+    return `<div class="sten-row"><span class="sten-name">${esc(BOYUT_AD[k]||k)}</span><div class="sten-scale">${cells}</div></div>`;
+  }).join("");
+  return `
+    <div class="assess-head">
+      <div><div class="ah-poz">${esc(a.pozisyonAd||ASSESS_POZ_AD[a.pozisyon]||a.pozisyon||"")}</div><div class="ah-sub">${esc(a.adayAd||"")}${a.tamamlanmaTarihi?" · "+fmtTarih(a.tamamlanmaTarihi):""}</div></div>
+      <div class="ah-uyum"><div class="ah-pct">%${a.uygunluk!=null?a.uygunluk:"—"}</div><div class="ah-lbl">Profil Uyum</div></div>
+      <span class="status-badge ${kr.c}" style="font-size:12px">${kr.t}</span>
+    </div>
+    ${detay ? `<div class="sten-wrap">${bars||`<div style="color:var(--ink-mute);font-size:13px">Yetkinlik verisi bulunamadı.</div>`}</div>` : ""}`;
+}
+async function assessIlet(aday, pozKey) {
+  const token = assessToken();
+  await setDoc(doc(db, "iseAlimAssessment", token), {
+    adayId: aday.id, adayAd: (aday.ad + " " + aday.soyad).trim(), adayDepartman: aday.departman || "",
+    pozisyon: pozKey, pozisyonAd: ASSESS_POZ_AD[pozKey] || pozKey, durum: "bekliyor",
+    ileten: currentProfile.adSoyad || "İK", olusturmaTarihi: serverTimestamp()
+  });
+  return token;
+}
+function linkKutu(link) {
+  return `<div class="link-box"><input type="text" readonly value="${esc(link)}" onclick="this.select()"><button class="btn btn-teal btn-sm" data-kopyala="${esc(link)}">📋 Kopyala</button></div>`;
+}
+function wireKopyala() {
+  document.querySelectorAll("[data-kopyala]").forEach((b) => { if (b._k) return; b._k = true; b.addEventListener("click", () => { const t = b.dataset.kopyala; if (navigator.clipboard) { navigator.clipboard.writeText(t).then(() => toast("✓ Link kopyalandı")).catch(() => fallbackKopya(b)); } else fallbackKopya(b); }); });
+}
+function fallbackKopya(b) { const i = b.closest(".link-box").querySelector("input"); i.select(); try { document.execCommand("copy"); toast("✓ Kopyalandı"); } catch (_) {} }
+// aday detayı içindeki assessment bloğu
+function assessAdayInner(aday) {
+  const mine = adayAssessmentlari(aday.id);
+  const tamam = mine.filter((m) => m.durum === "tamamlandi");
+  const bek = mine.filter((m) => m.durum !== "tamamlandi");
+  const varsayilan = ASSESS_POZ.find((p) => (aday.unvan || "").toLocaleLowerCase("tr").includes(p.ad.split(" ")[0].toLocaleLowerCase("tr")));
+  let html = "";
+  if (tamam.length) html += tamam.map((m) => `<div class="assess-card click adaySonuc" style="margin-bottom:10px" data-tok="${m.id}">${assessSonucKarti(m, false)}</div>`).join("");
+  if (bek.length) html += bek.map((m) => `<div style="margin-bottom:10px"><span class="assess-pill ap-bek">Sınav bekliyor · ${esc(m.pozisyonAd || "")}</span>${linkKutu(assessLink(m.id))}</div>`).join("");
+  html += `<div class="mini-form">
+      <div style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">${mine.length ? "Yeni Sınav Gönder" : "Değerlendirme Sınavı Gönder"}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select id="asAdayPoz" style="min-width:220px;flex:1">${ASSESS_POZ.map((p) => `<option value="${p.key}" ${varsayilan && varsayilan.key === p.key ? "selected" : ""}>${esc(p.ad)}</option>`).join("")}</select>
+        <button type="button" class="btn btn-teal btn-sm" id="asAdayUret">🔗 Assessment İlet</button>
+      </div>
+      <div id="asAdayLink" style="margin-top:6px"></div>
+    </div>`;
+  return html;
+}
+
+function renderAssessmentPage(adaylarList) {
+  const tamamlanan = assessmentlar.filter((a) => a.durum === "tamamlandi").sort((x, y) => (y.tamamlanmaTarihi || "").localeCompare(x.tamamlanmaTarihi || ""));
+  const bekleyen = assessmentlar.filter((a) => a.durum !== "tamamlandi");
+  const aktifAdaylar = adaylarList.filter((a) => a.durum !== "olumsuz" && a.durum !== "vazgecti");
+  el("#pageWrap").innerHTML = `
+    <div class="page-head"><div><h1>Assessment — Değerlendirme Sınavları</h1><p>Pozisyon bazlı yetkinlik sınavı gönderin (SPICA / Durumsal Yargı modeli) ve sonuçları sten (1-10) + Profil Uyum ile görün. Sonuçlar yalnızca İK'ya görünür.</p></div></div>
+    <div class="assess-tabs" id="asTabs">
+      <button data-tab="ilet" class="${assessTab === 'ilet' ? 'active' : ''}">📨 Assessment İlet</button>
+      <button data-tab="sonuc" class="${assessTab === 'sonuc' ? 'active' : ''}">📊 Assessment Sonuçları ${tamamlanan.length ? `(${tamamlanan.length})` : ""}</button>
+    </div>
+    <div id="asBody"></div>`;
+  el("#asTabs").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { assessTab = b.dataset.tab; renderAssessmentPage(adaylarList); }));
+  const body = el("#asBody");
+  if (assessTab === "ilet") {
+    body.innerHTML = `
+      <div class="stat-row"><div class="stat-card"><div class="n">${aktifAdaylar.length}</div><div class="l">Aktif Aday</div></div>
+        <div class="stat-card"><div class="n">${bekleyen.length}</div><div class="l">Bekleyen Sınav</div></div>
+        <div class="stat-card"><div class="n">${tamamlanan.length}</div><div class="l">Tamamlanan</div></div></div>
+      <div class="section-title">Adaya Sınav Gönder</div>
+      <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 12px">Bir aday için pozisyon seçip <b>Link Üret</b> deyin. Oluşan bağlantıyı adaya kendiniz iletin (WhatsApp / e-posta). Aday tamamlayınca sonuç otomatik "Sonuçlar" sekmesine düşer.</p>
+      <div class="card-list" id="ietList"></div>`;
+    const list = el("#ietList");
+    list.innerHTML = aktifAdaylar.length ? aktifAdaylar.map((a) => {
+      const mine = adayAssessmentlari(a.id); const son = mine[0];
+      let rozet = `<span class="assess-pill ap-yok">Sınav yok</span>`;
+      if (son) { if (son.durum === "tamamlandi") { const kr = uygunlukKarar(son.uygunluk); rozet = `<span class="status-badge ${kr.c}" style="font-size:11px">Tamamlandı · %${son.uygunluk} ${kr.t}</span>`; } else rozet = `<span class="assess-pill ap-bek">Bekliyor</span>`; }
+      const varsay = ASSESS_POZ.find((p) => (a.unvan || "").toLocaleLowerCase("tr").includes(p.ad.split(" ")[0].toLocaleLowerCase("tr")));
+      return `<div class="aday-card" style="cursor:default;align-items:flex-start;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:12px;width:100%">${avatarHtml(a.ad + " " + a.soyad, 36)}
+          <div class="main" style="flex:1"><b>${esc(a.ad)} ${esc(a.soyad)}</b><div class="meta">${esc(a.unvan || "")} · ${esc(a.departman || "")}</div></div>${rozet}</div>
+        <div style="display:flex;gap:8px;align-items:center;width:100%;flex-wrap:wrap">
+          <select class="asPoz" data-id="${a.id}" style="min-width:220px">${ASSESS_POZ.map((p) => `<option value="${p.key}" ${varsay && varsay.key === p.key ? "selected" : ""}>${esc(p.ad)}</option>`).join("")}</select>
+          <button class="btn btn-teal btn-sm asUret" data-id="${a.id}">🔗 Sınav Linki Üret</button></div>
+        <div class="asLink" data-id="${a.id}" style="width:100%"></div></div>`;
+    }).join("") : `<div class="empty-state">Aktif aday yok.</div>`;
+    list.querySelectorAll(".asUret").forEach((b) => b.addEventListener("click", async () => {
+      const id = b.dataset.id; const aday = adaylar.find((x) => x.id === id); const poz = list.querySelector(`.asPoz[data-id="${id}"]`).value;
+      b.disabled = true; b.textContent = "Üretiliyor…";
+      try { const token = await assessIlet(aday, poz); list.querySelector(`.asLink[data-id="${id}"]`).innerHTML = linkKutu(assessLink(token)) + `<div style="font-size:11.5px;color:var(--ink-soft);margin-top:5px">✓ Link üretildi. Adaya iletin.</div>`; b.textContent = "✓ Üretildi"; wireKopyala(); }
+      catch (e) { toast("Üretilemedi: " + e.message); b.disabled = false; b.textContent = "🔗 Sınav Linki Üret"; }
+    }));
+  } else {
+    body.innerHTML = tamamlanan.length ? `<div>${tamamlanan.map((a, i) => `<div class="assess-card click" data-si="${i}">${assessSonucKarti(a, false)}</div>`).join("")}</div>`
+      : `<div class="empty-state">Henüz tamamlanmış sınav yok. "Assessment İlet" sekmesinden bir adaya sınav gönderin.</div>`;
+    body.querySelectorAll(".assess-card[data-si]").forEach((c) => c.addEventListener("click", () => { const a = tamamlanan[+c.dataset.si]; const open = c.classList.toggle("open"); c.innerHTML = assessSonucKarti(a, open); }));
+  }
+  wireKopyala();
+}
+
 function renderRaporlarPage(adaylarList, talepList, isAdmin) {
   const departmanlar = isAdmin ? DEPARTMAN_LISTESI : [currentProfile.muduluk].filter(Boolean);
 
@@ -2544,6 +2690,9 @@ function openAdayDetay(aday, isAdmin) {
     <div class="section-title">İletişim Geçmişi</div>
     <div id="iletisimWrap">${iletisimInner(a)}</div>
 
+    ${isAdmin ? `<div class="section-title">Değerlendirme Sınavı (Assessment)</div>
+    <div id="assessWrap">${assessAdayInner(a)}</div>` : ""}
+
     ${a.gecmis && a.gecmis.length ? gecmisHtml(a) : ""}
 
     <div class="section-title">Not</div>
@@ -2889,6 +3038,22 @@ function openAdayDetay(aday, isAdmin) {
       const yeni = [...(aday.iletisim || []), kayit]; ilEkle.disabled = true;
       try { await ekleGecmisli({ iletisim: yeni, _not: `${kayit.tur}: ${ozet}` }, "İletişim kaydı"); el("#iletisimWrap").innerHTML = iletisimInner(aday); wireEklentiler(); toast("✓ İletişim kaydı eklendi."); } catch (e) { toast("Eklenemedi: " + e.message); ilEkle.disabled = false; }
     });
+    // Assessment: aday detayından sınav ilet
+    const asUret = document.getElementById("asAdayUret");
+    if (asUret) asUret.addEventListener("click", async () => {
+      const poz = el("#asAdayPoz").value; asUret.disabled = true; asUret.textContent = "Üretiliyor…";
+      try {
+        const token = await assessIlet(aday, poz);
+        el("#asAdayLink").innerHTML = linkKutu(assessLink(token)) + `<div style="font-size:11.5px;color:var(--ink-soft);margin-top:5px">✓ Link üretildi. Adaya iletin — sonuç geldiğinde burada ve Assessment sayfasında görünür.</div>`;
+        await ekleGecmisli({ _not: `${ASSESS_POZ_AD[poz] || poz} sınavı iletildi` }, "Assessment iletildi");
+        asUret.textContent = "✓ İletildi"; wireKopyala();
+      } catch (e) { toast("Üretilemedi: " + e.message); asUret.disabled = false; asUret.textContent = "🔗 Assessment İlet"; }
+    });
+    document.querySelectorAll("#assessWrap .adaySonuc").forEach((c) => c.addEventListener("click", () => {
+      const tok = c.dataset.tok; const m = assessmentlar.find((x) => x.id === tok); if (!m) return;
+      const open = c.classList.toggle("open"); c.innerHTML = assessSonucKarti(m, open);
+    }));
+    wireKopyala();
   }
 
   overlay.innerHTML = `
