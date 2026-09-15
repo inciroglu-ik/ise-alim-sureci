@@ -2001,6 +2001,53 @@ function teklifMektubuHtml(a, t) {
       </div>
     </div>`;
 }
+// --- Özlük dosyasına konacak imzalı formlar (oryantasyon + deneme süresi) ---
+function imzaBlokHtml() {
+  const kol = (rol) => `<div style="flex:1;text-align:center"><div style="height:44px"></div><div style="border-top:1px solid #1c2530;padding-top:6px;font-size:11px;color:#132029"><b>${rol}</b><br>Ad-Soyad / İmza / Tarih</div></div>`;
+  return `<div style="margin-top:38px;display:flex;gap:22px;justify-content:space-between">${kol("Müdür")}${kol("İnsan Kaynakları")}${kol("Çalışan")}</div>`;
+}
+function formLetterhead(baslik) {
+  return `<div style="display:flex;align-items:center;gap:12px;border-bottom:2px solid #117a63;padding-bottom:13px;margin-bottom:18px">
+      <div style="width:44px;height:44px;border-radius:11px;background:linear-gradient(140deg,#2fb094,#0b5548);display:flex;align-items:center;justify-content:center">
+        <svg width="30" height="30" viewBox="0 0 40 40"><circle cx="20" cy="14.6" r="5.1" fill="#fff"/><path d="M9.8 31.6c0-6 4.6-9.3 10.2-9.3s10.2 3.3 10.2 9.3z" fill="#fff"/><path d="M27.6 10.4c2.7 1.2 4.5 3.8 4.8 6.8" fill="none" stroke="#e6b45a" stroke-width="2.2" stroke-linecap="round"/></svg></div>
+      <div><div style="font-family:'Source Serif 4',Georgia,serif;font-size:17px;font-weight:700;color:#0b5548">İnciroğlu Otomotiv</div><div style="font-size:11px;color:#56676f">İnsan Kaynakları — ${esc(baslik)}</div></div>
+      <div style="margin-left:auto;font-size:11px;color:#56676f;text-align:right">Tarih: ${fmtTarih(bugunISO())}</div></div>`;
+}
+function calisanBilgiHtml(a) {
+  const c = (lbl, val) => `<td style="padding:7px 10px;border:1px solid #e2e8e5;background:#f0f8f5;font-weight:700;width:22%">${lbl}</td><td style="padding:7px 10px;border:1px solid #e2e8e5;width:28%">${val}</td>`;
+  return `<table style="width:100%;border-collapse:collapse;margin:0 0 16px;font-size:12px">
+    <tr>${c("Ad Soyad", esc(a.ad)+" "+esc(a.soyad))}${c("Departman", esc(a.departman||"")+(a.bolum?" / "+esc(a.bolum):""))}</tr>
+    <tr>${c("Unvan", esc(a.unvan||""))}${c("İşe Başlama", a.iseBaslamaTarihi?fmtTarih(a.iseBaslamaTarihi):"—")}</tr></table>`;
+}
+function oryantasyonFormuHtml(a) {
+  const o = a.oryantasyon || { maddeler: [] };
+  const maddeler = o.maddeler || [];
+  const tamam = maddeler.filter((m) => m.tamamlandi).length;
+  const oran = maddeler.length ? Math.round(tamam / maddeler.length * 100) : 0;
+  const kat = {}; maddeler.forEach((m) => { const k = m.kategori || "Genel"; (kat[k] = kat[k] || []).push(m); });
+  const rows = Object.keys(kat).map((k) =>
+    `<tr><td colspan="3" style="padding:8px 10px;border:1px solid #e2e8e5;background:#eef2f0;font-weight:700;color:#0b5548;font-size:11px">${esc(k)}</td></tr>` +
+    kat[k].map((m) => `<tr><td style="padding:7px 10px;border:1px solid #e2e8e5;font-size:11px">${esc(m.baslik || m.ad || "")}${m.sorumlu ? `<div style="color:#8496a0;font-size:10px;margin-top:2px">Sorumlu: ${esc(m.sorumlu)}</div>` : ""}</td><td style="padding:7px 10px;border:1px solid #e2e8e5;text-align:center;width:64px;font-weight:700;color:${m.tamamlandi ? '#2f6b45' : '#95541a'}">${m.tamamlandi ? '✓' : '—'}</td><td style="padding:7px 10px;border:1px solid #e2e8e5;text-align:center;width:86px;font-size:10.5px;color:#56676f">${(m.tamamlanmaTarihi || m.tarih) ? fmtTarih(m.tamamlanmaTarihi || m.tarih) : ""}</td></tr>`).join("")).join("");
+  return `<div style="max-width:170mm;margin:0 auto;font-size:12px;color:#132029">${formLetterhead("Oryantasyon Formu")}
+    <h2 style="font-family:'Source Serif 4',Georgia,serif;font-size:18px;margin:0 0 14px">Oryantasyon Takip Formu</h2>
+    ${calisanBilgiHtml(a)}
+    <div style="font-size:12px;margin:0 0 12px">Oryantasyon Programı: <b>${esc(o.sablonAdi || "Genel")}</b> · Tamamlanma: <b>%${oran}</b> (${tamam}/${maddeler.length})</div>
+    <table style="width:100%;border-collapse:collapse;margin:0 0 14px"><tr><th style="text-align:left;padding:8px 10px;border:1px solid #e2e8e5;background:#0b5548;color:#fff;font-size:10.5px">Madde</th><th style="padding:8px 10px;border:1px solid #e2e8e5;background:#0b5548;color:#fff;font-size:10.5px;width:64px">Durum</th><th style="padding:8px 10px;border:1px solid #e2e8e5;background:#0b5548;color:#fff;font-size:10.5px;width:86px">Tarih</th></tr>${rows || `<tr><td colspan="3" style="padding:12px;border:1px solid #e2e8e5;text-align:center;color:#8496a0">Oryantasyon maddesi bulunmuyor.</td></tr>`}</table>
+    ${imzaBlokHtml()}</div>`;
+}
+function denemeFormuHtml(a) {
+  const ds = a.denemeSuresi || {}; const deg = ds.degerlendirme || {};
+  const rows = DENEME_KRITERLERI.map((k) => { const lbl = (DENEME_PUAN_OPT.find((o) => o.key === deg[k.key]) || {}).label || "—";
+    return `<tr><td style="padding:7px 10px;border:1px solid #e2e8e5;font-size:10.5px;color:#0b5548;font-weight:700;width:26%">${esc(k.kategori)}</td><td style="padding:7px 10px;border:1px solid #e2e8e5;font-size:11px">${esc(k.ad)}</td><td style="padding:7px 10px;border:1px solid #e2e8e5;text-align:center;width:90px;font-weight:700">${esc(lbl)}</td></tr>`; }).join("");
+  return `<div style="max-width:170mm;margin:0 auto;font-size:12px;color:#132029">${formLetterhead("Deneme Süresi Değerlendirme Formu")}
+    <h2 style="font-family:'Source Serif 4',Georgia,serif;font-size:18px;margin:0 0 14px">Deneme Süresi Değerlendirme Formu</h2>
+    ${calisanBilgiHtml(a)}
+    <div style="font-size:12px;margin:0 0 12px">Başlangıç: <b>${a.iseBaslamaTarihi ? fmtTarih(a.iseBaslamaTarihi) : "—"}</b> · Deneme Bitişi: <b>${ds.bitisTarihi ? fmtTarih(ds.bitisTarihi) : "—"}</b> · Değerlendiren: <b>${esc(deg.degerlendirenKullanici || "—")}</b></div>
+    <table style="width:100%;border-collapse:collapse;margin:0 0 12px"><tr><th style="text-align:left;padding:8px 10px;border:1px solid #e2e8e5;background:#0b5548;color:#fff;font-size:10.5px">Kriter</th><th style="text-align:left;padding:8px 10px;border:1px solid #e2e8e5;background:#0b5548;color:#fff;font-size:10.5px">Açıklama</th><th style="padding:8px 10px;border:1px solid #e2e8e5;background:#0b5548;color:#fff;font-size:10.5px;width:90px">Puan</th></tr>${rows}</table>
+    <div style="border:1px solid #e2e8e5;border-radius:8px;padding:12px 14px;margin:0 0 12px"><div style="font-weight:700;color:#0b5548;font-size:11px;margin-bottom:4px">Genel Değerlendirme (Yönetici Yorumu)</div><div style="font-size:12px;min-height:34px">${esc(deg.yorum || "")}</div></div>
+    <div style="border:1px solid ${deg.sonuc === DENEME_SONUC_OPT[0] ? '#c3e2ce' : (deg.sonuc ? '#efc9c9' : '#e2e8e5')};background:${deg.sonuc === DENEME_SONUC_OPT[0] ? '#e6f3ea' : (deg.sonuc ? '#fbe8e8' : '#fff')};border-radius:8px;padding:12px 14px"><div style="font-weight:700;color:#0b5548;font-size:11px;margin-bottom:4px">Sonuç</div><div style="font-size:12px">${esc(deg.sonuc || "— (henüz kesinleşmedi)")}</div></div>
+    ${imzaBlokHtml()}</div>`;
+}
 function raporAcVeYazdir(html, title) {
   const win = window.open("", "_blank");
   if (!win) { toast("⚠ Açılır pencere engellendi. Tarayıcı ayarlarından izin verin."); return; }
@@ -2815,6 +2862,7 @@ function openAdayDetay(aday, isAdmin) {
     });
     return `
     <div class="section-title">Oryantasyon (${esc(a.oryantasyon.sablonAdi || "Genel")}) — %${oran} tamamlandı (${tamam}/${maddeler.length})</div>
+    ${isAdmin ? `<button type="button" class="btn btn-ghost btn-sm" id="oryPdfBtn" style="margin-bottom:10px">🖨 Oryantasyon Formu (İmzalı PDF)</button>` : ""}
     <div class="progress-track" style="margin-bottom:12px"><div class="progress-fill" style="width:${oran}%"></div></div>
     <div id="oryantasyonListesi">
       ${kategoriler.map((grp, gi) => {
@@ -2853,6 +2901,7 @@ function openAdayDetay(aday, isAdmin) {
     const devreDisi = kilitli || !canEditSurec;
     return `
     <div class="section-title">Deneme Süresi Değerlendirmesi</div>
+    ${canEditSurec ? `<button type="button" class="btn btn-ghost btn-sm" id="denPdfBtn" style="margin-bottom:10px">🖨 Deneme Süresi Formu (İmzalı PDF)</button>` : ""}
     <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:10px">
       Başlangıç: ${fmtTarih(a.iseBaslamaTarihi)} · Bitiş: ${fmtTarih(ds.bitisTarihi)}
       ${kilitli ? ` · <span style="color:var(--good);font-weight:600">✓ Değerlendirme kesinleşti</span>` : (kalanGun !== null ? ` · ${kalanGun >= 0 ? kalanGun + " gün kaldı" : "süresi doldu"}` : "")}
@@ -3068,6 +3117,10 @@ function openAdayDetay(aday, isAdmin) {
   function wireDynamicEvents() {
     wireScorecard();
     wireEklentiler();
+    const oryPdf = document.getElementById("oryPdfBtn");
+    if (oryPdf) oryPdf.addEventListener("click", () => raporAcVeYazdir(oryantasyonFormuHtml(aday), "Oryantasyon Formu — " + aday.ad + " " + aday.soyad));
+    const denPdf = document.getElementById("denPdfBtn");
+    if (denPdf) denPdf.addEventListener("click", () => raporAcVeYazdir(denemeFormuHtml(aday), "Deneme Suresi Formu — " + aday.ad + " " + aday.soyad));
     document.querySelectorAll("[data-evrak-check]").forEach((cb) => {
       cb.addEventListener("change", () => {
         const i = +cb.dataset.evrakCheck;
