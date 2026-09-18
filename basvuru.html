@@ -47,7 +47,7 @@
   select{appearance:none;-webkit-appearance:none;padding-right:34px;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' fill='none' stroke='%2356676f' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}
   textarea{resize:vertical;min-height:84px;}
   input:focus,select:focus,textarea:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3.5px rgba(17,122,99,.14);}
-  input.err,select.err{border-color:var(--bad);box-shadow:0 0 0 3px var(--bad-bg);}
+  input.err,select.err,textarea.err{border-color:var(--bad);box-shadow:0 0 0 3px var(--bad-bg);}
   .kvkk{display:flex;gap:10px;align-items:flex-start;background:var(--teal-50);border:1px solid var(--teal-100);border-radius:var(--r);padding:13px 15px;margin-top:6px;font-size:12.5px;color:var(--ink-soft);line-height:1.55;}
   .kvkk input{width:17px;height:17px;flex:none;margin-top:1px;accent-color:var(--teal);}
   .btn{width:100%;margin-top:20px;border:none;border-radius:var(--r-sm);padding:14px;font-family:inherit;font-weight:700;font-size:15px;color:#fff;cursor:pointer;background:linear-gradient(180deg,var(--teal),#0e6c58);box-shadow:var(--sh-teal);transition:transform .12s,box-shadow .18s,background .16s;}
@@ -61,6 +61,14 @@
   .cvinfo{font-size:12.5px;color:var(--ink-soft);word-break:break-word;}
   .cvinfo.ok{color:var(--good);font-weight:600;}
   .cvinfo.bad{color:var(--bad);font-weight:600;}
+  .poz-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
+  @media(max-width:560px){.poz-grid{grid-template-columns:1fr;}}
+  .poz-opt{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--ink);border:1px solid var(--line);border-radius:var(--r-sm);padding:9px 12px;cursor:pointer;transition:border-color .15s,background .15s;user-select:none;}
+  .poz-opt:hover{border-color:var(--teal-200);background:var(--teal-50);}
+  .poz-opt input{width:16px;height:16px;flex:none;accent-color:var(--teal);margin:0;box-shadow:none;}
+  .poz-opt.on{border-color:var(--teal);background:var(--teal-50);font-weight:600;color:var(--teal-deep);}
+  .poz-opt.dis{opacity:.42;cursor:not-allowed;}
+  .poz-grid.err{outline:2px solid var(--bad-bg);outline-offset:3px;border-radius:var(--r-sm);}
   .errmsg{background:var(--bad-bg);color:var(--bad);border:1px solid var(--bad-line);border-radius:var(--r-sm);padding:11px 14px;font-size:13px;margin-top:14px;display:none;}
   .done{text-align:center;padding:30px 10px;}
   .done .ic{width:76px;height:76px;border-radius:50%;background:linear-gradient(140deg,var(--teal-400),var(--teal-deep));display:flex;align-items:center;justify-content:center;margin:0 auto 20px;box-shadow:var(--sh-teal);}
@@ -89,38 +97,35 @@
       </div>
       <div class="grid">
         <div class="field"><label>Telefon <span class="req">*</span></label><input id="telefon" inputmode="tel" autocomplete="tel" placeholder="05xx xxx xx xx"></div>
-        <div class="field"><label>E-posta</label><input id="email" type="email" autocomplete="email"></div>
+        <div class="field"><label>E-posta <span class="req">*</span></label><input id="email" type="email" autocomplete="email"></div>
       </div>
       <div class="grid">
         <div class="field"><label>Yaş</label><input id="yas" inputmode="numeric"></div>
-        <div class="field"><label>Yaşadığınız İl / İlçe</label><input id="yer"></div>
+        <div class="field"><label>Yaşadığınız İl / İlçe <span class="req">*</span></label><input id="yer"></div>
       </div>
 
       <div class="sec">Başvuru</div>
-      <div class="grid">
-        <div class="field"><label>Başvurduğunuz Pozisyon <span class="req">*</span></label>
-          <select id="pozisyon">
-            <option value="">Seçiniz…</option>
-            <option>Satış Danışmanı</option>
-            <option>Servis Danışmanı</option>
-            <option>Yedek Parça Danışmanı</option>
-            <option>Ön Muhasebe / Muhasebe</option>
-            <option>İnsan Kaynakları</option>
-            <option>Resepsiyon / Ön Büro</option>
-            <option>Teknisyen / Usta</option>
-            <option>Kaporta / Boya</option>
-            <option>Yıkama / Detailing</option>
-            <option>Diğer</option>
-          </select>
+      <div class="field"><label>Başvurduğunuz Pozisyon(lar) <span class="req">*</span> · en fazla 3 seçebilirsiniz</label>
+        <div class="poz-grid" id="pozGrid">
+          <label class="poz-opt"><input type="checkbox" name="poz" value="Satış Danışmanı"><span>Satış Danışmanı</span></label>
+          <label class="poz-opt"><input type="checkbox" name="poz" value="Servis Danışmanı"><span>Servis Danışmanı</span></label>
+          <label class="poz-opt"><input type="checkbox" name="poz" value="Yedek Parça Danışmanı"><span>Yedek Parça Danışmanı</span></label>
+          <label class="poz-opt"><input type="checkbox" name="poz" value="Ön Muhasebe / Muhasebe"><span>Ön Muhasebe / Muhasebe</span></label>
+          <label class="poz-opt"><input type="checkbox" name="poz" value="İnsan Kaynakları"><span>İnsan Kaynakları</span></label>
+          <label class="poz-opt"><input type="checkbox" name="poz" value="Resepsiyon / Ön Büro"><span>Resepsiyon / Ön Büro</span></label>
+          <label class="poz-opt"><input type="checkbox" name="poz" value="Teknisyen / Usta"><span>Teknisyen / Usta</span></label>
+          <label class="poz-opt"><input type="checkbox" name="poz" value="Kaporta / Boya"><span>Kaporta / Boya</span></label>
+          <label class="poz-opt"><input type="checkbox" name="poz" value="Yıkama / Detailing"><span>Yıkama / Detailing</span></label>
+          <label class="poz-opt"><input type="checkbox" name="poz" value="Diğer"><span>Diğer</span></label>
         </div>
-        <div class="field"><label>İlgilendiğiniz Marka / Departman</label>
-          <select id="departman">
-            <option value="">Farketmez</option>
-            <option>BMW</option><option>MINI</option><option>FIAT</option><option>ALFA ROMEO</option>
-            <option>HONDA</option><option>PEUGEOT</option><option>CITROEN</option><option>OPEL</option>
-            <option>2. EL</option><option>MERKEZ / İDARİ</option>
-          </select>
-        </div>
+      </div>
+      <div class="field"><label>İlgilendiğiniz Marka / Departman</label>
+        <select id="departman">
+          <option value="">Farketmez</option>
+          <option>BMW</option><option>MINI</option><option>FIAT</option><option>ALFA ROMEO</option>
+          <option>HONDA</option><option>PEUGEOT</option><option>CITROEN</option><option>OPEL</option>
+          <option>2. EL</option><option>MERKEZ / İDARİ</option>
+        </select>
       </div>
       <div class="field"><label>Toplam Deneyiminiz</label>
         <select id="deneyimYil">
@@ -128,7 +133,7 @@
           <option>Deneyimsiz / Yeni Mezun</option><option>1 yıldan az</option><option>1–3 yıl</option><option>3–5 yıl</option><option>5–10 yıl</option><option>10+ yıl</option>
         </select>
       </div>
-      <div class="field"><label>Deneyim Özeti — çalıştığınız yerler, roller ve süreler</label>
+      <div class="field"><label>Deneyim / Özgeçmiş Özeti — çalıştığınız yerler, roller ve süreler <span class="req">*</span></label>
         <textarea id="deneyim" placeholder="Örn: 2020–2024 X Otomotiv'de Satış Danışmanı; 2018–2020 Y'de …"></textarea>
       </div>
       <div class="field"><label>Eklemek İstedikleriniz (opsiyonel)</label>
@@ -158,7 +163,22 @@
 
   const el = (id) => document.getElementById(id);
   const bugunISO = () => { const d = new Date(); return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); };
-  const zorunlu = ["ad", "soyad", "telefon", "pozisyon"];
+  const zorunlu = ["ad", "soyad", "telefon", "email", "yer", "deneyim"];
+
+  // --- Pozisyon çoklu seçim (en az 1, en fazla 3) ---
+  const pozGrid = el("pozGrid");
+  const pozSecili = () => [...pozGrid.querySelectorAll("input[name=poz]:checked")].map((b) => b.value);
+  pozGrid.addEventListener("change", () => {
+    const boxes = [...pozGrid.querySelectorAll("input[name=poz]")];
+    const n = boxes.filter((b) => b.checked).length;
+    boxes.forEach((b) => {
+      const opt = b.closest(".poz-opt");
+      opt.classList.toggle("on", b.checked);
+      const dis = !b.checked && n >= 3;
+      b.disabled = dis; opt.classList.toggle("dis", dis);
+    });
+    if (n > 0) pozGrid.classList.remove("err");
+  });
 
   // --- CV / Özgeçmiş (PDF/Word) — aday belgesine base64 gömülür (Firestore 1MB sınırı için 600KB) ---
   let cvData = null;
@@ -185,6 +205,10 @@
     let eksik = false;
     zorunlu.forEach((id) => { const v = el(id).value.trim(); el(id).classList.toggle("err", !v); if (!v) eksik = true; });
     if (eksik) { err.textContent = "Lütfen yıldızlı (*) alanları doldurun."; err.style.display = "block"; return; }
+    const poz = pozSecili();
+    if (!poz.length) { pozGrid.classList.add("err"); err.textContent = "En az bir pozisyon seçin (en fazla 3)."; err.style.display = "block"; return; }
+    const emailV = el("email").value.trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailV)) { el("email").classList.add("err"); err.textContent = "Geçerli bir e-posta adresi girin."; err.style.display = "block"; return; }
     if (!el("kvkk").checked) { err.textContent = "Devam etmek için KVKK onayını işaretleyin."; err.style.display = "block"; return; }
 
     const btn = el("gonder"); btn.disabled = true; btn.textContent = "Gönderiliyor…";
@@ -196,7 +220,8 @@
       email: el("email").value.trim(),
       yas: isNaN(yasNum) ? null : yasNum,
       yer: el("yer").value.trim(),
-      unvan: el("pozisyon").value,
+      unvan: poz[0],
+      basvurulanPozisyonlar: poz,
       departman: el("departman").value,
       deneyimYil: el("deneyimYil").value,
       deneyim: el("deneyim").value.trim(),

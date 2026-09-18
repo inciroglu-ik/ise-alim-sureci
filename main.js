@@ -2750,6 +2750,7 @@ function openAdayDetay(aday, isAdmin) {
       <div class="field"><label>E-posta</label><input type="email" id="dEmail" value="${esc(a.email || "")}" ${isAdmin ? "" : "disabled"}></div>
     </div>
     ${kaynakEtiketHtml(a)}
+    ${a.basvurulanPozisyonlar && a.basvurulanPozisyonlar.length > 1 ? `<div class="field"><label>Başvurulan Pozisyonlar</label><div style="font-size:13px;line-height:1.9">${a.basvurulanPozisyonlar.map((p) => `<span style="display:inline-block;margin:0 5px 4px 0;padding:3px 10px;background:var(--teal-soft,#dcefe9);color:var(--teal-deep,#0b5548);border-radius:12px;font-size:12px;font-weight:600">${esc(p)}</span>`).join("")}</div></div>` : ""}
     ${cvHtml(a)}
     ${!gorusmeAsamasinda && !olumsuz ? `<div class="field"><label>İşe Başlama Tarihi</label><input type="date" id="dTarih" value="${esc(a.iseBaslamaTarihi || "")}" ${isAdmin ? "" : "disabled"}></div>` : ""}
 
