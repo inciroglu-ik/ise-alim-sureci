@@ -1279,13 +1279,16 @@ async function panoTasi(aday, yeniDurum, isAdmin) {
 
 function renderAdaylarPage(list, isAdmin) {
   const gorunurListe = isAdmin ? list : list.filter((a) => a.durum !== "olumsuz");
+  // Web Başvuruları görünümü İK/İdare (admin) triyaj ekranıdır; müdür sorgusu departmana
+  // kısıtlı olduğundan "Farketmez" başvuruları müdüre düşmez → müdürü bu moda düşürme.
+  if (!isAdmin && adayGorunum === "web") adayGorunum = "liste";
   const total = gorunurListe.length;
   const gorusmeBekleyen = list.filter((a) => a.durum === "gorusme_bekliyor").length;
   const evrakBekleyen = list.filter((a) => a.durum === "evrak_bekliyor").length;
   const sgkBekleyen = list.filter((a) => a.durum === "sgk_bekliyor").length;
   const denemeSuresinde = list.filter((a) => a.durum === "ise_basladi").length;
   const tamamlandi = list.filter((a) => a.durum === "tamamlandi").length;
-  const webSayi = list.filter((a) => a.kaynak === "Web Başvurusu").length;
+  const webSayi = gorunurListe.filter((a) => a.kaynak === "Web Başvurusu").length;
 
   const yarin = yarinISO();
   const yarinBaslayanlar = list.filter((a) => a.iseBaslamaTarihi === yarin && a.durum !== "vazgecti" && a.durum !== "olumsuz" && !a.sgkGirisYapildi);
@@ -1331,7 +1334,7 @@ function renderAdaylarPage(list, isAdmin) {
       <div class="view-toggle" id="gorunumToggle">
         <button type="button" data-gorunum="liste" class="${adayGorunum === "liste" ? "active" : ""}">☰ Liste</button>
         <button type="button" data-gorunum="pano" class="${adayGorunum === "pano" ? "active" : ""}">▦ Pano</button>
-        <button type="button" data-gorunum="web" class="${adayGorunum === "web" ? "active" : ""}">🌐 Web Başvuruları${webSayi ? ` <span style="background:var(--teal,#117a63);color:#fff;border-radius:9px;padding:0 6px;font-size:11px;margin-left:2px">${webSayi}</span>` : ""}</button>
+        ${isAdmin ? `<button type="button" data-gorunum="web" class="${adayGorunum === "web" ? "active" : ""}">🌐 Web Başvuruları${webSayi ? ` <span style="background:var(--teal,#117a63);color:#fff;border-radius:9px;padding:0 6px;font-size:11px;margin-left:2px">${webSayi}</span>` : ""}</button>` : ""}
       </div>
     </div>
     <div id="grupListesi"></div>`;
@@ -1532,20 +1535,30 @@ function renderAdaylarPage(list, isAdmin) {
         <span style="font-size:12.5px;color:var(--ink-soft);align-self:center">${liste.length} başvuru${filtreVar ? " (filtreli)" : ""} · en yeniden eskiye sıralı</span>
       </div>`;
     const body = liste.length
-      ? `<div class="stage-group-body" style="display:block">${liste.map((a) => webAppCardHtml(a)).join("")}</div>`
+      ? `<div class="stage-group-body" style="display:grid;gap:9px">${liste.map((a) => webAppCardHtml(a)).join("")}</div>`
       : `<div class="empty-state">${webAll.length ? "Filtreyle eşleşen web başvurusu yok." : "Henüz web başvurusu gelmedi. Başvuru formu paylaşıldığında gelen başvurular burada listelenecek."}</div>`;
     return filterBar + body;
   }
   function webAppCardHtml(a) {
-    const pozTags = basvuruPozlari(a).map((p) => `<span style="display:inline-block;margin:0 5px 4px 0;padding:2px 9px;background:var(--teal-soft,#dcefe9);color:var(--teal-deep,#0b5548);border-radius:11px;font-size:11.5px;font-weight:600">${esc(p)}</span>`).join("");
+    const chip = (txt, alt) => `<span style="display:inline-block;margin:0 5px 4px 0;padding:2px 9px;border-radius:11px;font-size:11.5px;font-weight:600;${alt ? "background:#eef2f0;color:#56676f" : "background:var(--teal-soft,#dcefe9);color:var(--teal-deep,#0b5548)"}">${esc(txt)}</span>`;
+    const pozTags = basvuruPozlari(a).map((p) => chip(p, false)).join("");
+    const ekChip = [];
+    if (a.departman) ekChip.push(chip("🏷 " + a.departman, true));
+    if (a.deneyimYil) ekChip.push(chip(a.deneyimYil, true));
+    const ms = basvuruZamanMs(a);
+    const yeni = ms > 0 && (Date.now() - ms) < 48 * 3600 * 1000;
+    const iletisim = [];
+    if (a.telefon) iletisim.push(`<a href="tel:${esc(a.telefon)}" onclick="event.stopPropagation()" style="color:inherit;text-decoration:none">📞 ${esc(a.telefon)}</a>`);
+    if (a.email) iletisim.push(`<a href="mailto:${esc(a.email)}" onclick="event.stopPropagation()" style="color:inherit;text-decoration:none">📧 ${esc(a.email)}</a>`);
     return `
     <div class="aday-card" data-id="${a.id}">
       <div style="display:flex;align-items:flex-start;gap:12px;flex:1;min-width:240px">
         ${avatarHtml(a.ad + " " + a.soyad, 38)}
         <div class="main">
-          <b>${esc(a.ad)} ${esc(a.soyad)}</b>
-          <div style="margin:5px 0 2px">${pozTags || `<span style="font-size:12px;color:var(--ink-mute)">Pozisyon belirtilmemiş</span>`}</div>
-          <div style="font-size:12px;color:var(--ink-soft)">🕐 ${fmtBasvuruZaman(a)}${a.yer ? ` &nbsp;·&nbsp; 📍 ${esc(a.yer)}` : ""}${a.telefon ? ` &nbsp;·&nbsp; 📞 ${esc(a.telefon)}` : ""}</div>
+          <b>${esc(a.ad)} ${esc(a.soyad)}</b>${yeni ? ` <span style="background:#c2410c;color:#fff;border-radius:9px;padding:1px 7px;font-size:10px;font-weight:700;margin-left:5px;vertical-align:middle">YENİ</span>` : ""}
+          <div style="margin:5px 0 3px">${pozTags || `<span style="font-size:12px;color:var(--ink-mute)">Pozisyon belirtilmemiş</span>`}${ekChip.join("")}</div>
+          <div style="font-size:12px;color:var(--ink-soft)">🕐 ${fmtBasvuruZaman(a)}${a.yer ? ` &nbsp;·&nbsp; 📍 ${esc(a.yer)}` : ""}</div>
+          ${iletisim.length ? `<div style="font-size:12px;color:var(--ink-soft);margin-top:2px">${iletisim.join(" &nbsp;·&nbsp; ")}</div>` : ""}
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:10px">
