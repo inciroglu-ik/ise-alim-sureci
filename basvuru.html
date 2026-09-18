@@ -55,6 +55,12 @@
   .btn:active{transform:translateY(1px);}
   .btn:disabled{opacity:.6;cursor:default;}
   .foot{text-align:center;color:var(--ink-mute);font-size:12px;margin-top:22px;line-height:1.6;}
+  .cvbox{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px dashed var(--line-strong);border-radius:var(--r-sm);padding:12px 14px;background:var(--panel-alt);}
+  .cvbtn{border:1px solid var(--teal-200);background:var(--teal-50);color:var(--teal-deep);font-family:inherit;font-weight:700;font-size:13px;padding:9px 15px;border-radius:var(--r-sm);cursor:pointer;transition:background .15s,border-color .15s;white-space:nowrap;}
+  .cvbtn:hover{background:var(--teal-100);border-color:var(--teal);}
+  .cvinfo{font-size:12.5px;color:var(--ink-soft);word-break:break-word;}
+  .cvinfo.ok{color:var(--good);font-weight:600;}
+  .cvinfo.bad{color:var(--bad);font-weight:600;}
   .errmsg{background:var(--bad-bg);color:var(--bad);border:1px solid var(--bad-line);border-radius:var(--r-sm);padding:11px 14px;font-size:13px;margin-top:14px;display:none;}
   .done{text-align:center;padding:30px 10px;}
   .done .ic{width:76px;height:76px;border-radius:50%;background:linear-gradient(140deg,var(--teal-400),var(--teal-deep));display:flex;align-items:center;justify-content:center;margin:0 auto 20px;box-shadow:var(--sh-teal);}
@@ -128,6 +134,13 @@
       <div class="field"><label>Eklemek İstedikleriniz (opsiyonel)</label>
         <textarea id="mesaj" placeholder="Kısa bir ön yazı, güçlü yönleriniz, maaş beklentiniz vb."></textarea>
       </div>
+      <div class="field"><label>CV / Özgeçmiş (opsiyonel) — PDF veya Word, en fazla 600 KB</label>
+        <div class="cvbox">
+          <input type="file" id="cv" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+          <button type="button" class="cvbtn" id="cvbtn">📎 Dosya Seç</button>
+          <span class="cvinfo" id="cvinfo">Henüz dosya seçilmedi</span>
+        </div>
+      </div>
 
       <label class="kvkk"><input type="checkbox" id="kvkk"><span>Başvuru sürecinde paylaştığım kişisel verilerimin, İnciroğlu Otomotiv İnsan Kaynakları tarafından yalnızca işe alım değerlendirmesi amacıyla işlenmesini kabul ediyorum.</span></label>
 
@@ -146,6 +159,25 @@
   const el = (id) => document.getElementById(id);
   const bugunISO = () => { const d = new Date(); return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); };
   const zorunlu = ["ad", "soyad", "telefon", "pozisyon"];
+
+  // --- CV / Özgeçmiş (PDF/Word) — aday belgesine base64 gömülür (Firestore 1MB sınırı için 600KB) ---
+  let cvData = null;
+  const MAX_CV = 600 * 1024;
+  el("cvbtn").addEventListener("click", () => el("cv").click());
+  el("cv").addEventListener("change", () => {
+    cvData = null;
+    const inf = el("cvinfo");
+    const f = el("cv").files[0];
+    if (!f) { inf.textContent = "Henüz dosya seçilmedi"; inf.className = "cvinfo"; return; }
+    const ext = (f.name.split(".").pop() || "").toLowerCase();
+    if (!["pdf", "doc", "docx"].includes(ext)) { inf.textContent = "Yalnızca PDF veya Word (.pdf, .doc, .docx) yükleyebilirsiniz."; inf.className = "cvinfo bad"; el("cv").value = ""; return; }
+    if (f.size > MAX_CV) { inf.textContent = "Dosya çok büyük (" + Math.round(f.size / 1024) + " KB). En fazla 600 KB olabilir; lütfen PDF olarak sıkıştırın."; inf.className = "cvinfo bad"; el("cv").value = ""; return; }
+    inf.textContent = "Okunuyor…"; inf.className = "cvinfo";
+    const rd = new FileReader();
+    rd.onload = () => { cvData = { ad: f.name, tip: f.type || "application/octet-stream", boyut: f.size, veri: rd.result }; inf.textContent = "✓ " + f.name + " (" + Math.round(f.size / 1024) + " KB)"; inf.className = "cvinfo ok"; };
+    rd.onerror = () => { cvData = null; inf.textContent = "Dosya okunamadı, lütfen tekrar deneyin."; inf.className = "cvinfo bad"; };
+    rd.readAsDataURL(f);
+  });
 
   el("form").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -179,6 +211,7 @@
       olusturmaTarihi: serverTimestamp(),
       guncellemeTarihi: serverTimestamp()
     };
+    if (cvData) { kayit.cv = cvData; kayit.gecmis[0].not += " (CV eklendi: " + cvData.ad + ")"; }
     try {
       await addDoc(collection(db, "iseAlimAday"), kayit);
       el("card").innerHTML = `

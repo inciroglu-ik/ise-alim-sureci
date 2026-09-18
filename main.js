@@ -2750,6 +2750,7 @@ function openAdayDetay(aday, isAdmin) {
       <div class="field"><label>E-posta</label><input type="email" id="dEmail" value="${esc(a.email || "")}" ${isAdmin ? "" : "disabled"}></div>
     </div>
     ${kaynakEtiketHtml(a)}
+    ${cvHtml(a)}
     ${!gorusmeAsamasinda && !olumsuz ? `<div class="field"><label>İşe Başlama Tarihi</label><input type="date" id="dTarih" value="${esc(a.iseBaslamaTarihi || "")}" ${isAdmin ? "" : "disabled"}></div>` : ""}
 
     ${gorusmeAsamasinda ? gorusmeHtml(a) : ""}
@@ -3006,6 +3007,17 @@ function openAdayDetay(aday, isAdmin) {
   const MULAKAT_TUR = ["Telefon", "Yüz Yüze", "Video", "Teknik", "Panel"];
   const ILETISIM_TUR = ["Telefon", "E-posta", "WhatsApp / SMS", "Yüz Yüze", "Diğer"];
 
+  function cvHtml(a) {
+    if (!a.cv || !a.cv.veri) return "";
+    const kb = a.cv.boyut ? Math.round(a.cv.boyut / 1024) + " KB" : "";
+    const ico = /pdf/i.test((a.cv.tip || "") + (a.cv.ad || "")) ? "📄" : "📝";
+    return `
+    <div class="section-title">CV / Özgeçmiş</div>
+    <div class="evrak-row done" style="align-items:center">
+      <span style="flex:1;font-size:13.5px;font-weight:600">${ico} ${esc(a.cv.ad || "Özgeçmiş")}${kb ? ` <span style="font-weight:400;color:var(--ink-soft)">· ${kb}</span>` : ""}</span>
+      <a class="btn btn-sm" href="${a.cv.veri}" download="${esc(a.cv.ad || "cv")}" style="text-decoration:none">⬇ İndir</a>
+    </div>`;
+  }
   function kaynakEtiketHtml(a) {
     return `
     <div class="two-col">
