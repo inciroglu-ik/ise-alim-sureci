@@ -1190,8 +1190,43 @@ function render() {
 // ADAYLAR SAYFASI — aşamaya göre gruplu görünüm (tek dropdown yerine)
 // ---------------------------------------------------------------
 const acikGruplar = { gorusme_bekliyor: true, evrak_bekliyor: true, sgk_bekliyor: true, ise_basladi: true, tamamlandi: false, vazgecti: false, olumsuz: false };
-// Aday havuzu görünümü: "liste" (aşama akordeonu) | "pano" (sürükle-bırak Kanban).
+// Aday havuzu görünümü: "liste" (aşama akordeonu) | "pano" (sürükle-bırak Kanban) | "web" (web başvuruları).
 let adayGorunum = "liste";
+let webPozFiltre = "", webSehirFiltre = "";
+
+// --- Web başvurusu yardımcıları (başvuru zamanı = olusturmaTarihi serverTimestamp) ---
+function basvuruZamani(a) {
+  const t = a && a.olusturmaTarihi;
+  if (t && typeof t.toDate === "function") return t.toDate();
+  if (t && t.seconds != null) return new Date(t.seconds * 1000);
+  if (a && a.basvuruTarihi) return new Date(a.basvuruTarihi + "T00:00:00");
+  return null;
+}
+function basvuruZamanMs(a) { const d = basvuruZamani(a); return d ? d.getTime() : 0; }
+function fmtBasvuruZaman(a) {
+  const d = basvuruZamani(a); if (!d) return "—";
+  const t = a.olusturmaTarihi;
+  const saatVar = t && (typeof t.toDate === "function" || t.seconds != null);
+  return d.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })
+    + (saatVar ? ", " + d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }) : "");
+}
+function basvuruPozlari(a) {
+  return (a.basvurulanPozisyonlar && a.basvurulanPozisyonlar.length) ? a.basvurulanPozisyonlar : (a.unvan ? [a.unvan] : []);
+}
+// CV'yi yeni sekmede aç (dataURL -> Blob; PDF tarayıcıda açılır, Word iner).
+function cvAc(cv) {
+  if (!cv || !cv.veri) return;
+  try {
+    const parts = cv.veri.split(",");
+    const mime = ((parts[0] || "").match(/:(.*?);/) || [])[1] || cv.tip || "application/octet-stream";
+    const bin = atob(parts[1] || "");
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([arr], { type: mime }));
+    window.open(url, "_blank");
+    setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) {} }, 60000);
+  } catch (e) { try { window.open(cv.veri, "_blank"); } catch (_) {} }
+}
 // Panoda serbestçe sürüklenip bırakılabilen (doğrudan durum değişen) aşamalar.
 // Terminal/karar aşamaları (olumsuz/tamamlandı/vazgeçti) form akışı gerektirdiği
 // için oraya bırakılınca aday detayı açılır.
@@ -1250,6 +1285,7 @@ function renderAdaylarPage(list, isAdmin) {
   const sgkBekleyen = list.filter((a) => a.durum === "sgk_bekliyor").length;
   const denemeSuresinde = list.filter((a) => a.durum === "ise_basladi").length;
   const tamamlandi = list.filter((a) => a.durum === "tamamlandi").length;
+  const webSayi = list.filter((a) => a.kaynak === "Web Başvurusu").length;
 
   const yarin = yarinISO();
   const yarinBaslayanlar = list.filter((a) => a.iseBaslamaTarihi === yarin && a.durum !== "vazgecti" && a.durum !== "olumsuz" && !a.sgkGirisYapildi);
@@ -1295,17 +1331,23 @@ function renderAdaylarPage(list, isAdmin) {
       <div class="view-toggle" id="gorunumToggle">
         <button type="button" data-gorunum="liste" class="${adayGorunum === "liste" ? "active" : ""}">☰ Liste</button>
         <button type="button" data-gorunum="pano" class="${adayGorunum === "pano" ? "active" : ""}">▦ Pano</button>
+        <button type="button" data-gorunum="web" class="${adayGorunum === "web" ? "active" : ""}">🌐 Web Başvuruları${webSayi ? ` <span style="background:var(--teal,#117a63);color:#fff;border-radius:9px;padding:0 6px;font-size:11px;margin-left:2px">${webSayi}</span>` : ""}</button>
       </div>
     </div>
     <div id="grupListesi"></div>`;
 
+    function syncToolbarWeb() {
+      const rf = el("#rolFiltre"); if (rf) rf.style.display = adayGorunum === "web" ? "none" : "";
+    }
     el("#gorunumToggle").querySelectorAll("button").forEach((b) => {
       b.addEventListener("click", () => {
         adayGorunum = b.dataset.gorunum;
         el("#gorunumToggle").querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b));
+        syncToolbarWeb();
         draw();
       });
     });
+    syncToolbarWeb();
 
   if (isAdmin) el("#yeniAdayBtn").addEventListener("click", () => openAdayForm());
 
@@ -1315,7 +1357,9 @@ function renderAdaylarPage(list, isAdmin) {
 
     const rolSec = el("#rolFiltre") ? el("#rolFiltre").value : "";
     let html;
-    if (rolSec) {
+    if (adayGorunum === "web") {
+      html = webBasvurulariHtml(gorunurListe.filter(eslesen));
+    } else if (rolSec) {
       // FAZ 1b — Pozisyona göre havuz: bu role uygun (hedefRoller'ında bu rol olan) adaylar,
       // %uygunlukla (rolPuanlari[rol]). Faz 1'de puan yok → "AI puanı bekleniyor" rozeti.
       const uygunlar = gorunurListe
@@ -1368,6 +1412,18 @@ function renderAdaylarPage(list, isAdmin) {
         if (aday) openAdayDetay(aday, isAdmin);
       });
     });
+    // --- Web başvuruları: CV aç butonları + pozisyon/şehir filtreleri ---
+    if (adayGorunum === "web") {
+      document.querySelectorAll("[data-cvac]").forEach((btn) => {
+        btn.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          const aday = adaylar.find((x) => x.id === btn.dataset.cvac);
+          if (aday && aday.cv) cvAc(aday.cv);
+        });
+      });
+      const pf = el("#webPozF"); if (pf) pf.addEventListener("change", () => { webPozFiltre = pf.value; draw(); });
+      const sf = el("#webSehirF"); if (sf) sf.addEventListener("change", () => { webSehirFiltre = sf.value; draw(); });
+    }
 
     // --- Akış panosu: kart tıklama + (admin) sürükle-bırak ---
     document.querySelectorAll(".kan-card[data-id]").forEach((card) => {
@@ -1449,6 +1505,52 @@ function renderAdaylarPage(list, isAdmin) {
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:14px;">${badge}</div>
+    </div>`;
+  }
+  function webBasvurulariHtml(baseList) {
+    const webAll = baseList.filter((a) => a.kaynak === "Web Başvurusu");
+    const pozSet = new Set(), sehirSet = new Set();
+    webAll.forEach((a) => { basvuruPozlari(a).forEach((p) => p && pozSet.add(p)); if (a.yer && a.yer.trim()) sehirSet.add(a.yer.trim()); });
+    const pozlar = [...pozSet].sort((x, y) => x.localeCompare(y, "tr"));
+    const sehirler = [...sehirSet].sort((x, y) => x.localeCompare(y, "tr"));
+    const liste = webAll.filter((a) => {
+      if (webPozFiltre && !basvuruPozlari(a).includes(webPozFiltre)) return false;
+      if (webSehirFiltre && (a.yer || "").trim() !== webSehirFiltre) return false;
+      return true;
+    }).sort((a, b) => basvuruZamanMs(b) - basvuruZamanMs(a));
+    const filtreVar = webPozFiltre || webSehirFiltre;
+    const filterBar = `
+      <div class="toolbar" style="margin:2px 0 14px">
+        <select id="webPozF" style="min-width:210px">
+          <option value="">— Tüm pozisyonlar —</option>
+          ${pozlar.map((p) => `<option value="${esc(p)}" ${webPozFiltre === p ? "selected" : ""}>${esc(p)}</option>`).join("")}
+        </select>
+        <select id="webSehirF" style="min-width:190px">
+          <option value="">— Tüm şehirler —</option>
+          ${sehirler.map((s) => `<option value="${esc(s)}" ${webSehirFiltre === s ? "selected" : ""}>${esc(s)}</option>`).join("")}
+        </select>
+        <span style="font-size:12.5px;color:var(--ink-soft);align-self:center">${liste.length} başvuru${filtreVar ? " (filtreli)" : ""} · en yeniden eskiye sıralı</span>
+      </div>`;
+    const body = liste.length
+      ? `<div class="stage-group-body" style="display:block">${liste.map((a) => webAppCardHtml(a)).join("")}</div>`
+      : `<div class="empty-state">${webAll.length ? "Filtreyle eşleşen web başvurusu yok." : "Henüz web başvurusu gelmedi. Başvuru formu paylaşıldığında gelen başvurular burada listelenecek."}</div>`;
+    return filterBar + body;
+  }
+  function webAppCardHtml(a) {
+    const pozTags = basvuruPozlari(a).map((p) => `<span style="display:inline-block;margin:0 5px 4px 0;padding:2px 9px;background:var(--teal-soft,#dcefe9);color:var(--teal-deep,#0b5548);border-radius:11px;font-size:11.5px;font-weight:600">${esc(p)}</span>`).join("");
+    return `
+    <div class="aday-card" data-id="${a.id}">
+      <div style="display:flex;align-items:flex-start;gap:12px;flex:1;min-width:240px">
+        ${avatarHtml(a.ad + " " + a.soyad, 38)}
+        <div class="main">
+          <b>${esc(a.ad)} ${esc(a.soyad)}</b>
+          <div style="margin:5px 0 2px">${pozTags || `<span style="font-size:12px;color:var(--ink-mute)">Pozisyon belirtilmemiş</span>`}</div>
+          <div style="font-size:12px;color:var(--ink-soft)">🕐 ${fmtBasvuruZaman(a)}${a.yer ? ` &nbsp;·&nbsp; 📍 ${esc(a.yer)}` : ""}${a.telefon ? ` &nbsp;·&nbsp; 📞 ${esc(a.telefon)}` : ""}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        ${a.cv ? `<button type="button" class="btn btn-sm btn-teal" data-cvac="${a.id}" title="CV'yi yeni sekmede aç">📄 CV'yi Aç</button>` : `<span style="font-size:11.5px;color:var(--ink-mute)">CV yok</span>`}
+      </div>
     </div>`;
   }
   el("#searchBox").addEventListener("input", draw);
