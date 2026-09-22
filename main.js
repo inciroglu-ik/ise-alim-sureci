@@ -2312,6 +2312,174 @@ function assessSonucKarti(a, detay) {
     </div>
     ${detay ? `<div class="sten-wrap">${bars||`<div style="color:var(--ink-mute);font-size:13px">Yetkinlik verisi bulunamadı.</div>`}</div>${!kalibre?`<div style="font-size:11px;color:var(--ink-mute);margin-top:10px;line-height:1.5">ℹ️ Şu an <b>geçici referans norma</b> göre puanlanıyor. Bu pozisyonda tamamlanan sınav sayısı <b>${NORM_MIN}</b>'e ulaşınca sten ve Profil Uyum, İnciroğlu'nun <b>kendi aday dağılımına</b> göre otomatik olarak yeniden hesaplanır.</div>`:''}` : ""}`;
 }
+// ==================== AYRINTILI (YORUMLU) DEĞERLENDİRME RAPORU ====================
+// Sten (1-10) -> bant (0-4): 1-2 / 3-4 / 5-6 / 7-8 / 9-10
+function bandOf(sten){ if(sten==null) return 2; return sten<=2?0:sten<=4?1:sten<=6?2:sten<=8?3:4; }
+const BAND_LABEL = ["Beklenenin Oldukça Altında","Beklenenin Altında","Beklenen Düzeyde","Beklenenin Üstünde","Beklenenin Oldukça Üstünde"];
+const BAND_ROZET = ["r-bad","r-uyari","r-bekle","r-basari","r-basari"];
+// Her boyutun kısa "ne ölçer" tanımı (rapor başlığı altında)
+const BOYUT_ACIKLAMA = {
+  musteri:"Müşterinin ihtiyacını doğru okuma, beklentiyi aşan çözüm sunma ve kalıcı memnuniyet yaratma.",
+  ikna:"Karşı tarafı doğru argümanla ikna etme, yönlendirme ve etkili iletişim kurma.",
+  iletisim:"Bilgiyi açık, doğru ve karşı tarafa uygun biçimde aktarma; aktif dinleme.",
+  sonuc:"Hedefe kilitlenme, engellere rağmen sonucu getirme ve başarı motivasyonu.",
+  dayaniklilik:"Baskı ve stres altında sakin kalma, hızlı toparlanma ve performansı koruma.",
+  detay:"Ayrıntıya dikkat, hata yakalama ve işi doğru/eksiksiz tamamlama.",
+  ekip:"Takımla uyum, iş birliği ve ortak hedefe katkı.",
+  liderlik:"Yönlendirme, sorumluluk alma, geliştirme/koçluk ve karar verme.",
+  analitik:"Neden-sonuç kurma, veriyi yorumlama ve akılcı çözüm üretme.",
+  planlama:"Önceliklendirme, zaman/kaynak yönetimi ve düzenli ilerleme.",
+  hafiza:"Görsel bilgiyi hatırlama ve dikkati sürdürme."
+};
+// Boyut x bant yorum kütüphanesi (SPICA/DYT tarzı: güçlü yön + nüans)
+const BOYUT_YORUM = {
+  musteri:[
+    "Müşterinin ihtiyaç ve beklentilerini fark etmekte zorlanır; etkileşimde çoğunlukla kendi önceliklerine odaklanır. Müşteri memnuniyetini merkeze alan bir yaklaşım için yakın yönlendirme ve destek gerekir.",
+    "Müşteri beklentilerini temel düzeyde karşılar ancak yoğun ya da zorlu anlarda müşteri odağını koruyamayabilir. Beklentiyi aşan çözümler üretme konusunda desteklenmesi yararlı olur.",
+    "Müşteri ihtiyaçlarını genel olarak doğru okur ve beklenen düzeyde karşılık verir. Rutin durumlarda memnuniyeti gözetir; alışılmadık taleplerde zaman zaman ek yönlendirmeye ihtiyaç duyabilir.",
+    "Müşteriyi dikkatle dinler, ihtiyacını doğru anlar ve sıklıkla beklentinin ötesine geçen çözümler sunar. Zorlu müşteri durumlarını genelde sakin ve çözüm odaklı yönetir; nadiren yoğunlukta önceliklendirmede güçlük yaşayabilir.",
+    "Müşteri odaklılık belirgin bir güçlü yönüdür; ihtiyacı proaktif olarak öngörür ve kalıcı memnuniyet yaratır. En zorlu durumlarda bile müşteri deneyimini merkeze alır ve güven veren bir ilişki kurar."],
+  ikna:[
+    "Karşı tarafı ikna etme ve argümanını etkili biçimde aktarma konusunda zorlanır. Mesajını yapılandırma ve itirazları karşılama becerisi geliştirilmelidir.",
+    "Basit durumlarda görüşünü aktarabilir ancak dirençle karşılaştığında ikna gücü zayıflar. Argümanlarını gerekçelendirme ve karşı tarafı yönlendirme konusunda desteğe ihtiyaç duyar.",
+    "Görüşlerini beklenen düzeyde savunur ve çoğu durumda karşı tarafı yönlendirebilir. Karmaşık ya da dirençli durumlarda ikna gücünü artırmak için daha güçlü gerekçelendirme faydalı olur.",
+    "İkna edici bir dile sahiptir; argümanlarını doğru gerekçelerle kurar ve karşı tarafı etkili biçimde yönlendirir. İtirazları çoğunlukla yapıcı şekilde karşılar; nadiren çok dirençli durumlarda zorlanabilir.",
+    "İkna ve etkileme belirgin bir güçlü yönüdür; en zorlu muhataplarda dahi doğru argümanla sonuç alır. Karşı tarafın bakış açısını okuyup mesajını buna göre uyarlayarak güçlü bir etki yaratır."],
+  iletisim:[
+    "Bilgiyi açık ve anlaşılır biçimde aktarmakta güçlük çeker; dinleme ve geri bildirimde eksiklikler görülebilir. Net ve yapılandırılmış iletişim için gelişime ihtiyaç vardır.",
+    "Temel iletişimi kurar ancak mesajı her zaman net ve eksiksiz aktaramayabilir. Aktif dinleme ve karşı tarafa uygun dil kullanımı konusunda desteklenmelidir.",
+    "Beklenen düzeyde açık iletişim kurar; karşı tarafı genellikle doğru anlar ve anlaşılır biçimde aktarır. Karmaşık konuları sadeleştirmede zaman zaman gelişime açıktır.",
+    "Açık, doğru ve karşı tarafa uygun biçimde iletişim kurar; iyi bir dinleyicidir. Zorlu konuları çoğunlukla anlaşılır şekilde aktarır; nadiren yoğunlukta netliği azalabilir.",
+    "İletişim belirgin bir güçlü yönüdür; en karmaşık konuları bile sade ve etkili biçimde aktarır. Aktif dinleme ve doğru soru sorma ile karşısındakini tam anlar ve güçlü bir bağ kurar."],
+  sonuc:[
+    "Hedefe ulaşmada engellerle karşılaştığında çabası hızla azalabilir. Sonuç odaklı, kararlı bir yaklaşım için motivasyon ve takip desteği gerekir.",
+    "Belirlenen hedefe yönelir ancak zorluklar karşısında ısrarını her zaman koruyamaz. Sonucu getirme konusunda ara hedefler ve takip ile desteklenmesi yararlı olur.",
+    "Hedeflerine beklenen düzeyde odaklanır ve çoğu durumda sonucu getirir. Uzun soluklu ya da engelli görevlerde kararlılığını sürdürmede zaman zaman desteğe ihtiyaç duyabilir.",
+    "Hedefe kilitlenir ve engellere rağmen sonucu getirme konusunda kararlıdır. Başarı motivasyonu yüksektir; nadiren çok uzun süren zorlu görevlerde temposu değişebilir.",
+    "Sonuca ulaşma azmi belirgin bir güçlü yönüdür; en zorlu koşullarda bile hedefinden vazgeçmez. Yüksek başarı motivasyonuyla kendini ve çevresini sonuç almaya yönlendirir."],
+  dayaniklilik:[
+    "Baskı ve stres altında sakinliğini ve performansını korumakta zorlanır. Zorlu durumlarda toparlanma ve duygu yönetimi için desteğe ihtiyaç duyar.",
+    "Normal koşullarda dengeli çalışır ancak yoğun baskı altında performansı ve ruh hâli etkilenebilir. Stresle başa çıkma stratejileri geliştirmesi yararlı olur.",
+    "Beklenen düzeyde stres toleransına sahiptir; çoğu zorlu durumu dengeli yönetir. Baskının yoğunlaştığı anlarda zaman zaman gerilim yaşayabilir.",
+    "Baskı altında genellikle sakin kalır, hızlı toparlanır ve performansını korur. Zorlu durumları çözüm odaklı karşılar; nadiren art arda gelen yoğun baskıda zorlanabilir.",
+    "Dayanıklılık belirgin bir güçlü yönüdür; en yoğun baskı altında dahi sakin, dengeli ve üretken kalır. Zorlukları fırsata çevirme ve çevresine güven verme eğilimindedir."],
+  detay:[
+    "Ayrıntılara dikkat ve hata yakalamada zorlanır; işleri eksik ya da hatalı tamamlayabilir. Doğruluk ve titizlik için kontrol mekanizmalarıyla desteklenmelidir.",
+    "Temel doğruluğu sağlar ancak yoğunlukta detayları gözden kaçırabilir. İşini gözden geçirme ve kontrol alışkanlığı geliştirmesi yararlı olur.",
+    "Beklenen düzeyde titizlikle çalışır; çoğu hatayı fark eder. Zaman baskısı ya da iş yükü arttığında detayda kayıplar yaşayabilir.",
+    "Ayrıntıya özen gösterir, hataları çoğunlukla kendiliğinden fark eder ve işini doğru tamamlar. Yoğun koşullarda dahi titizliğini büyük ölçüde korur; nadiren çok yoğunlukta ufak kaçaklar olabilir.",
+    "Detay ve doğruluk belirgin bir güçlü yönüdür; hataları erkenden yakalar ve işini eksiksiz teslim eder. Baskı altında bile titizliğini koruyarak yüksek güvenilirlik sağlar."],
+  ekip:[
+    "Takımla uyum ve iş birliği konusunda zorlanır; çoğunlukla bireysel çalışmayı tercih eder. Ortak hedefe katkı ve paylaşım için yönlendirilmeye ihtiyaç duyar.",
+    "Takım içinde çalışabilir ancak iş birliğini her zaman aktif biçimde kurmaz. Bilgi paylaşımı ve ortak sorumluluk konusunda desteklenmesi yararlı olur.",
+    "Beklenen düzeyde takım oyuncusudur; ortak hedeflere katkı verir ve uyum sağlar. Anlaşmazlık ya da baskı anlarında iş birliğini sürdürmede zaman zaman desteğe ihtiyaç duyabilir.",
+    "Takımla uyumlu çalışır, bilgi paylaşır ve ortak başarıya katkı verir. Anlaşmazlıkları çoğunlukla yapıcı yönetir; nadiren yoğun rekabet ortamında zorlanabilir.",
+    "Takım çalışması belirgin bir güçlü yönüdür; iş birliğini kurar, güçlendirir ve grubu ortak hedefe taşır. Farklı görüşleri uzlaştırma ve destekleyici bir ortam yaratma eğilimindedir."],
+  liderlik:[
+    "Yönlendirme, sorumluluk alma ve ekibi geliştirme konusunda zorlanır. Liderlik davranışları için deneyim ve gelişim desteğine ihtiyaç vardır.",
+    "Sınırlı ölçüde sorumluluk alır ancak ekibi yönlendirme ve geliştirmede çekingen kalabilir. Karar alma ve koçluk becerileri desteklenmelidir.",
+    "Beklenen düzeyde yönlendirme yapar ve sorumluluk alır. Zorlu kararlar ve ekip geliştirme konularında zaman zaman daha fazla inisiyatif alması beklenir.",
+    "Sorumluluk alır, ekibini yönlendirir ve gelişimlerine katkı verir. Kararlarını çoğunlukla zamanında ve gerekçeli alır; nadiren çok belirsiz durumlarda tereddüt edebilir.",
+    "Liderlik belirgin bir güçlü yönüdür; ekibi ortak hedefe yönlendirir, motive eder ve geliştirir. Zorlu kararları kararlılıkla alır ve çevresinde güven ile bağlılık yaratır."],
+  analitik:[
+    "Olaylar arasında neden-sonuç kurma ve veriyi yorumlama konusunda zorlanır. Karmaşık sorunlarda akılcı çözüm üretmek için yapılandırılmış desteğe ihtiyaç duyar.",
+    "Basit durumlarda muhakeme yürütür ancak çok değişkenli sorunlarda ilişkileri kurmakta zorlanabilir. Analiz ve çıkarımda desteklenmesi yararlı olur.",
+    "Beklenen düzeyde analitik düşünür; neden-sonuç ilişkilerini genellikle doğru kurar. Çok karmaşık ya da belirsiz durumlarda derin analizde zaman zaman zorlanabilir.",
+    "Olayları çözümler, neden-sonuç ilişkilerini doğru kurar ve akılcı çözümler üretir. Karmaşık sorunları çoğunlukla yapılandırarak ele alır; nadiren çok yüksek belirsizlikte zorlanabilir.",
+    "Analitik muhakeme belirgin bir güçlü yönüdür; karmaşık verileri hızla çözümler ve isabetli çıkarımlar yapar. Belirsizlik altında dahi mantıklı, kanıta dayalı kararlar üretir."],
+  planlama:[
+    "İşleri önceliklendirme, zaman ve kaynak yönetiminde zorlanır. Düzenli ve planlı ilerleme için yapılandırılmış desteğe ihtiyaç duyar.",
+    "Temel planlama yapar ancak öncelikler karıştığında ya da yük arttığında düzeni koruyamayabilir. Zaman yönetimi ve takip konusunda desteklenmesi yararlı olur.",
+    "Beklenen düzeyde planlar ve işlerini organize eder. Aynı anda çok sayıda önceliğin olduğu yoğun durumlarda zaman zaman desteğe ihtiyaç duyabilir.",
+    "İşlerini önceliklendirir, planlı ve düzenli ilerler; zamanı iyi yönetir. Beklenmedik durumlarda planını çoğunlukla hızla uyarlar; nadiren aşırı yoğunlukta zorlanabilir.",
+    "Planlama ve organizasyon belirgin bir güçlü yönüdür; karmaşık iş yükünü bile düzenli ve öngörülü biçimde yönetir. Öncelikleri net kurar, kaynakları verimli kullanır ve aksaklıkları önceden önler."],
+  hafiza:[
+    "Görsel bilgiyi hatırlama ve dikkati sürdürmede zorlanır; ayrıntılar hızla kaybolabilir. Bu alanda tekrar ve destekleyici yöntemlere ihtiyaç duyar.",
+    "Kısa süreli görsel bilgiyi kısmen hatırlar ancak yoğunlukta dikkatini sürdürmede zorlanabilir. Bilgiyi pekiştirme yöntemleriyle desteklenmesi yararlı olur.",
+    "Beklenen düzeyde görsel hafıza ve dikkate sahiptir; çoğu bilgiyi doğru hatırlar. Uzun süreli dikkat gerektiren durumlarda zaman zaman kaymalar olabilir.",
+    "Görsel bilgiyi doğru hatırlar ve dikkatini iyi sürdürür. Yoğun bilgi akışında büyük ölçüde odağını korur; nadiren çok uzun süren görevlerde zorlanabilir.",
+    "Görsel hafıza ve dikkat belirgin bir güçlü yönüdür; ayrıntıları hızla ve doğru biçimde hatırlar. Yoğun ve uzun süreli görevlerde bile odağını ve doğruluğunu korur."]
+};
+const ASSESS_KAYNAKCA = [
+  "Schmidt, F. L., & Hunter, J. E. (1998). The validity and utility of selection methods in personnel psychology. Psychological Bulletin, 124(2), 262-274.",
+  "Schmidt, F. L., Oh, I.-S., & Shaffer, J. A. (2016). The validity and utility of selection methods in personnel psychology: An updated and comprehensive review.",
+  "McDaniel, M. A., Hartman, N. S., Whetzel, D. L., & Grubb, W. L. (2007). Situational judgment tests, response instructions, and validity: A meta-analysis. Personnel Psychology, 60(1), 63-91.",
+  "Motowidlo, S. J., Dunnette, M. D., & Carter, G. W. (1990). An alternative selection procedure: The low-fidelity simulation. Journal of Applied Psychology, 75(6), 640-647.",
+  "Barrick, M. R., & Mount, M. K. (1991). The Big Five personality dimensions and job performance: A meta-analysis. Personnel Psychology, 44(1), 1-26.",
+  "Ones, D. S., Viswesvaran, C., & Schmidt, F. L. (1993). Comprehensive meta-analysis of integrity test validities. Journal of Applied Psychology, 78(4), 679-703.",
+  "Spencer, L. M., & Spencer, S. M. (1993). Competence at Work: Models for Superior Performance. New York: Wiley.",
+  "Lombardo, M. M., & Eichinger, R. W. (2000). High potentials as high learners. Human Resource Management, 39(4), 321-329.",
+  "Cattell, R. B. (1949). The Standard Ten (Sten) Score Scale. Institute for Personality and Ability Testing. — Norm grubu: Türkiye beyaz yaka / İnciroğlu aday havuzu."
+];
+// 1-10 sten çubuğu (yazdırılabilir, satır içi stil)
+function stenBarInline(on){
+  const cells = [1,2,3,4,5,6,7,8,9,10].map((n) => {
+    const active = n === on, filled = n < on;
+    const bg = active ? "#0b5548" : (filled ? "#bfe0d6" : "#eef2f0");
+    const col = active ? "#fff" : (filled ? "#0b5548" : "#9fb0aa");
+    return `<span style="display:inline-block;width:24px;height:22px;line-height:22px;text-align:center;font-size:10.5px;font-weight:700;background:${bg};color:${col};border:1px solid #d7e0dc">${active ? on : ""}</span>`;
+  }).join("");
+  return `<span style="display:inline-flex;border-radius:4px;overflow:hidden;border:1px solid #cdd8d3">${cells}</span>`;
+}
+function uygunlukRenk(pct){ if(pct==null) return "#8a9a94"; if(pct>=70) return "#2f6b45"; if(pct>=55) return "#3d4f8f"; if(pct>=40) return "#a15c1f"; return "#a13030"; }
+// Aday assessment sonucundan SPICA tarzı ayrıntılı, yorumlu rapor gövdesi üretir.
+function assessRaporHtml(a){
+  const pozKey = a.pozisyon;
+  const nrm = assessNorm(pozKey);
+  const agirlik = POZ_AGIRLIK[pozKey] || {};
+  const boyutlar = a.boyutlar || {};
+  const stenler = {};
+  Object.keys(boyutlar).forEach((k) => { if (boyutlar[k] != null) stenler[k] = stenFromRaw(boyutlar[k], nrm.norm[k]); });
+  let us = 0, ws = 0;
+  for (const d in agirlik) { if (stenler[d] != null) { us += (stenler[d] / 10 * 100) * agirlik[d]; ws += agirlik[d]; } }
+  const uygunluk = ws > 0 ? Math.round(us / ws) : (a.uygunluk != null ? a.uygunluk : null);
+  const kr = uygunlukKarar(uygunluk);
+  const kalibre = nrm.N >= NORM_MIN;
+  // İlgililik (ağırlık) sırasına göre; ağırlık eşitse stene göre
+  const keys = Object.keys(stenler).sort((x, y) => (agirlik[y] || 0) - (agirlik[x] || 0) || stenler[y] - stenler[x]);
+  const pozAd = a.pozisyonAd || ASSESS_POZ_AD[a.pozisyon] || a.pozisyon || "";
+  if (!keys.length) {
+    return `${formLetterhead("Değerlendirme Raporu")}<h2 style="font-family:'Source Serif 4',Georgia,serif;font-size:18px;margin:0 0 8px;color:#0b5548">Yetkinlik Değerlendirme Raporu</h2><div style="color:#8a9a94">Bu sınav için yetkinlik verisi bulunamadı.</div>`;
+  }
+  const ozetRows = keys.map((k) => {
+    const b = bandOf(stenler[k]);
+    return `<tr><td style="font-weight:600">${esc(BOYUT_AD[k] || k)}</td><td style="white-space:nowrap">${stenBarInline(stenler[k])}</td><td><span class="rozet ${BAND_ROZET[b]}">${stenler[k]} · ${BAND_LABEL[b]}</span></td></tr>`;
+  }).join("");
+  const detay = keys.map((k) => {
+    const st = stenler[k], b = bandOf(st);
+    return `<div class="kisi-blok" style="page-break-inside:avoid;margin-bottom:12px">
+      <h4 style="margin:0 0 2px">${esc(BOYUT_AD[k] || k)}</h4>
+      <div class="kisi-meta" style="margin-bottom:8px">${esc(BOYUT_ACIKLAMA[k] || "")}</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:9px">${stenBarInline(st)}<span style="font-weight:800;color:#0b5548">${st}/10</span><span class="rozet ${BAND_ROZET[b]}">${BAND_LABEL[b]}</span></div>
+      <div class="yorum-blok">${esc((BOYUT_YORUM[k] && BOYUT_YORUM[k][b]) || "")}</div>
+    </div>`;
+  }).join("");
+  const byScore = [...keys].sort((x, y) => stenler[y] - stenler[x]);
+  const guclu = byScore.filter((k) => stenler[k] >= 7).slice(0, 4);
+  const gelisim = byScore.slice().reverse().filter((k) => stenler[k] <= 5).slice(0, 4);
+  const liste = (arr, bos) => arr.length ? `<ul style="margin:4px 0 0;padding-left:18px">${arr.map((k) => `<li style="margin-bottom:3px"><b>${esc(BOYUT_AD[k] || k)}</b> — ${stenler[k]}/10 (${BAND_LABEL[bandOf(stenler[k])]})</li>`).join("")}</ul>` : `<div style="color:#8a9a94;font-size:11px;margin-top:4px">${bos}</div>`;
+  return `${formLetterhead("Değerlendirme Raporu")}
+    <h2 style="font-family:'Source Serif 4',Georgia,serif;font-size:18px;margin:0 0 4px;color:#0b5548">Yetkinlik Değerlendirme Raporu</h2>
+    <div style="font-size:11.5px;color:#56676f;margin-bottom:14px"><b>${esc(a.adayAd || "")}</b> · Pozisyon: <b>${esc(pozAd)}</b>${a.tamamlanmaTarihi ? " · Tamamlanma: " + fmtTarih(a.tamamlanmaTarihi) : ""} · Norm: ${kalibre ? "İnciroğlu normu" : "Geçici referans norm"} (${nrm.N} kişi)</div>
+    <div class="filtre-ozet" style="line-height:1.6">Bu rapor, adayın İnciroğlu Otomotiv İnsan Kaynakları değerlendirme sınavına verdiği yanıtlar doğrultusunda hazırlanmıştır. Sınav; <b>bilişsel yetenek</b> (muhakeme, dikkat), <b>durumsal yargı</b> (iş senaryolarında karar) ve <b>çalışma stili</b> boyutlarını ölçer. Her yetkinlik 1-10 <b>sten</b> puanıyla raporlanır: 1-2 oldukça altında, 3-4 altında, 5-6 beklenen düzeyde, 7-8 üstünde, 9-10 oldukça üstünde. <b>Profil Uyum</b>, pozisyonun gerektirdiği yetkinliklerin ağırlıklı ortalamasıdır.</div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="n" style="color:${uygunlukRenk(uygunluk)}">%${uygunluk != null ? uygunluk : "—"}</div><div class="l">Profil Uyum</div></div>
+      <div class="kpi"><div class="n" style="color:${uygunlukRenk(uygunluk)};font-size:15px;padding-top:4px">${kr.t}</div><div class="l">Karar</div></div>
+      <div class="kpi"><div class="n">${keys.length}</div><div class="l">Ölçülen Yetkinlik</div></div>
+    </div>
+    <h3 class="bolum">Yetkinlik Puanları (Özet)</h3>
+    <table><thead><tr><th>Yetkinlik</th><th style="width:270px">Puan (1-10 sten)</th><th style="width:210px">Düzey</th></tr></thead><tbody>${ozetRows}</tbody></table>
+    <h3 class="bolum" style="margin-top:22px">Yetkinlik Bazında Ayrıntılı Değerlendirme</h3>
+    ${detay}
+    <h3 class="bolum">Güçlü Yönler & Gelişim Alanları</h3>
+    <div style="display:flex;gap:16px;flex-wrap:wrap">
+      <div style="flex:1;min-width:220px;border:1px solid #cbe3d6;background:#f0f8f4;border-radius:9px;padding:11px 14px"><div style="font-weight:800;color:#2f6b45;font-size:11.5px">✓ Güçlü Yönler</div>${liste(guclu, "Bu pozisyon için 7 ve üzeri belirgin güçlü yön öne çıkmadı.")}</div>
+      <div style="flex:1;min-width:220px;border:1px solid #ecd6c4;background:#fbf4ec;border-radius:9px;padding:11px 14px"><div style="font-weight:800;color:#a15c1f;font-size:11.5px">↑ Gelişim Alanları</div>${liste(gelisim, "Belirgin (5 ve altı) gelişim alanı öne çıkmadı.")}</div>
+    </div>
+    ${!kalibre ? `<div style="font-size:10.5px;color:#8a9a94;margin-top:14px;line-height:1.5">ℹ️ Puanlar şu an <b>geçici referans norma</b> göre hesaplanmıştır. Bu pozisyonda tamamlanan sınav sayısı ${NORM_MIN}'e ulaşınca sten ve Profil Uyum, İnciroğlu'nun kendi aday dağılımına göre yeniden hesaplanır.</div>` : ""}
+    <h3 class="bolum" style="margin-top:22px">Kaynakça</h3>
+    <ol style="margin:4px 0 0;padding-left:20px;font-size:9.8px;color:#56676f;line-height:1.55">${ASSESS_KAYNAKCA.map((r) => `<li style="margin-bottom:4px">${esc(r)}</li>`).join("")}</ol>`;
+}
 async function assessIlet(aday, pozKey) {
   const token = assessToken();
   const yeni = [...(aday.assessmentler || []), {
@@ -2335,7 +2503,7 @@ function assessAdayInner(aday) {
   const bek = mine.filter((m) => m.durum !== "tamamlandi");
   const varsayilan = ASSESS_POZ.find((p) => (aday.unvan || "").toLocaleLowerCase("tr").includes(p.ad.split(" ")[0].toLocaleLowerCase("tr")));
   let html = "";
-  if (tamam.length) html += tamam.map((m) => `<div class="assess-card click adaySonuc" style="margin-bottom:10px" data-tok="${m.token}">${assessSonucKarti(m, false)}</div>`).join("");
+  if (tamam.length) html += tamam.map((m) => `<div style="margin-bottom:12px"><div class="assess-card click adaySonuc" data-tok="${m.token}">${assessSonucKarti(m, false)}</div><div style="margin-top:6px"><button class="btn btn-teal btn-sm asRaporBtn" data-tok="${m.token}">📄 Ayrıntılı Rapor / PDF İndir</button></div></div>`).join("");
   if (bek.length) html += bek.map((m) => `<div style="margin-bottom:10px"><span class="assess-pill ap-bek">Sınav bekliyor · ${esc(m.pozisyonAd || "")}</span>${linkKutu(assessLink(aday.id, m.token))}</div>`).join("");
   html += `<div class="mini-form">
       <div style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">${mine.length ? "Yeni Sınav Gönder" : "Değerlendirme Sınavı Gönder"}</div>
@@ -2391,9 +2559,10 @@ function renderAssessmentPage(adaylarList) {
       catch (e) { toast("Üretilemedi: " + e.message); b.disabled = false; b.textContent = "🔗 Sınav Linki Üret"; }
     }));
   } else {
-    body.innerHTML = tamamlanan.length ? `<div>${tamamlanan.map((a, i) => `<div class="assess-card click" data-si="${i}">${assessSonucKarti(a, false)}</div>`).join("")}</div>`
+    body.innerHTML = tamamlanan.length ? `<div>${tamamlanan.map((a, i) => `<div style="margin-bottom:14px"><div class="assess-card click" data-si="${i}">${assessSonucKarti(a, false)}</div><div style="display:flex;gap:8px;margin-top:7px;flex-wrap:wrap"><button class="btn btn-teal btn-sm" data-rapor="${i}">📄 Ayrıntılı Rapor / PDF İndir</button><span style="font-size:11px;color:var(--ink-mute);align-self:center">Karta tıkla → sten kırılımı · Butona bas → yorumlu tam rapor</span></div></div>`).join("")}</div>`
       : `<div class="empty-state">Henüz tamamlanmış sınav yok. "Assessment İlet" sekmesinden bir adaya sınav gönderin.</div>`;
     body.querySelectorAll(".assess-card[data-si]").forEach((c) => c.addEventListener("click", () => { const a = tamamlanan[+c.dataset.si]; const open = c.classList.toggle("open"); c.innerHTML = assessSonucKarti(a, open); }));
+    body.querySelectorAll("[data-rapor]").forEach((b) => b.addEventListener("click", () => { const a = tamamlanan[+b.dataset.rapor]; raporAcVeYazdir(assessRaporHtml(a), "Değerlendirme Raporu — " + (a.adayAd || "")); }));
   }
   wireKopyala();
 }
@@ -3277,6 +3446,10 @@ function openAdayDetay(aday, isAdmin) {
     document.querySelectorAll("#assessWrap .adaySonuc").forEach((c) => c.addEventListener("click", () => {
       const tok = c.dataset.tok; const m = (aday.assessmentler || []).find((x) => x.token === tok); if (!m) return;
       const open = c.classList.toggle("open"); c.innerHTML = assessSonucKarti(m, open);
+    }));
+    document.querySelectorAll("#assessWrap .asRaporBtn").forEach((b) => b.addEventListener("click", (e) => {
+      e.stopPropagation(); const tok = b.dataset.tok; const m = adayAssessmentlari(aday.id).find((x) => x.token === tok);
+      if (m) raporAcVeYazdir(assessRaporHtml(m), "Değerlendirme Raporu — " + (m.adayAd || ""));
     }));
     wireKopyala();
   }
