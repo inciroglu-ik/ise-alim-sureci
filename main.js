@@ -2135,9 +2135,11 @@ function raporKapsayiciHtml(title, bodyHtml) {
 }
 function teklifMektubuHtml(a, t) {
   const bugun = fmtTarih(bugunISO());
+  const arac = t.ulasim === "arac";
+  const bolum = (baslik, satirlar) => `<div style="margin:18px 0 2px;font-family:'Source Serif 4',Georgia,serif;font-size:14px;font-weight:700;color:#0b5548;border-bottom:1px solid #dcefe9;padding-bottom:5px">${esc(baslik)}</div><ul style="margin:9px 0 0;padding-left:20px;line-height:1.75">${satirlar.filter(Boolean).map((s) => `<li style="margin-bottom:5px">${s}</li>`).join("")}</ul>`;
   return `
-    <div style="max-width:150mm;margin:0 auto;font-size:12.5px;line-height:1.7;color:#1c2530">
-      <div style="display:flex;align-items:center;gap:12px;border-bottom:2px solid #117a63;padding-bottom:14px;margin-bottom:22px">
+    <div style="max-width:170mm;margin:0 auto;font-size:12.5px;line-height:1.7;color:#1c2530">
+      <div style="display:flex;align-items:center;gap:12px;border-bottom:2px solid #117a63;padding-bottom:14px;margin-bottom:20px">
         <div style="width:44px;height:44px;border-radius:11px;background:linear-gradient(140deg,#2fb094,#0b5548);display:flex;align-items:center;justify-content:center">
           <svg width="30" height="30" viewBox="0 0 40 40"><circle cx="20" cy="14.6" r="5.1" fill="#fff"/><path d="M9.8 31.6c0-6 4.6-9.3 10.2-9.3s10.2 3.3 10.2 9.3z" fill="#fff"/><path d="M27.6 10.4c2.7 1.2 4.5 3.8 4.8 6.8" fill="none" stroke="#e6b45a" stroke-width="2.2" stroke-linecap="round"/></svg>
         </div>
@@ -2147,23 +2149,36 @@ function teklifMektubuHtml(a, t) {
         </div>
         <div style="margin-left:auto;font-size:11px;color:#56676f;text-align:right">Tarih: ${bugun}</div>
       </div>
-      <h2 style="font-family:'Source Serif 4',Georgia,serif;font-size:19px;color:#0f1a20;margin:0 0 16px">İş Teklifi Mektubu</h2>
+      <h2 style="font-family:'Source Serif 4',Georgia,serif;font-size:19px;color:#0f1a20;margin:0 0 14px">İş Teklifi Mektubu</h2>
       <p>Sayın <b>${esc(a.ad)} ${esc(a.soyad)}</b>,</p>
-      <p>İnciroğlu Otomotiv ailesine katılmanızdan memnuniyet duyarız. Yürüttüğümüz değerlendirme süreci sonucunda, aşağıda ayrıntıları belirtilen pozisyon için size iş teklifinde bulunmaktan mutluluk duyuyoruz.</p>
-      <table style="width:100%;border-collapse:collapse;margin:18px 0">
-        <tbody>
-          <tr><td style="padding:9px 12px;border:1px solid #e2e8e5;background:#f0f8f5;font-weight:700;width:42%">Pozisyon</td><td style="padding:9px 12px;border:1px solid #e2e8e5">${esc(t.pozisyon || a.unvan || "—")}</td></tr>
-          ${a.departman ? `<tr><td style="padding:9px 12px;border:1px solid #e2e8e5;background:#f0f8f5;font-weight:700">Departman / Marka</td><td style="padding:9px 12px;border:1px solid #e2e8e5">${esc(a.departman)}</td></tr>` : ""}
-          <tr><td style="padding:9px 12px;border:1px solid #e2e8e5;background:#f0f8f5;font-weight:700">Ücret / Paket</td><td style="padding:9px 12px;border:1px solid #e2e8e5">${esc(t.maas || "Görüşmede belirtilecektir")}</td></tr>
-          <tr><td style="padding:9px 12px;border:1px solid #e2e8e5;background:#f0f8f5;font-weight:700">İşe Başlama Tarihi</td><td style="padding:9px 12px;border:1px solid #e2e8e5">${t.baslamaTarihi ? fmtTarih(t.baslamaTarihi) : "Karşılıklı belirlenecektir"}</td></tr>
-        </tbody>
-      </table>
-      ${t.not ? `<p>${esc(t.not)}</p>` : ""}
-      <p>Bu teklif; işe başlangıçta imzalanacak iş sözleşmesi, özlük evraklarının tamamlanması ve şirket politikalarına uyum şartına bağlıdır. Teklifi kabul etmeniz hâlinde, İnsan Kaynakları birimimiz sizinle başlangıç sürecine dair iletişime geçecektir.</p>
-      <p>Aramıza katılmanızı sabırsızlıkla bekliyoruz.</p>
-      <div style="margin-top:34px;display:flex;justify-content:space-between;gap:40px">
-        <div style="flex:1"><div style="border-top:1px solid #1c2530;padding-top:6px;font-size:11.5px">İnsan Kaynakları<br>İnciroğlu Otomotiv</div></div>
-        <div style="flex:1"><div style="border-top:1px solid #1c2530;padding-top:6px;font-size:11.5px">Aday Onayı (Ad-Soyad / İmza / Tarih)<br>${esc(a.ad)} ${esc(a.soyad)}</div></div>
+      <p>Yürütülen seçme ve yerleştirme süreci sonucunda, yetkinliklerinizin şirketimizin hedefleriyle örtüştüğü tespit edilmiştir. Şirketimizde görev almanıza yönelik iş teklifimizin detayları aşağıda bilgilerinize sunulmuştur:</p>
+      ${bolum("Görev Bilgileri", [
+        "<b>Şirket:</b> İnciroğlu Otomotiv",
+        "<b>Pozisyon:</b> " + esc(t.pozisyon || a.unvan || "—"),
+        t.yonetici ? "<b>Bağlı Olacağı Yönetici:</b> " + esc(t.yonetici) : "",
+        "<b>Planlanan İş Başlangıç Tarihi:</b> " + (t.baslamaTarihi ? fmtTarih(t.baslamaTarihi) : "Karşılıklı belirlenecektir")
+      ])}
+      ${bolum("Mali ve Yan Haklar", [
+        "<b>Aylık Ücret:</b> " + esc(t.maas || "Görüşmede belirtilecektir") + " (Ödemeler her ayın 5. günü banka hesabına yatırılır.)",
+        "<b>Deneme Süresi:</b> 4857 sayılı İş Kanunu uyarınca " + esc(t.deneme || "2 Ay") + "’dır.",
+        "<b>Yemek / Ulaşım:</b> " + (arac ? "Kurum içi yemekhane ve tahsisli araç imkânı sağlanacaktır." : "Kurum içi yemekhane ve personel servisi imkânı sağlanacaktır.")
+      ])}
+      ${arac ? bolum("Zimmetli Araç ve Ekipmanlar", [
+        "Çalışana, görevinin ifası amacıyla tahsisli elektrikli şirket aracı, bilgisayar, telefon ve kurumsal GSM hattı tahsis edilecektir.",
+        "Trafik cezası sorumlulukları ve kişisel kullanım kısıtlamaları “Araç Kullanım Talimatı” ile ayrıca imza altına alınacaktır."
+      ]) : ""}
+      ${bolum("Çalışma Koşulları", [
+        "<b>Çalışma Saatleri:</b> " + esc(t.saatler || "Haftada 6 gün, 08:30 – 17:30")
+      ])}
+      ${bolum("Gizlilik, Rekabet Yasağı ve Şarta Bağlılık", [
+        "<b>Referans ve Belge Teyidi:</b> İşbu teklif; adayın mülakatlarda beyan ettiği eğitim, tecrübe ve referans bilgilerinin doğrulanması ve “İşe Giriş Evrak Seti”nin eksiksiz teslimi şartına bağlıdır. Aksi durumda teklif kendiliğinden hükümsüz kalır.",
+        "<b>Sır Saklama ve Rekabet:</b> Aday; şirkete ait mali tabloları, müşteri datalarını, fiyatlama stratejilerini ve operasyonel süreçleri gizli tutmayı; işten ayrılması hâlinde 1 (bir) yıl süreyle " + esc(t.rekabetIl || "Kayseri") + " il sınırları içinde rakip işletmelerde çalışmamayı peşinen kabul eder.",
+        "<b>Onay ve Geçerlilik:</b> İşbu belge, bir “İş Sözleşmesi” olmayıp tarafların iyi niyetine dayalı bir ön bilgilendirme ve tekliftir. İş ilişkisi; adayın işe giriş evraklarını tamamlayarak “Belirsiz Süreli İş Sözleşmesi”ni imzalaması ve SGK girişinin yapılması ile resmen başlar. Teklif, " + (t.gecerlilik ? fmtTarih(t.gecerlilik) : "…/…/20…") + " mesai bitimine kadar geçerlidir."
+      ])}
+      ${t.not ? `<p style="margin-top:12px">${esc(t.not)}</p>` : ""}
+      <div style="margin-top:32px;display:flex;justify-content:space-between;gap:40px">
+        <div style="flex:1"><div style="border-top:1px solid #1c2530;padding-top:6px;font-size:11.5px"><b>İşveren / Yetkili İmza</b><br>${esc(t.imzaYetkili || "")}<br>İnciroğlu Otomotiv</div></div>
+        <div style="flex:1"><div style="border-top:1px solid #1c2530;padding-top:6px;font-size:11.5px"><b>Aday Onayı</b><br>Maddeleri okudum, anladım ve teklifi kabul ediyorum.<br>İmza: _____________ Tarih: __________<br>${esc(a.ad)} ${esc(a.soyad)}</div></div>
       </div>
     </div>`;
 }
@@ -3439,28 +3454,49 @@ function openAdayDetay(aday, isAdmin) {
   }
   function teklifInner(a) {
     const t = a.teklif || {};
+    const d = isAdmin ? "" : "disabled";
     const dur = t.durum || "";
     const durEt = { hazirlandi: ["Hazırlandı", "st-evrak"], iletildi: ["İletildi", "st-gorusme"], kabul: ["Kabul Edildi", "st-tamam"], red: ["Reddedildi", "st-olumsuz"] };
     const rozet = dur && durEt[dur] ? `<span class="status-badge ${durEt[dur][1]}">${durEt[dur][0]}</span>` : "";
     return `
       ${rozet ? `<div style="margin-bottom:10px">${rozet}</div>` : ""}
       <div class="two-col">
-        <div class="field" style="margin:0"><label>Teklif Pozisyonu</label><input type="text" id="tkPoz" value="${esc(t.pozisyon || a.unvan || "")}" ${isAdmin ? "" : "disabled"}></div>
-        <div class="field" style="margin:0"><label>Ücret / Paket</label><input type="text" id="tkMaas" value="${esc(t.maas || "")}" placeholder="ör. net maaş + prim" ${isAdmin ? "" : "disabled"}></div>
+        <div class="field" style="margin:0"><label>Teklif Pozisyonu</label><input type="text" id="tkPoz" value="${esc(t.pozisyon || a.unvan || "")}" ${d}></div>
+        <div class="field" style="margin:0"><label>Bağlı Olacağı Yönetici</label><input type="text" id="tkYonetici" value="${esc(t.yonetici || "")}" placeholder="ör. Birkan Çalışkan (CEO)" ${d}></div>
       </div>
       <div class="two-col">
-        <div class="field" style="margin:8px 0 0"><label>Başlama Tarihi</label><input type="date" id="tkBaslama" value="${esc(t.baslamaTarihi || "")}" ${isAdmin ? "" : "disabled"}></div>
+        <div class="field" style="margin:8px 0 0"><label>Aylık Ücret</label><input type="text" id="tkMaas" value="${esc(t.maas || "")}" placeholder="ör. 200.000 TL NET" ${d}></div>
+        <div class="field" style="margin:8px 0 0"><label>Planlanan Başlama Tarihi</label><input type="date" id="tkBaslama" value="${esc(t.baslamaTarihi || "")}" ${d}></div>
+      </div>
+      <div class="two-col">
+        <div class="field" style="margin:8px 0 0"><label>Deneme Süresi</label><input type="text" id="tkDeneme" value="${esc(t.deneme || "2 Ay")}" ${d}></div>
+        <div class="field" style="margin:8px 0 0"><label>Yemek / Ulaşım</label>
+          <select id="tkUlasim" ${d}>
+            <option value="servis" ${t.ulasim !== "arac" ? "selected" : ""}>Yemekhane + Personel Servisi</option>
+            <option value="arac" ${t.ulasim === "arac" ? "selected" : ""}>Yemekhane + Tahsisli Araç</option>
+          </select>
+        </div>
+      </div>
+      <div class="two-col">
+        <div class="field" style="margin:8px 0 0"><label>Çalışma Saatleri</label><input type="text" id="tkSaatler" value="${esc(t.saatler || "Haftada 6 gün, 08:30 – 17:30")}" ${d}></div>
+        <div class="field" style="margin:8px 0 0"><label>Rekabet Yasağı İli</label><input type="text" id="tkRekabetIl" value="${esc(t.rekabetIl || "Kayseri")}" ${d}></div>
+      </div>
+      <div class="two-col">
+        <div class="field" style="margin:8px 0 0"><label>Teklif Geçerlilik Tarihi</label><input type="date" id="tkGecerlilik" value="${esc(t.gecerlilik || "")}" ${d}></div>
+        <div class="field" style="margin:8px 0 0"><label>İşveren / Yetkili İmza</label><input type="text" id="tkImza" value="${esc(t.imzaYetkili || "Alaaddin Çağlıköse")}" ${d}></div>
+      </div>
+      <div class="two-col">
         <div class="field" style="margin:8px 0 0"><label>Durum</label>
-          <select id="tkDurum" ${isAdmin ? "" : "disabled"}>
+          <select id="tkDurum" ${d}>
             <option value="">—</option>
             ${Object.keys(durEt).map((k) => `<option value="${k}" ${dur === k ? "selected" : ""}>${durEt[k][0]}</option>`).join("")}
           </select>
         </div>
+        <div class="field" style="margin:8px 0 0"><label>Not (mektuba eklenir)</label><input type="text" id="tkNot" value="${esc(t.not || "")}" ${d}></div>
       </div>
-      <div class="field" style="margin:8px 0 0"><label>Not</label><input type="text" id="tkNot" value="${esc(t.not || "")}" ${isAdmin ? "" : "disabled"}></div>
       ${isAdmin ? `<div style="margin-top:11px;display:flex;gap:8px;flex-wrap:wrap">
         <button type="button" class="btn btn-teal btn-sm" id="tkKaydet">Teklifi Kaydet</button>
-        <button type="button" class="btn btn-ghost btn-sm" id="tkYazdir">🖨 Teklif Mektubu</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="tkYazdir">🖨 Teklif Mektubu (PDF)</button>
       </div>` : ""}`;
   }
   function iletisimInner(a) {
@@ -3506,13 +3542,13 @@ function openAdayDetay(aday, isAdmin) {
     });
     const tkKaydet = document.getElementById("tkKaydet");
     if (tkKaydet) tkKaydet.addEventListener("click", async () => {
-      const teklif = { pozisyon: el("#tkPoz").value.trim(), maas: el("#tkMaas").value.trim(), baslamaTarihi: el("#tkBaslama").value, durum: el("#tkDurum").value, not: el("#tkNot").value.trim(), guncelleyen: currentProfile.adSoyad, tarih: bugunISO() };
+      const teklif = { pozisyon: el("#tkPoz").value.trim(), maas: el("#tkMaas").value.trim(), baslamaTarihi: el("#tkBaslama").value, durum: el("#tkDurum").value, not: el("#tkNot").value.trim(), yonetici: el("#tkYonetici").value.trim(), deneme: el("#tkDeneme").value.trim(), ulasim: el("#tkUlasim").value, saatler: el("#tkSaatler").value.trim(), rekabetIl: el("#tkRekabetIl").value.trim(), gecerlilik: el("#tkGecerlilik").value, imzaYetkili: el("#tkImza").value.trim(), guncelleyen: currentProfile.adSoyad, tarih: bugunISO() };
       tkKaydet.disabled = true;
       try { await ekleGecmisli({ teklif, _not: `Teklif${teklif.durum ? " (" + teklif.durum + ")" : ""} ${teklif.maas || ""}`.trim() }, "Teklif güncellendi"); el("#teklifWrap").innerHTML = teklifInner(aday); wireEklentiler(); toast("✓ Teklif kaydedildi."); } catch (e) { toast("Kaydedilemedi: " + e.message); tkKaydet.disabled = false; }
     });
     const tkYazdir = document.getElementById("tkYazdir");
     if (tkYazdir) tkYazdir.addEventListener("click", () => {
-      const t = { pozisyon: el("#tkPoz").value.trim(), maas: el("#tkMaas").value.trim(), baslamaTarihi: el("#tkBaslama").value, not: el("#tkNot").value.trim() };
+      const t = { pozisyon: el("#tkPoz").value.trim(), maas: el("#tkMaas").value.trim(), baslamaTarihi: el("#tkBaslama").value, not: el("#tkNot").value.trim(), yonetici: el("#tkYonetici").value.trim(), deneme: el("#tkDeneme").value.trim(), ulasim: el("#tkUlasim").value, saatler: el("#tkSaatler").value.trim(), rekabetIl: el("#tkRekabetIl").value.trim(), gecerlilik: el("#tkGecerlilik").value, imzaYetkili: el("#tkImza").value.trim() };
       raporAcVeYazdir(teklifMektubuHtml(aday, t), "Teklif Mektubu");
     });
     const ilEkle = document.getElementById("ilEkle");
