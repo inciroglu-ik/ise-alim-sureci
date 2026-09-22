@@ -820,7 +820,7 @@ function avatarHtml(name, size) {
 function fmtTarih(iso) {
   if (!iso) return "—";
   const d = new Date(iso + "T00:00:00");
-  if (isNaN(d)) return iso;
+  if (isNaN(d)) return esc(iso); // geçersiz/kötü niyetli girdi (aday yazabilir) → kaçır, ham HTML basma
   return d.toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" });
 }
 function bugunISO() {
@@ -2290,11 +2290,11 @@ function assessSonucKarti(a, detay) {
   const boyutlar = a.boyutlar || {};
   // her boyut için norma göre sten
   const stenler = {};
-  Object.keys(boyutlar).forEach((k) => { if (boyutlar[k] != null) stenler[k] = stenFromRaw(boyutlar[k], nrm.norm[k]); });
+  Object.keys(boyutlar).forEach((k) => { if (boyutlar[k] != null && Number.isFinite(boyutlar[k])) stenler[k] = stenFromRaw(boyutlar[k], nrm.norm[k]); });
   // Profil Uyum = pozisyon ağırlıklarıyla sten ortalaması (100'lük); ağırlık yoksa ham uygunluğa düş
   let us = 0, ws = 0;
   for (const d in agirlik) { if (stenler[d] != null) { us += (stenler[d] / 10 * 100) * agirlik[d]; ws += agirlik[d]; } }
-  const uygunluk = ws > 0 ? Math.round(us / ws) : (a.uygunluk != null ? a.uygunluk : null);
+  const uygunluk = ws > 0 ? Math.round(us / ws) : (a.uygunluk != null && Number.isFinite(+a.uygunluk) ? Math.round(+a.uygunluk) : null);
   const kr = uygunlukKarar(uygunluk);
   const kalibre = nrm.N >= NORM_MIN;
   const normRozet = `<span style="font-size:10px;font-weight:600;color:${kalibre ? 'var(--good)' : 'var(--ink-mute)'};background:${kalibre ? 'var(--good-bg)' : '#eef1f0'};border:1px solid ${kalibre ? 'var(--good-line)' : '#dde3e1'};border-radius:20px;padding:2px 9px;white-space:nowrap">${kalibre ? '📊 İnciroğlu normu' : '📋 Geçici norm'} · ${nrm.N} kişi</span>`;
@@ -2429,10 +2429,10 @@ function assessRaporHtml(a){
   const agirlik = POZ_AGIRLIK[pozKey] || {};
   const boyutlar = a.boyutlar || {};
   const stenler = {};
-  Object.keys(boyutlar).forEach((k) => { if (boyutlar[k] != null) stenler[k] = stenFromRaw(boyutlar[k], nrm.norm[k]); });
+  Object.keys(boyutlar).forEach((k) => { if (boyutlar[k] != null && Number.isFinite(boyutlar[k])) stenler[k] = stenFromRaw(boyutlar[k], nrm.norm[k]); });
   let us = 0, ws = 0;
   for (const d in agirlik) { if (stenler[d] != null) { us += (stenler[d] / 10 * 100) * agirlik[d]; ws += agirlik[d]; } }
-  const uygunluk = ws > 0 ? Math.round(us / ws) : (a.uygunluk != null ? a.uygunluk : null);
+  const uygunluk = ws > 0 ? Math.round(us / ws) : (a.uygunluk != null && Number.isFinite(+a.uygunluk) ? Math.round(+a.uygunluk) : null);
   const kr = uygunlukKarar(uygunluk);
   const kalibre = nrm.N >= NORM_MIN;
   // İlgililik (ağırlık) sırasına göre; ağırlık eşitse stene göre
@@ -2456,7 +2456,7 @@ function assessRaporHtml(a){
   }).join("");
   const byScore = [...keys].sort((x, y) => stenler[y] - stenler[x]);
   const guclu = byScore.filter((k) => stenler[k] >= 7).slice(0, 4);
-  const gelisim = byScore.slice().reverse().filter((k) => stenler[k] <= 5).slice(0, 4);
+  const gelisim = byScore.slice().reverse().filter((k) => stenler[k] <= 4).slice(0, 4);
   const liste = (arr, bos) => arr.length ? `<ul style="margin:4px 0 0;padding-left:18px">${arr.map((k) => `<li style="margin-bottom:3px"><b>${esc(BOYUT_AD[k] || k)}</b> — ${stenler[k]}/10 (${BAND_LABEL[bandOf(stenler[k])]})</li>`).join("")}</ul>` : `<div style="color:#8a9a94;font-size:11px;margin-top:4px">${bos}</div>`;
   return `${formLetterhead("Değerlendirme Raporu")}
     <h2 style="font-family:'Source Serif 4',Georgia,serif;font-size:18px;margin:0 0 4px;color:#0b5548">Yetkinlik Değerlendirme Raporu</h2>
@@ -2474,7 +2474,7 @@ function assessRaporHtml(a){
     <h3 class="bolum">Güçlü Yönler & Gelişim Alanları</h3>
     <div style="display:flex;gap:16px;flex-wrap:wrap">
       <div style="flex:1;min-width:220px;border:1px solid #cbe3d6;background:#f0f8f4;border-radius:9px;padding:11px 14px"><div style="font-weight:800;color:#2f6b45;font-size:11.5px">✓ Güçlü Yönler</div>${liste(guclu, "Bu pozisyon için 7 ve üzeri belirgin güçlü yön öne çıkmadı.")}</div>
-      <div style="flex:1;min-width:220px;border:1px solid #ecd6c4;background:#fbf4ec;border-radius:9px;padding:11px 14px"><div style="font-weight:800;color:#a15c1f;font-size:11.5px">↑ Gelişim Alanları</div>${liste(gelisim, "Belirgin (5 ve altı) gelişim alanı öne çıkmadı.")}</div>
+      <div style="flex:1;min-width:220px;border:1px solid #ecd6c4;background:#fbf4ec;border-radius:9px;padding:11px 14px"><div style="font-weight:800;color:#a15c1f;font-size:11.5px">↑ Gelişim Alanları</div>${liste(gelisim, "Belirgin (4 ve altı) gelişim alanı öne çıkmadı.")}</div>
     </div>
     ${!kalibre ? `<div style="font-size:10.5px;color:#8a9a94;margin-top:14px;line-height:1.5">ℹ️ Puanlar şu an <b>geçici referans norma</b> göre hesaplanmıştır. Bu pozisyonda tamamlanan sınav sayısı ${NORM_MIN}'e ulaşınca sten ve Profil Uyum, İnciroğlu'nun kendi aday dağılımına göre yeniden hesaplanır.</div>` : ""}
     <h3 class="bolum" style="margin-top:22px">Kaynakça</h3>
@@ -2542,7 +2542,7 @@ function renderAssessmentPage(adaylarList) {
     list.innerHTML = aktifAdaylar.length ? aktifAdaylar.map((a) => {
       const mine = adayAssessmentlari(a.id); const son = mine[0];
       let rozet = `<span class="assess-pill ap-yok">Sınav yok</span>`;
-      if (son) { if (son.durum === "tamamlandi") { const kr = uygunlukKarar(son.uygunluk); rozet = `<span class="status-badge ${kr.c}" style="font-size:11px">Tamamlandı · %${son.uygunluk} ${kr.t}</span>`; } else rozet = `<span class="assess-pill ap-bek">Bekliyor</span>`; }
+      if (son) { if (son.durum === "tamamlandi") { const su = (son.uygunluk != null && Number.isFinite(+son.uygunluk)) ? Math.round(+son.uygunluk) : null; const kr = uygunlukKarar(su); rozet = `<span class="status-badge ${kr.c}" style="font-size:11px">Tamamlandı · %${su != null ? su : "—"} ${kr.t}</span>`; } else rozet = `<span class="assess-pill ap-bek">Bekliyor</span>`; }
       const varsay = ASSESS_POZ.find((p) => (a.unvan || "").toLocaleLowerCase("tr").includes(p.ad.split(" ")[0].toLocaleLowerCase("tr")));
       return `<div class="aday-card" style="cursor:default;align-items:flex-start;flex-direction:column;gap:10px">
         <div style="display:flex;align-items:center;gap:12px;width:100%">${avatarHtml(a.ad + " " + a.soyad, 36)}
