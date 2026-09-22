@@ -709,7 +709,7 @@ function modEnvanter(){
       <div class="lik-lbl"><span>Kesinlikle katılmıyorum</span><span>Kesinlikle katılıyorum</span></div>
       <div class="foot-row"><span class="qcount">İfade ${i+1} / ${list.length}</span><button class="btn" id="ileri" disabled>İleri →</button></div>`;
     document.querySelectorAll("#lik button").forEach(b=>b.onclick=()=>{ sel=+b.dataset.v; document.querySelectorAll("#lik button").forEach(x=>x.classList.toggle("sel",x===b)); $("ileri").disabled=false; });
-    $("ileri").onclick=()=>{ const val=s.ters?(6-sel):sel; addPuan(s.dim,(val-1)/4*2,2); cevaplar.envanter.push({q:s.t,v:sel}); i++; q(); };
+    $("ileri").onclick=()=>{ const val=s.ters?(6-sel):sel; addPuan(s.dim,(val-1)/4*2,2); cevaplar.envanter.push({q:s.t,v:sel,val:val,ters:!!s.ters}); i++; q(); };
   }
   q();
 }
@@ -726,11 +726,28 @@ async function finish(){
   let us=0, wsum=0;
   for(const d in P.agirlik){ if(boyut[d]!=null){ us += boyut[d]*P.agirlik[d]; wsum += P.agirlik[d]; } }
   const uygunluk = wsum>0 ? Math.round(us/wsum) : null;
+  // ---- Yanıt Güvenilirliği (geçerlik) göstergeleri ----
+  const sure_sn = 45*60 - Math.max(0, genelKalan);
+  const sureDoldu = genelKalan <= 0;
+  const beklenenQ = 14 + 4 + (P.sjt?P.sjt.length:0) + (P.sim&&P.sim.adimlar?P.sim.adimlar.length:0) + (typeof ENVANTER!=="undefined"?ENVANTER.length:0);
+  const cevapQ = (cevaplar.bilissel||[]).length + (cevaplar.hafiza||[]).length + (cevaplar.sjt||[]).length + (cevaplar.sim||[]).length + (cevaplar.envanter||[]).length;
+  const tamamlanmaOrani = beklenenQ>0 ? Math.round(Math.min(1, cevapQ/beklenenQ)*100) : 100;
+  // sosyal istenirlik: en olumlu seçeneği / ucu seçme oranı (yüksek = "iyi görünme" eğilimi)
+  let favSay=0, favTop=0;
+  (P.sjt||[]).forEach((s,idx)=>{ const ans=(cevaplar.sjt||[])[idx]; if(!ans||ans.sel==null) return; favTop++; const sums=s.o.map(o=>Object.values(o.p||{}).reduce((a,b)=>a+b,0)); if(sums.length && sums[ans.sel]===Math.max.apply(null,sums)) favSay++; });
+  ((P.sim&&P.sim.adimlar)||[]).forEach((a,idx)=>{ const sel=(cevaplar.sim||[])[idx]; if(sel==null) return; favTop++; const sums=a.o.map(o=>Object.values(o.p||{}).reduce((x,y)=>x+y,0)); if(sums.length && sums[sel]===Math.max.apply(null,sums)) favSay++; });
+  (cevaplar.envanter||[]).forEach((e)=>{ if(e.val==null) return; favTop++; if(e.val>=5) favSay++; });
+  const sosyalIstenirlik = favTop>0 ? Math.round(favSay/favTop*100) : null;
+  // tutarlılık: envanter ham yanıtlarının dağılımı (düşük SD = "düz çizgi" / dikkatsiz yanıt)
+  const vs=(cevaplar.envanter||[]).map(e=>e.v).filter(x=>x!=null);
+  let tutarSd=null;
+  if(vs.length>=3){ const mn=vs.reduce((a,b)=>a+b,0)/vs.length; tutarSd=Math.round(Math.sqrt(vs.reduce((a,b)=>a+(b-mn)*(b-mn),0)/vs.length)*100)/100; }
+  const gecerlik = { sure_sn, sureDoldu, tamamlanmaOrani, sosyalIstenirlik, tutarSd, beklenenQ, cevapQ };
   try{
     const snap = await getDoc(doc(db,"iseAlimAday",ADAYID));
     const aday = snap.exists() ? snap.data() : {};
     const arr = (aday.assessmentler || []).map((x) => x.token === TOKEN
-      ? Object.assign({}, x, { durum:"tamamlandi", tamamlanmaTarihi:new Date().toISOString().slice(0,10), boyutlar:boyut, uygunluk:uygunluk, cevaplar:cevaplar })
+      ? Object.assign({}, x, { durum:"tamamlandi", tamamlanmaTarihi:new Date().toISOString().slice(0,10), boyutlar:boyut, uygunluk:uygunluk, gecerlik:gecerlik, cevaplar:cevaplar })
       : x);
     await setDoc(doc(db,"iseAlimAday",ADAYID), { assessmentler:arr, guncellemeTarihi:serverTimestamp() }, {merge:true});
   }catch(e){ /* yine de teşekkür göster */ }

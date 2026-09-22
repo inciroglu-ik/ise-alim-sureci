@@ -2422,7 +2422,52 @@ function stenBarInline(on){
   return `<span style="display:inline-flex;border-radius:4px;overflow:hidden;border:1px solid #cdd8d3">${cells}</span>`;
 }
 function uygunlukRenk(pct){ if(pct==null) return "#8a9a94"; if(pct>=70) return "#2f6b45"; if(pct>=55) return "#3d4f8f"; if(pct>=40) return "#a15c1f"; return "#a13030"; }
-// Aday assessment sonucundan SPICA tarzı ayrıntılı, yorumlu rapor gövdesi üretir.
+// ---- Yüzdelik (sten -> norm yüzdelik dilimi) ve mülakat soru bankası ----
+const STEN_PCT = [null, 1, 4, 11, 23, 40, 60, 77, 89, 96, 99];
+function stenPct(st){ return (st >= 1 && st <= 10) ? STEN_PCT[st] : null; }
+const MULAKAT_SORU = {
+  musteri:["Hoşnutsuz ya da zorlu bir müşteriyle yaşadığınız bir durumu ve bunu nasıl yönettiğinizi anlatır mısınız?","Bir müşterinin açıkça dile getirmediği bir ihtiyacı fark edip karşıladığınız bir örnek verir misiniz?"],
+  ikna:["Başta size katılmayan birini ikna etmek zorunda kaldığınız bir durumu ve nasıl yaklaştığınızı anlatın.","Bir itirazla karşılaştığınızda argümanınızı nasıl kurarsınız? Somut bir örnekle açıklayın."],
+  iletisim:["Karmaşık bir konuyu anlatırken yanlış anlaşıldığınız ve bunu nasıl düzelttiğiniz bir örnek verir misiniz?","Sizden farklı düşünen biriyle iletişimi nasıl yönetirsiniz? Bir örnek paylaşın."],
+  sonuc:["Ciddi engellerle karşılaştığınız hâlde bir hedefi tamamladığınız bir örneği anlatır mısınız?","Motivasyonunuzun düştüğü bir işi yine de sonuçlandırdığınız bir durumu paylaşın."],
+  dayaniklilik:["Yoğun baskı altında çalıştığınız bir dönemi ve bununla nasıl başa çıktığınızı anlatın.","Beklenmedik bir aksilik ya da sert bir eleştiri sonrası kendinizi nasıl toparladınız?"],
+  detay:["Bir hatayı fark edip önüne geçtiğiniz bir durumu anlatın; işinizi nasıl kontrol edersiniz?","Zaman baskısı altında doğruluğu nasıl korursunuz? Somut bir örnek verin."],
+  ekip:["Takım içinde bir anlaşmazlık yaşadığınız durumu ve bunun nasıl çözüldüğünü anlatır mısınız?","Ortak bir hedefe katkınızı somutlaştıran bir örnek verin."],
+  liderlik:["Bir ekibi ya da işi yönlendirdiğiniz bir örneği anlatın; zor bir kararı nasıl aldınız?","Bir ekip arkadaşınızın gelişimine katkı sağladığınız bir durumu paylaşın."],
+  analitik:["Karmaşık bir sorunu analiz edip çözdüğünüz bir örneği adım adım anlatır mısınız?","Eksik bilgiyle karar vermeniz gereken bir durumda nasıl ilerlediniz?"],
+  planlama:["Aynı anda birçok işi yönetmeniz gereken bir dönemi ve nasıl önceliklendirdiğinizi anlatın.","Planınızın beklenmedik biçimde bozulduğu bir durumda nasıl uyarlama yaptınız?"],
+  hafiza:["Yoğun ve detay gerektiren bir işte dikkatinizi nasıl sürdürürsünüz? Somut bir örnek verin.","Aynı anda çok sayıda bilgiyi takip etmeniz gereken bir durumu nasıl yönettiniz?"]
+};
+function listeBirlestir(arr){ if(!arr || !arr.length) return ""; if(arr.length === 1) return arr[0]; return arr.slice(0, -1).join(", ") + " ve " + arr[arr.length - 1]; }
+// Yönetici özeti (3-4 cümle, doğal dil) — sten profilinden üretilir.
+function assessOzet(ad, pozAd, uygunluk, kr, guclu, gelisim){
+  const gAd = guclu.map((k) => BOYUT_AD[k] || k);
+  const eAd = gelisim.map((k) => BOYUT_AD[k] || k);
+  const s1 = `<b>${esc(ad || "Aday")}</b>, ${esc(pozAd)} pozisyonu için yapılan yetkinlik değerlendirmesinde %${uygunluk != null ? uygunluk : "—"} profil uyumu ile <b>${kr.t}</b> düzeyindedir.`;
+  const s2 = gAd.length ? ` En güçlü olduğu alanlar ${esc(listeBirlestir(gAd))}.` : ` Belirgin biçimde öne çıkan bir güçlü yön saptanmadı.`;
+  const s3 = eAd.length ? ` Gelişime en açık alanları ${esc(listeBirlestir(eAd))}; bu alanların mülakatta derinlemesine sorgulanması önerilir.` : ` Belirgin bir gelişim alanı öne çıkmadı.`;
+  const s4 = uygunluk != null ? (uygunluk >= 70 ? " Genel görünüm pozisyon için olumludur." : uygunluk >= 55 ? " Aday değerlendirilebilir; nihai kararın mülakat bulgularıyla desteklenmesi önerilir." : " Pozisyon uyumu sınırlı görünmektedir; dikkatli değerlendirilmelidir.") : "";
+  return s1 + s2 + s3 + s4;
+}
+// Yanıt güvenilirliği değerlendirmesi (sınavda kaydedilen gecerlik verisinden).
+function gecerlikDegerlendir(g){
+  if(!g) return null;
+  const flags = [];
+  const dk = g.sure_sn != null ? Math.round(g.sure_sn / 60) : null;
+  if(g.sureDoldu) flags.push("Süre dolmuş — aday tüm bölümleri tamamlayamamış olabilir.");
+  else if(dk != null && dk < 10) flags.push("Sınav beklenenden çok hızlı tamamlanmış (" + dk + " dk) — aceleci/dikkatsiz yanıt olasılığı.");
+  if(g.tamamlanmaOrani != null && g.tamamlanmaOrani < 90) flags.push("Tamamlanma oranı düşük (%" + g.tamamlanmaOrani + ") — eksik yanıtlar puanları etkileyebilir.");
+  if(g.sosyalIstenirlik != null && g.sosyalIstenirlik >= 75) flags.push("Yüksek sosyal istenirlik (%" + g.sosyalIstenirlik + ") — 'iyi görünme' eğilimi; davranışsal puanlar bir miktar yüksek okunmalıdır.");
+  if(g.tutarSd != null && g.tutarSd < 0.6) flags.push("Envanter yanıtlarında düşük değişkenlik (düz çizgi) — dikkatsiz yanıtlama olasılığı.");
+  const verdict = flags.length === 0 ? { t: "✓ Güvenle yorumlanabilir", c: "#2f6b45", bg: "#e6f3ea", bd: "#c3e2ce" } : { t: "⚠ Dikkatli yorumlanmalı", c: "#a15c1f", bg: "#fbf4ec", bd: "#ecd6c4" };
+  const rows = [];
+  if(dk != null) rows.push(["Tamamlama süresi", dk + " dk" + (g.sureDoldu ? " (süre doldu)" : "")]);
+  if(g.tamamlanmaOrani != null) rows.push(["Tamamlanma oranı", "%" + g.tamamlanmaOrani + (g.cevapQ != null && g.beklenenQ != null ? " (" + g.cevapQ + "/" + g.beklenenQ + " soru)" : "")]);
+  if(g.sosyalIstenirlik != null) rows.push(["Sosyal istenirlik (iyi görünme eğilimi)", "%" + g.sosyalIstenirlik + (g.sosyalIstenirlik >= 75 ? " · yüksek" : g.sosyalIstenirlik >= 55 ? " · orta" : " · düşük")]);
+  if(g.tutarSd != null) rows.push(["Yanıt tutarlılığı (envanter dağılımı)", "σ=" + g.tutarSd + (g.tutarSd < 0.6 ? " · düşük (düz çizgi)" : " · normal")]);
+  return { verdict, flags, rows };
+}
+// Aday assessment sonucundan SPICA tarzı ayrıntılı, yorumlu, çok bölümlü rapor gövdesi üretir.
 function assessRaporHtml(a){
   const pozKey = a.pozisyon;
   const nrm = assessNorm(pozKey);
@@ -2435,50 +2480,95 @@ function assessRaporHtml(a){
   const uygunluk = ws > 0 ? Math.round(us / ws) : (a.uygunluk != null && Number.isFinite(+a.uygunluk) ? Math.round(+a.uygunluk) : null);
   const kr = uygunlukKarar(uygunluk);
   const kalibre = nrm.N >= NORM_MIN;
-  // İlgililik (ağırlık) sırasına göre; ağırlık eşitse stene göre
-  const keys = Object.keys(stenler).sort((x, y) => (agirlik[y] || 0) - (agirlik[x] || 0) || stenler[y] - stenler[x]);
   const pozAd = a.pozisyonAd || ASSESS_POZ_AD[a.pozisyon] || a.pozisyon || "";
-  if (!keys.length) {
-    return `${formLetterhead("Değerlendirme Raporu")}<h2 style="font-family:'Source Serif 4',Georgia,serif;font-size:18px;margin:0 0 8px;color:#0b5548">Yetkinlik Değerlendirme Raporu</h2><div style="color:#8a9a94">Bu sınav için yetkinlik verisi bulunamadı.</div>`;
-  }
-  const ozetRows = keys.map((k) => {
-    const b = bandOf(stenler[k]);
-    return `<tr><td style="font-weight:600">${esc(BOYUT_AD[k] || k)}</td><td style="white-space:nowrap">${stenBarInline(stenler[k])}</td><td><span class="rozet ${BAND_ROZET[b]}">${stenler[k]} · ${BAND_LABEL[b]}</span></td></tr>`;
-  }).join("");
-  const detay = keys.map((k) => {
-    const st = stenler[k], b = bandOf(st);
-    return `<div class="kisi-blok" style="page-break-inside:avoid;margin-bottom:12px">
-      <h4 style="margin:0 0 2px">${esc(BOYUT_AD[k] || k)}</h4>
-      <div class="kisi-meta" style="margin-bottom:8px">${esc(BOYUT_ACIKLAMA[k] || "")}</div>
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:9px">${stenBarInline(st)}<span style="font-weight:800;color:#0b5548">${st}/10</span><span class="rozet ${BAND_ROZET[b]}">${BAND_LABEL[b]}</span></div>
-      <div class="yorum-blok">${esc((BOYUT_YORUM[k] && BOYUT_YORUM[k][b]) || "")}</div>
-    </div>`;
-  }).join("");
+  const normEt = (kalibre ? "İnciroğlu normu" : "Geçici referans norm") + " · " + nrm.N + " kişi";
+  const uretenAd = (typeof currentProfile !== "undefined" && currentProfile && currentProfile.adSoyad) ? currentProfile.adSoyad : "İK";
+  const uretimTs = new Date().toLocaleString("tr-TR");
+  // ilgililik (ağırlık) sırası
+  const keys = Object.keys(stenler).sort((x, y) => (agirlik[y] || 0) - (agirlik[x] || 0) || stenler[y] - stenler[x]);
   const byScore = [...keys].sort((x, y) => stenler[y] - stenler[x]);
   const guclu = byScore.filter((k) => stenler[k] >= 7).slice(0, 4);
   const gelisim = byScore.slice().reverse().filter((k) => stenler[k] <= 4).slice(0, 4);
+  // KAPAK
+  const kapak = `<div style="page-break-after:always;min-height:238mm;display:flex;flex-direction:column">
+    ${formLetterhead("Değerlendirme Raporu")}
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;text-align:center;padding:20px 0">
+      <div style="font-size:11px;letter-spacing:.18em;color:#8a9a94;text-transform:uppercase;margin-bottom:14px">Gizli Belge · İç Kullanım</div>
+      <div style="font-family:'Source Serif 4',Georgia,serif;font-size:30px;font-weight:700;color:#0b5548;line-height:1.2">Yetkinlik Değerlendirme<br>Raporu</div>
+      <div style="width:70px;height:3px;background:#e6b45a;margin:20px auto"></div>
+      <div style="font-size:20px;font-weight:700;color:#132029;margin-top:6px">${esc(a.adayAd || "")}</div>
+      <div style="font-size:13px;color:#56676f;margin-top:6px">${esc(pozAd)}</div>
+      <div style="font-size:12px;color:#8a9a94;margin-top:22px">
+        Sınav Tarihi: ${a.tamamlanmaTarihi ? fmtTarih(a.tamamlanmaTarihi) : "—"}<br>
+        Norm Grubu: ${esc(normEt)}<br>
+        Rapor Üretimi: ${esc(uretimTs)} · ${esc(uretenAd)}
+      </div>
+    </div>
+    <div style="font-size:9.5px;color:#aab6b1;text-align:center;border-top:1px solid #e2e8e5;padding-top:10px">İnciroğlu Otomotiv — İnsan Kaynakları · Bu belge yalnızca yetkili İK ve üst yönetim tarafından kullanılır.</div>
+  </div>`;
+  if (!keys.length) {
+    return kapak + `<div style="color:#8a9a94">Bu sınav için yetkinlik verisi bulunamadı.</div>`;
+  }
+  // YÖNETİCİ ÖZETİ
+  const ozet = `<div style="border-left:4px solid #117a63;background:#f0f8f5;border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:16px">
+    <div style="font-weight:800;color:#0b5548;font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Yönetici Özeti</div>
+    <div style="font-size:11.5px;line-height:1.6">${assessOzet(a.adayAd, pozAd, uygunluk, kr, guclu, gelisim)}</div></div>`;
+  // YANIT GÜVENİLİRLİĞİ
+  const gd = gecerlikDegerlendir(a.gecerlik);
+  const gecerlikBlok = gd ? `<div style="border:1px solid ${gd.verdict.bd};background:${gd.verdict.bg};border-radius:8px;padding:12px 16px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+        <div style="font-weight:800;color:#0b5548;font-size:11px;text-transform:uppercase;letter-spacing:.05em">Yanıt Güvenilirliği</div>
+        <div style="font-weight:800;color:${gd.verdict.c};font-size:12.5px">${gd.verdict.t}</div>
+      </div>
+      <table style="margin:0"><tbody>${gd.rows.map((r) => `<tr><td style="border:none;padding:3px 0;font-size:10.5px;color:#56676f;width:52%">${esc(r[0])}</td><td style="border:none;padding:3px 0;font-size:10.5px;font-weight:600">${esc(r[1])}</td></tr>`).join("")}</tbody></table>
+      ${gd.flags.length ? `<div style="margin-top:8px;font-size:10.3px;color:#7a4a12;line-height:1.5">${gd.flags.map((f) => "• " + esc(f)).join("<br>")}</div>` : `<div style="margin-top:6px;font-size:10.3px;color:#3d7a52">Güvenilirlik göstergelerinde uyarı bulunmuyor; sonuçlar güvenle yorumlanabilir.</div>`}
+    </div>` : `<div style="border:1px dashed #dbe3df;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:10.5px;color:#8a9a94">ℹ️ Bu sınav güvenilirlik göstergeleri eklenmeden önce tamamlandığı için süre/tutarlılık verisi bulunmuyor. Yeni sınavlarda bu bölüm otomatik dolar.</div>`;
+  // ÖZET TABLO (yüzdelik dâhil)
+  const ozetRows = keys.map((k) => {
+    const st = stenler[k], b = bandOf(st), p = stenPct(st);
+    return `<tr><td style="font-weight:600">${esc(BOYUT_AD[k] || k)}</td><td style="white-space:nowrap">${stenBarInline(st)}</td><td style="text-align:center;font-weight:700;color:#0b5548">${p != null ? "%" + p : "—"}</td><td><span class="rozet ${BAND_ROZET[b]}">${BAND_LABEL[b]}</span></td></tr>`;
+  }).join("");
+  // AYRINTILI DEĞERLENDİRME
+  const detay = keys.map((k) => {
+    const st = stenler[k], b = bandOf(st), p = stenPct(st), alt = Math.max(1, st - 1), ust = Math.min(10, st + 1);
+    return `<div class="kisi-blok" style="page-break-inside:avoid;margin-bottom:12px">
+      <h4 style="margin:0 0 2px">${esc(BOYUT_AD[k] || k)}</h4>
+      <div class="kisi-meta" style="margin-bottom:8px">${esc(BOYUT_ACIKLAMA[k] || "")}</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap">${stenBarInline(st)}<span style="font-weight:800;color:#0b5548">${st}/10</span><span class="rozet ${BAND_ROZET[b]}">${BAND_LABEL[b]}</span><span style="font-size:10px;color:#8a9a94">güven aralığı ${alt}–${ust} · ${p != null ? "%" + p + " yüzdelik" : ""}</span></div>
+      <div class="yorum-blok">${esc((BOYUT_YORUM[k] && BOYUT_YORUM[k][b]) || "")}</div>
+    </div>`;
+  }).join("");
+  // MÜLAKAT SORULARI (gelişim + sınırda: sten<=5) — düşük çıkan yetkinlikleri derinleştir
+  const probeKeys = byScore.slice().reverse().filter((k) => stenler[k] <= 5 && MULAKAT_SORU[k]).slice(0, 4);
+  const mulakatBlok = probeKeys.length ? `<h3 class="bolum">Önerilen Mülakat Soruları</h3>
+    <div style="font-size:10.5px;color:#56676f;margin-bottom:8px">Aşağıdaki yetkinlikler beklenen düzeyin altında ya da sınırda çıkmıştır; mülakatta bu davranışsal sorularla derinleştirilmesi önerilir.</div>
+    ${probeKeys.map((k) => `<div style="margin-bottom:9px"><div style="font-weight:700;color:#0b5548;font-size:11px">${esc(BOYUT_AD[k] || k)} <span style="font-weight:500;color:#8a9a94">(${stenler[k]}/10)</span></div><ul style="margin:3px 0 0;padding-left:18px;font-size:11px;line-height:1.5">${MULAKAT_SORU[k].map((q) => `<li style="margin-bottom:2px">${esc(q)}</li>`).join("")}</ul></div>`).join("")}` : "";
   const liste = (arr, bos) => arr.length ? `<ul style="margin:4px 0 0;padding-left:18px">${arr.map((k) => `<li style="margin-bottom:3px"><b>${esc(BOYUT_AD[k] || k)}</b> — ${stenler[k]}/10 (${BAND_LABEL[bandOf(stenler[k])]})</li>`).join("")}</ul>` : `<div style="color:#8a9a94;font-size:11px;margin-top:4px">${bos}</div>`;
-  return `${formLetterhead("Değerlendirme Raporu")}
-    <h2 style="font-family:'Source Serif 4',Georgia,serif;font-size:18px;margin:0 0 4px;color:#0b5548">Yetkinlik Değerlendirme Raporu</h2>
-    <div style="font-size:11.5px;color:#56676f;margin-bottom:14px"><b>${esc(a.adayAd || "")}</b> · Pozisyon: <b>${esc(pozAd)}</b>${a.tamamlanmaTarihi ? " · Tamamlanma: " + fmtTarih(a.tamamlanmaTarihi) : ""} · Norm: ${kalibre ? "İnciroğlu normu" : "Geçici referans norm"} (${nrm.N} kişi)</div>
-    <div class="filtre-ozet" style="line-height:1.6">Bu rapor, adayın İnciroğlu Otomotiv İnsan Kaynakları değerlendirme sınavına verdiği yanıtlar doğrultusunda hazırlanmıştır. Sınav; <b>bilişsel yetenek</b> (muhakeme, dikkat), <b>durumsal yargı</b> (iş senaryolarında karar) ve <b>çalışma stili</b> boyutlarını ölçer. Her yetkinlik 1-10 <b>sten</b> puanıyla raporlanır: 1-2 oldukça altında, 3-4 altında, 5-6 beklenen düzeyde, 7-8 üstünde, 9-10 oldukça üstünde. <b>Profil Uyum</b>, pozisyonun gerektirdiği yetkinliklerin ağırlıklı ortalamasıdır.</div>
+  return kapak + `
+    ${ozet}
+    ${gecerlikBlok}
     <div class="kpi-row">
       <div class="kpi"><div class="n" style="color:${uygunlukRenk(uygunluk)}">%${uygunluk != null ? uygunluk : "—"}</div><div class="l">Profil Uyum</div></div>
       <div class="kpi"><div class="n" style="color:${uygunlukRenk(uygunluk)};font-size:15px;padding-top:4px">${kr.t}</div><div class="l">Karar</div></div>
       <div class="kpi"><div class="n">${keys.length}</div><div class="l">Ölçülen Yetkinlik</div></div>
     </div>
     <h3 class="bolum">Yetkinlik Puanları (Özet)</h3>
-    <table><thead><tr><th>Yetkinlik</th><th style="width:270px">Puan (1-10 sten)</th><th style="width:210px">Düzey</th></tr></thead><tbody>${ozetRows}</tbody></table>
-    <h3 class="bolum" style="margin-top:22px">Yetkinlik Bazında Ayrıntılı Değerlendirme</h3>
+    <table><thead><tr><th>Yetkinlik</th><th style="width:250px">Puan (1-10 sten)</th><th style="width:80px;text-align:center">Yüzdelik</th><th style="width:180px">Düzey</th></tr></thead><tbody>${ozetRows}</tbody></table>
+    <div style="font-size:9.5px;color:#8a9a94;margin-top:6px">Sten puanları 1–10 ölçeğindedir (ort. 5,5). <b>Yüzdelik</b>: adayın norm grubunun yüzde kaçından daha yüksek olduğunu gösterir. Her sten ölçüm hata payı nedeniyle <b>±1 bandında</b> yorumlanmalıdır.</div>
+    <h3 class="bolum" style="margin-top:20px">Yetkinlik Bazında Ayrıntılı Değerlendirme</h3>
     ${detay}
-    <h3 class="bolum">Güçlü Yönler & Gelişim Alanları</h3>
+    ${mulakatBlok}
+    <h3 class="bolum">Güçlü Yönler &amp; Gelişim Alanları</h3>
     <div style="display:flex;gap:16px;flex-wrap:wrap">
       <div style="flex:1;min-width:220px;border:1px solid #cbe3d6;background:#f0f8f4;border-radius:9px;padding:11px 14px"><div style="font-weight:800;color:#2f6b45;font-size:11.5px">✓ Güçlü Yönler</div>${liste(guclu, "Bu pozisyon için 7 ve üzeri belirgin güçlü yön öne çıkmadı.")}</div>
       <div style="flex:1;min-width:220px;border:1px solid #ecd6c4;background:#fbf4ec;border-radius:9px;padding:11px 14px"><div style="font-weight:800;color:#a15c1f;font-size:11.5px">↑ Gelişim Alanları</div>${liste(gelisim, "Belirgin (4 ve altı) gelişim alanı öne çıkmadı.")}</div>
     </div>
-    ${!kalibre ? `<div style="font-size:10.5px;color:#8a9a94;margin-top:14px;line-height:1.5">ℹ️ Puanlar şu an <b>geçici referans norma</b> göre hesaplanmıştır. Bu pozisyonda tamamlanan sınav sayısı ${NORM_MIN}'e ulaşınca sten ve Profil Uyum, İnciroğlu'nun kendi aday dağılımına göre yeniden hesaplanır.</div>` : ""}
+    ${!kalibre ? `<div style="font-size:10.5px;color:#8a9a94;margin-top:14px;line-height:1.5">ℹ️ Puanlar şu an <b>geçici referans norma</b> göre hesaplanmıştır. Bu pozisyonda tamamlanan sınav sayısı ${NORM_MIN}'e ulaşınca sten, yüzdelik ve Profil Uyum, İnciroğlu'nun kendi aday dağılımına göre yeniden hesaplanır.</div>` : ""}
     <h3 class="bolum" style="margin-top:22px">Kaynakça</h3>
-    <ol style="margin:4px 0 0;padding-left:20px;font-size:9.8px;color:#56676f;line-height:1.55">${ASSESS_KAYNAKCA.map((r) => `<li style="margin-bottom:4px">${esc(r)}</li>`).join("")}</ol>`;
+    <ol style="margin:4px 0 0;padding-left:20px;font-size:9.8px;color:#56676f;line-height:1.55">${ASSESS_KAYNAKCA.map((r) => `<li style="margin-bottom:4px">${esc(r)}</li>`).join("")}</ol>
+    <div style="margin-top:18px;border-top:1px solid #e2e8e5;padding-top:8px;font-size:9px;color:#aab6b1;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
+      <span>Rapor sürümü: ${esc(normEt)}</span><span>Üretim: ${esc(uretimTs)} · ${esc(uretenAd)}</span>
+    </div>`;
 }
 async function assessIlet(aday, pozKey) {
   const token = assessToken();
