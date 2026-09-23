@@ -2213,7 +2213,7 @@ function raporKapsayiciHtml(title, bodyHtml) {
   <style>
     @page { margin: 16mm 14mm; }
     *{box-sizing:border-box}
-    body{font-family:Arial,Helvetica,sans-serif;color:#1c2530;font-size:12px;line-height:1.55;margin:0;padding:22px 26px}
+    body{font-family:Arial,Helvetica,sans-serif;color:#1c2530;font-size:12px;line-height:1.55;margin:0;padding:22px 26px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     .letterhead{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #117a63;padding-bottom:12px;margin-bottom:16px}
     .letterhead .brand{font-size:19px;font-weight:800;color:#0b5548}
     .letterhead .brand small{display:block;font-size:10.5px;font-weight:400;color:#666;margin-top:2px}
@@ -2225,7 +2225,7 @@ function raporKapsayiciHtml(title, bodyHtml) {
     .kpi{flex:1;min-width:110px;border:1px solid #dfe3e0;border-radius:9px;padding:11px 12px;text-align:center}
     .kpi .n{font-size:21px;font-weight:800;color:#0b5548;line-height:1}
     .kpi .l{font-size:9.5px;color:#666;text-transform:uppercase;letter-spacing:.04em;margin-top:5px}
-    h3.bolum{font-size:12.5px;color:#0b5548;border-bottom:2px solid #dcefe9;padding-bottom:5px;margin:20px 0 10px}
+    h3.bolum{font-size:13px;color:#0b5548;border-bottom:2px solid #dcefe9;border-left:4px solid #e6b45a;padding:2px 0 5px 10px;margin:22px 0 11px;font-weight:800}
     table{width:100%;border-collapse:collapse;margin-top:4px;font-size:10.8px}
     th{background:#0b5548;color:#fff;padding:7px 8px;text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.03em}
     td{padding:6.5px 8px;border-bottom:1px solid #e5e8e5;vertical-align:top}
@@ -2654,11 +2654,12 @@ const ASSESS_KAYNAKCA = [
 function stenBarInline(on){
   const cells = [1,2,3,4,5,6,7,8,9,10].map((n) => {
     const active = n === on, filled = n < on;
-    const bg = active ? "#0b5548" : (filled ? "#bfe0d6" : "#eef2f0");
-    const col = active ? "#fff" : (filled ? "#0b5548" : "#9fb0aa");
-    return `<span style="display:inline-block;width:24px;height:22px;line-height:22px;text-align:center;font-size:10.5px;font-weight:700;background:${bg};color:${col};border:1px solid #d7e0dc">${active ? on : ""}</span>`;
+    const bg = active ? "linear-gradient(180deg,#17997e,#0b5548)" : (filled ? "linear-gradient(180deg,#cdeee3,#a4dccb)" : "#eff3f1");
+    const col = active ? "#fff" : "#0b5548";
+    const extra = active ? "box-shadow:inset 0 0 0 1.6px #e6b45a;position:relative;z-index:1;" : "";
+    return `<span style="display:inline-block;width:25px;height:23px;line-height:23px;text-align:center;font-size:11px;font-weight:800;background:${bg};color:${col};border-right:1px solid rgba(255,255,255,.55);${extra}">${active ? on : ""}</span>`;
   }).join("");
-  return `<span style="display:inline-flex;border-radius:4px;overflow:hidden;border:1px solid #cdd8d3">${cells}</span>`;
+  return `<span style="display:inline-flex;border-radius:5px;overflow:hidden;border:1px solid #cdd8d3;vertical-align:middle">${cells}</span>`;
 }
 function uygunlukRenk(pct){ if(pct==null) return "#8a9a94"; if(pct>=70) return "#2f6b45"; if(pct>=55) return "#3d4f8f"; if(pct>=40) return "#a15c1f"; return "#a13030"; }
 // ---- Yüzdelik (sten -> norm yüzdelik dilimi) ve mülakat soru bankası ----
@@ -2729,21 +2730,41 @@ function assessRaporHtml(a){
   const guclu = byScore.filter((k) => stenler[k] >= 7).slice(0, 4);
   const gelisim = byScore.slice().reverse().filter((k) => stenler[k] <= 4).slice(0, 4);
   // KAPAK
-  const kapak = `<div style="page-break-after:always;min-height:238mm;display:flex;flex-direction:column">
-    ${formLetterhead("Değerlendirme Raporu")}
-    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;text-align:center;padding:20px 0">
-      <div style="font-size:11px;letter-spacing:.18em;color:#8a9a94;text-transform:uppercase;margin-bottom:14px">Gizli Belge · İç Kullanım</div>
-      <div style="font-family:'Source Serif 4',Georgia,serif;font-size:30px;font-weight:700;color:#0b5548;line-height:1.2">Yetkinlik Değerlendirme<br>Raporu</div>
-      <div style="width:70px;height:3px;background:#e6b45a;margin:20px auto"></div>
-      <div style="font-size:20px;font-weight:700;color:#132029;margin-top:6px">${esc(a.adayAd || "")}</div>
-      <div style="font-size:13px;color:#56676f;margin-top:6px">${esc(pozAd)}</div>
-      <div style="font-size:12px;color:#8a9a94;margin-top:22px">
-        Sınav Tarihi: ${a.tamamlanmaTarihi ? fmtTarih(a.tamamlanmaTarihi) : "—"}<br>
-        Norm Grubu: ${esc(normEt)}<br>
-        Rapor Üretimi: ${esc(uretimTs)} · ${esc(uretenAd)}
+  const kapakSvg = `<svg width="196" height="196" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="100" cy="100" r="90" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="2"/>
+      <circle cx="100" cy="100" r="70" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="1.6" stroke-dasharray="5 9"/>
+      <circle cx="100" cy="100" r="50" fill="rgba(255,255,255,.05)"/>
+      <path d="M34 138 A76 76 0 0 1 166 62" fill="none" stroke="#e6b45a" stroke-width="4.5" stroke-linecap="round"/>
+      <circle cx="166" cy="62" r="5.5" fill="#e6b45a"/>
+      <rect x="74" y="112" width="13" height="26" rx="3.5" fill="rgba(255,255,255,.5)"/>
+      <rect x="93" y="96" width="13" height="42" rx="3.5" fill="rgba(255,255,255,.72)"/>
+      <rect x="112" y="78" width="13" height="60" rx="3.5" fill="#8fe6cf"/>
+      <circle cx="100" cy="100" r="6" fill="#fff"/>
+    </svg>`;
+  const kapak = `<div style="page-break-after:always;position:relative;min-height:252mm;margin:-22px -26px 0;padding:0;overflow:hidden;background:linear-gradient(158deg,#06342c 0%,#0b5548 46%,#12876d 100%);color:#fff">
+    <div style="position:absolute;inset:0;background:radial-gradient(560px 420px at 92% 6%,rgba(47,176,148,.4),transparent 60%),radial-gradient(520px 440px at -5% 104%,rgba(230,180,90,.16),transparent 55%)"></div>
+    <div style="position:relative;display:flex;align-items:center;gap:12px;padding:36px 42px 0">
+      <div style="width:44px;height:44px;flex:none">${LOGO_SVG}</div>
+      <div><div style="font-size:15px;font-weight:800;letter-spacing:.01em">İnciroğlu İnsan Kaynakları</div><div style="font-size:10px;color:#9fd8c8;letter-spacing:.16em;text-transform:uppercase;margin-top:2px">ATS · Aday Değerlendirme</div></div>
+      <div style="margin-left:auto;font-size:9px;letter-spacing:.22em;color:#dff3ec;border:1px solid rgba(255,255,255,.32);border-radius:20px;padding:5px 13px;text-transform:uppercase">Gizli</div>
+    </div>
+    <div style="position:relative;text-align:center;padding:58px 42px 0">
+      <div style="margin:0 auto 30px;width:196px;filter:drop-shadow(0 10px 22px rgba(0,0,0,.28))">${kapakSvg}</div>
+      <div style="font-size:11px;letter-spacing:.24em;color:#9fd8c8;text-transform:uppercase;margin-bottom:12px">Yetkinlik Değerlendirmesi</div>
+      <div style="font-family:'Source Serif 4',Georgia,serif;font-size:35px;font-weight:700;line-height:1.14">Aday Değerlendirme<br>Raporu</div>
+      <div style="width:82px;height:3px;background:#e6b45a;margin:24px auto 28px;border-radius:3px"></div>
+      <div style="display:inline-block;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.2);border-radius:16px;padding:18px 38px">
+        <div style="font-size:23px;font-weight:800;letter-spacing:.01em">${esc(a.adayAd || "")}</div>
+        <div style="font-size:13px;color:#cdeee3;margin-top:5px">${esc(pozAd)}</div>
+      </div>
+      <div style="font-size:11px;color:#9fd8c8;margin-top:28px;line-height:2">
+        Sınav Tarihi: <b style="color:#eafaf5;font-weight:700">${a.tamamlanmaTarihi ? fmtTarih(a.tamamlanmaTarihi) : "—"}</b><br>
+        Norm Grubu: <b style="color:#eafaf5;font-weight:700">${esc(normEt)}</b>
       </div>
     </div>
-    <div style="font-size:9.5px;color:#aab6b1;text-align:center;border-top:1px solid #e2e8e5;padding-top:10px">İnciroğlu Otomotiv — İnsan Kaynakları · Bu belge yalnızca yetkili İK ve üst yönetim tarafından kullanılır.</div>
+    <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(3,26,22,.28);padding:13px 42px;font-size:9.5px;color:#bfe8db;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
+      <span>İnciroğlu Otomotiv · İnsan Kaynakları — Gizli Belge</span><span>Rapor: ${esc(uretimTs)} · ${esc(uretenAd)}</span>
+    </div>
   </div>`;
   if (!keys.length) {
     return kapak + `<div style="color:#8a9a94">Bu sınav için yetkinlik verisi bulunamadı.</div>`;
