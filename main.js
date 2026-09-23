@@ -3246,13 +3246,33 @@ function openAdayDetay(aday, isAdmin) {
     </div>
     ${kaynakEtiketHtml(a)}
     ${a.basvurulanPozisyonlar && a.basvurulanPozisyonlar.length > 1 ? `<div class="field"><label>Başvurulan Pozisyonlar</label><div style="font-size:13px;line-height:1.9">${a.basvurulanPozisyonlar.map((p) => `<span style="display:inline-block;margin:0 5px 4px 0;padding:3px 10px;background:var(--teal-soft,#dcefe9);color:var(--teal-deep,#0b5548);border-radius:12px;font-size:12px;font-weight:600">${esc(p)}</span>`).join("")}</div></div>` : ""}
+
+    <!-- ===== SÜREÇ SIRASI: CV → Mülakat → Görüşme Sonucu → Değerlendirme → Assessment → Teklif → İşe Giriş → Oryantasyon → Deneme ===== -->
     ${cvHtml(a)}
-    ${!gorusmeAsamasinda && !olumsuz ? `<div class="field"><label>İşe Başlama Tarihi</label><input type="date" id="dTarih" value="${esc(a.iseBaslamaTarihi || "")}" ${isAdmin ? "" : "disabled"}></div>` : ""}
+
+    <div class="section-title">Planlı Mülakatlar</div>
+    <div id="mulakatWrap">${mulakatInner(a)}</div>
 
     ${gorusmeAsamasinda ? gorusmeHtml(a) : ""}
+
+    ${scorecardHtml(a)}
+
+    ${isAdmin ? `<div class="section-title">Değerlendirme Sınavı (Assessment)</div>
+    <div id="assessWrap">${assessAdayInner(a)}</div>` : ""}
+
     ${olumsuz ? olumsuzOzetHtml(a) : ""}
 
+    ${!olumsuz ? `<div class="section-title">Teklif</div><div id="teklifWrap">${teklifInner(a)}</div>` : ""}
+
     ${!gorusmeAsamasinda && !olumsuz ? `
+    <div class="field"><label>İşe Başlama Tarihi</label><input type="date" id="dTarih" value="${esc(a.iseBaslamaTarihi || "")}" ${isAdmin ? "" : "disabled"}></div>
+
+    <div class="section-title">İşe Giriş Evrakları (%${oran} tamamlandı)</div>
+    <div class="progress-track" style="margin-bottom:12px"><div class="progress-fill" style="width:${oran}%"></div></div>
+    <div id="evrakListesi">
+      ${(a.evraklar || []).map((e, i) => evrakRowHtml(e, i)).join("")}
+    </div>
+
     <div class="section-title">SGK Girişi</div>
     <div class="evrak-row ${a.sgkGirisYapildi ? "done" : ""}">
       <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;flex:1">
@@ -3262,28 +3282,12 @@ function openAdayDetay(aday, isAdmin) {
       <span style="font-size:12px;color:var(--ink-soft)">${a.sgkGirisTarihi ? "Tarih: " + fmtTarih(a.sgkGirisTarihi) : "—"}</span>
     </div>
 
-    <div class="section-title">Evrak Listesi (%${oran} tamamlandı)</div>
-    <div class="progress-track" style="margin-bottom:12px"><div class="progress-fill" style="width:${oran}%"></div></div>
-    <div id="evrakListesi">
-      ${(a.evraklar || []).map((e, i) => evrakRowHtml(e, i)).join("")}
-    </div>
-
     ${a.oryantasyon ? oryantasyonHtml(a) : ""}
     ${a.denemeSuresi ? denemeSuresiHtml(a) : ""}
     ` : ""}
 
-    ${scorecardHtml(a)}
-
-    <div class="section-title">Planlı Mülakatlar</div>
-    <div id="mulakatWrap">${mulakatInner(a)}</div>
-
-    ${!olumsuz ? `<div class="section-title">Teklif</div><div id="teklifWrap">${teklifInner(a)}</div>` : ""}
-
     <div class="section-title">İletişim Geçmişi</div>
     <div id="iletisimWrap">${iletisimInner(a)}</div>
-
-    ${isAdmin ? `<div class="section-title">Değerlendirme Sınavı (Assessment)</div>
-    <div id="assessWrap">${assessAdayInner(a)}</div>` : ""}
 
     ${a.gecmis && a.gecmis.length ? gecmisHtml(a) : ""}
 
