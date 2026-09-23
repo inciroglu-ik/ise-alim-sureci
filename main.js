@@ -1113,6 +1113,7 @@ function subscribeTalepler() {
 // LOGIN
 // ---------------------------------------------------------------
 function renderLogin(errMsg) {
+  hideAppLoader();
   root().innerHTML = `
   <div class="center-screen">
     <div class="login-card">
@@ -1120,7 +1121,7 @@ function renderLogin(errMsg) {
         <span class="brand-logo lg">${LOGO_SVG}</span>
         <div>
           <div class="name">İnciroğlu İnsan Kaynakları</div>
-          <div class="sub">İşe Alım Platformu · İnciroğlu Otomotiv</div>
+          <div class="sub">ATS · Aday Takip Sistemi · İnciroğlu Otomotiv</div>
         </div>
       </div>
       <h1>Giriş Yap</h1>
@@ -1140,12 +1141,14 @@ function renderLogin(errMsg) {
     const p = el("#password").value;
     const btn = e.target.querySelector("button");
     btn.disabled = true; btn.textContent = "Giriş yapılıyor…";
+    showAppLoader("Giriş yapılıyor…");
     try {
       // Bu giriş kişinin KENDİ form girişi — oturumu güvenilir işaretle (portal devralma koruması).
       try { sessionStorage.setItem("fbFormLogin", "1"); } catch (e) {}
       await signInWithEmailAndPassword(auth, `${u}@${LOGIN_DOMAIN}`, p);
     } catch (err) {
       try { sessionStorage.removeItem("fbFormLogin"); } catch (e) {}
+      hideAppLoader();
       const box = el("#loginErr");
       box.style.display = "block";
       box.textContent = "Kullanıcı adı veya şifre hatalı.";
@@ -1160,6 +1163,25 @@ function renderLogin(errMsg) {
 // Marka amblemi — İnciroğlu İnsan Kaynakları (kişi + pirinç gelişim yayı).
 const LOGO_SVG = `<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="ikLogo" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2fb094"/><stop offset=".55" stop-color="#117a63"/><stop offset="1" stop-color="#0b5548"/></linearGradient></defs><rect width="40" height="40" rx="11" fill="url(#ikLogo)"/><rect x=".6" y=".6" width="38.8" height="38.8" rx="10.4" fill="none" stroke="rgba(255,255,255,.2)"/><circle cx="20" cy="14.6" r="5.1" fill="#fff"/><path d="M9.8 31.6c0-6 4.6-9.3 10.2-9.3s10.2 3.3 10.2 9.3z" fill="#fff"/><path d="M27.6 10.4c2.7 1.2 4.5 3.8 4.8 6.8" fill="none" stroke="#e6b45a" stroke-width="2.2" stroke-linecap="round"/></svg>`;
 const APP_VER = "v2.0";
+// ---- Yükleme ekranları ("yaşayan site" hissi) ----
+function ensureLoaders() {
+  if (!document.getElementById("appLoader")) {
+    const l = document.createElement("div"); l.id = "appLoader"; l.className = "app-loader hide";
+    l.innerHTML = `<div class="loader-rings"><i></i><i></i><i></i><b></b></div>
+      <div class="brand">İnciroğlu İnsan Kaynakları<small>ATS · Aday Takip Sistemi</small></div>
+      <div class="msg"><span class="dot"></span><span id="appLoaderMsg">Yükleniyor…</span></div>`;
+    document.body.appendChild(l);
+  }
+  if (!document.getElementById("microLoader")) {
+    const m = document.createElement("div"); m.id = "microLoader"; m.className = "micro-loader";
+    m.innerHTML = `<span class="mspin"></span><span>İnciroğlu İK ATS · Yükleniyor…</span>`;
+    document.body.appendChild(m);
+  }
+}
+function showAppLoader(msg) { ensureLoaders(); const t = document.getElementById("appLoaderMsg"); if (t && msg) t.textContent = msg; document.getElementById("appLoader").classList.remove("hide"); }
+function hideAppLoader() { const l = document.getElementById("appLoader"); if (l) l.classList.add("hide"); }
+let _flashT = null;
+function flashLoader() { ensureLoaders(); const m = document.getElementById("microLoader"); if (!m) return; m.classList.add("show"); clearTimeout(_flashT); _flashT = setTimeout(() => m.classList.remove("show"), 480); }
 const ICONS = {
   people: `<svg width="16" height="16" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.4" fill="currentColor"/><path d="M2.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5" fill="currentColor" opacity=".85"/><circle cx="17.5" cy="8.5" r="2.6" fill="currentColor" opacity=".55"/><path d="M14.8 13.9c1-.6 2.1-.9 3-.9 2.8 0 5 2 5.2 5" fill="currentColor" opacity=".55"/></svg>`,
   genel: `<svg width="16" height="16" viewBox="0 0 24 24"><rect x="2.5" y="13" width="4.5" height="8.5" rx="1" fill="currentColor" opacity=".55"/><rect x="9.7" y="7" width="4.5" height="14.5" rx="1" fill="currentColor" opacity=".8"/><rect x="17" y="2.5" width="4.5" height="19" rx="1" fill="currentColor"/></svg>`,
@@ -1174,7 +1196,7 @@ function topbar() {
   <div class="topbar">
     <div class="brand">
       <span class="brand-logo">${LOGO_SVG}</span>
-      <div class="t">İnciroğlu İnsan Kaynakları<small>İşe Alım Platformu<span class="ver-badge">${APP_VER}</span></small></div>
+      <div class="t">İnciroğlu İnsan Kaynakları<small>ATS · Aday Takip Sistemi<span class="ver-badge">${APP_VER}</span></small></div>
     </div>
     <div class="who">
       <span class="pill live" title="Veriler canlı olarak güncellenir">Canlı</span>
@@ -1242,6 +1264,7 @@ function openPasswordModal() {
 
 let TAB = "genel";
 function render() {
+  hideAppLoader();
   const isAdmin = currentProfile.role === "admin";
   // Müdürler yalnızca kendi departmanlarındaki adayları, ve "olumsuz" (reddedilen)
   // adayları HİÇBİR ZAMAN görmemeli — bkz. Firestore kuralları (aynı kısıt orada
@@ -1268,7 +1291,7 @@ function render() {
     <div class="main-content"><div class="wrap" id="pageWrap"></div></div>
   </div>`;
   wireTopbar();
-  document.querySelectorAll("[data-nav]").forEach((n) => n.addEventListener("click", () => { TAB = n.dataset.nav; render(); }));
+  document.querySelectorAll("[data-nav]").forEach((n) => n.addEventListener("click", () => { flashLoader(); TAB = n.dataset.nav; render(); }));
 
   if (TAB === "talepler") renderTaleplerPage(gorulenTalepler, isAdmin);
   else if (TAB === "oryantasyon") renderOryantasyonPage(gorulenAdaylar, isAdmin);
@@ -3316,6 +3339,7 @@ function openAdayForm(onDoldur) {
 // ADAY DETAY
 // ---------------------------------------------------------------
 function openAdayDetay(aday, isAdmin) {
+  flashLoader();
   const overlay = document.createElement("div");
   overlay.className = "overlay";
   // Yalnızca admin genel bilgi/evrak/SGK düzenleyebilir; ama oryantasyon ve
