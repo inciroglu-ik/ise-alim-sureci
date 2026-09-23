@@ -1089,6 +1089,7 @@ function subscribeAdaylar() {
     render();
   }, (err) => {
     console.error(err);
+    hideAppLoader();
     root().innerHTML = `<div class="center-screen"><div class="login-card"><h1>Veri okunamadı</h1><p class="hint">${esc(err.message)}</p></div></div>`;
   });
 }
@@ -1178,8 +1179,24 @@ function ensureLoaders() {
     document.body.appendChild(m);
   }
 }
-function showAppLoader(msg) { ensureLoaders(); const t = document.getElementById("appLoaderMsg"); if (t && msg) t.textContent = msg; document.getElementById("appLoader").classList.remove("hide"); }
-function hideAppLoader() { const l = document.getElementById("appLoader"); if (l) l.classList.add("hide"); }
+let _loaderTimeout = null;
+function showAppLoader(msg) {
+  ensureLoaders();
+  const t = document.getElementById("appLoaderMsg"); if (t && msg) t.textContent = msg;
+  document.getElementById("appLoader").classList.remove("hide");
+  // GÜVENLİK: giriş/yükleme takılırsa ekran kalıcı kilitlenmesin — 15 sn sonra aç ve kullanıcıya tekrar dene de.
+  clearTimeout(_loaderTimeout);
+  _loaderTimeout = setTimeout(() => {
+    hideAppLoader();
+    try {
+      const b = document.querySelector("#loginForm button[type=submit], #loginForm button");
+      if (b) { b.disabled = false; b.textContent = "Giriş Yap"; }
+      const box = document.getElementById("loginErr");
+      if (box) { box.style.display = "block"; box.textContent = "Bağlantı beklenenden uzun sürdü. Lütfen tekrar giriş yapmayı deneyin."; }
+    } catch (_) {}
+  }, 15000);
+}
+function hideAppLoader() { clearTimeout(_loaderTimeout); const l = document.getElementById("appLoader"); if (l) l.classList.add("hide"); }
 let _flashT = null;
 function flashLoader() { ensureLoaders(); const m = document.getElementById("microLoader"); if (!m) return; m.classList.add("show"); clearTimeout(_flashT); _flashT = setTimeout(() => m.classList.remove("show"), 480); }
 const ICONS = {
