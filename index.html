@@ -545,6 +545,13 @@
   }
   @keyframes drawerIn{from{transform:translateX(28px);opacity:.4;}to{transform:none;opacity:1;}}
   @media(max-width:760px){.drawer{border-radius:0;}}
+  /* Büyük ekranda daha geniş, ferah ve düzenli aday görünümü */
+  @media(min-width:1240px){
+    .drawer{width:min(1080px,96%);}
+    .drawer-body{padding:26px 44px 96px;}
+    .drawer-body .two-col{gap:22px;}
+  }
+  @media(min-width:1600px){ .drawer{width:min(1180px,94%);} }
   .drawer-head{
     position:sticky;top:0;z-index:5;
     background:linear-gradient(105deg,var(--teal-900) 0%,var(--teal-deep) 65%,#0d6252 100%);
@@ -862,6 +869,6 @@
 <body>
 <div id="app"><div class="loader">Yükleniyor…</div></div>
 <div class="toast" id="toast"></div>
-<script type="module" src="main.js?v=202609231000"></script>
+<script type="module" src="main.js?v=202609231100"></script>
 </body>
 </html>

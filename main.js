@@ -2335,6 +2335,101 @@ function denemeFormuHtml(a) {
     <div style="border:1px solid ${deg.sonuc === DENEME_SONUC_OPT[0] ? '#c3e2ce' : (deg.sonuc ? '#efc9c9' : '#e2e8e5')};background:${deg.sonuc === DENEME_SONUC_OPT[0] ? '#e6f3ea' : (deg.sonuc ? '#fbe8e8' : '#fff')};border-radius:8px;padding:12px 14px"><div style="font-weight:700;color:#0b5548;font-size:11px;margin-bottom:4px">Sonuç</div><div style="font-size:12px">${esc(deg.sonuc || "— (henüz kesinleşmedi)")}</div></div>
     ${imzaBlokHtml()}</div>`;
 }
+// ==================== ADAY BİLGİ FORMU + TAM DOSYA (PDF) ====================
+function _tr(l, v) { return `<tr><td style="padding:6px 10px;border:1px solid #e2e8e5;background:#f0f8f5;font-weight:700;width:26%;font-size:10.5px">${esc(l)}</td><td style="padding:6px 10px;border:1px solid #e2e8e5;font-size:11px">${v || "—"}</td></tr>`; }
+function adayKisiselTabloHtml(a) {
+  const c = (lbl, val) => `<td style="padding:7px 10px;border:1px solid #e2e8e5;background:#f0f8f5;font-weight:700;width:22%;font-size:10.5px">${esc(lbl)}</td><td style="padding:7px 10px;border:1px solid #e2e8e5;width:28%;font-size:11px">${val || "—"}</td>`;
+  const poz = (a.basvurulanPozisyonlar && a.basvurulanPozisyonlar.length) ? a.basvurulanPozisyonlar.map(esc).join(", ") : esc(a.unvan || "");
+  const etk = (a.etiketler && a.etiketler.length) ? a.etiketler.map(esc).join(", ") : "";
+  const durum = esc((DURUM_ETIKET[a.durum] || {}).label || a.durum || "");
+  return `<table style="width:100%;border-collapse:collapse;margin:0 0 14px">
+    <tr>${c("Ad Soyad", esc(a.ad) + " " + esc(a.soyad))}${c("Unvan", esc(a.unvan || ""))}</tr>
+    <tr>${c("Departman", esc(a.departman || ""))}${c("Bölüm", esc(a.bolum || ""))}</tr>
+    <tr>${c("Telefon", esc(a.telefon || ""))}${c("E-posta", esc(a.email || ""))}</tr>
+    <tr>${c("Kaynak", esc(a.kaynak || ""))}${c("Süreç Durumu", durum)}</tr>
+    <tr>${c("Başvurulan Pozisyon(lar)", poz)}${c("Etiketler", etk)}</tr>
+  </table>`;
+}
+function _surecTablo(a) {
+  return `<table style="width:100%;border-collapse:collapse;margin:0 0 12px"><tbody>
+    ${_tr("Görüşme Tarihi", a.gorusmeTarihi ? fmtTarih(a.gorusmeTarihi) : "")}
+    ${_tr("İşe Başlama Tarihi", a.iseBaslamaTarihi ? fmtTarih(a.iseBaslamaTarihi) : "")}
+    ${_tr("SGK Girişi", a.sgkGirisYapildi ? ("Yapıldı" + (a.sgkGirisTarihi ? " · " + fmtTarih(a.sgkGirisTarihi) : "")) : "Yapılmadı")}
+    ${a.denemeSuresi ? _tr("Deneme Süresi Bitişi", a.denemeSuresi.bitisTarihi ? fmtTarih(a.denemeSuresi.bitisTarihi) : "") : ""}
+    ${a.redNedeni ? _tr("Ret Nedeni", esc(a.redNedeni) + (a.redAciklama ? " — " + esc(a.redAciklama) : "")) : ""}
+  </tbody></table>`;
+}
+function _dossierAssess(as) {
+  const nrm = assessNorm(as.pozisyon); const boy = as.boyutlar || {}; const st = {};
+  Object.keys(boy).forEach((k) => { if (boy[k] != null && Number.isFinite(boy[k])) st[k] = stenFromRaw(boy[k], nrm.norm[k]); });
+  const kr = uygunlukKarar(as.uygunluk);
+  const rows = Object.keys(st).sort((x, y) => st[y] - st[x]).map((k) => `<tr><td style="padding:4px 8px;border:1px solid #e5e8e5;font-size:10.5px">${esc(BOYUT_AD[k] || k)}</td><td style="padding:4px 8px;border:1px solid #e5e8e5;text-align:center;font-weight:700;width:70px">${st[k]}/10</td></tr>`).join("");
+  return `<div class="kisi-blok" style="page-break-inside:avoid;margin-bottom:10px"><h4 style="margin:0 0 2px">${esc(as.pozisyonAd || ASSESS_POZ_AD[as.pozisyon] || as.pozisyon || "")}</h4><div class="kisi-meta">${as.tamamlanmaTarihi ? fmtTarih(as.tamamlanmaTarihi) + " · " : ""}Profil Uyum %${as.uygunluk != null ? as.uygunluk : "—"} · ${kr.t}</div><table style="width:100%;border-collapse:collapse;margin-top:6px"><tbody>${rows || '<tr><td style="padding:4px 8px;border:1px solid #e5e8e5">—</td></tr>'}</tbody></table></div>`;
+}
+function _oryKompakt(a) {
+  const md = (a.oryantasyon && a.oryantasyon.maddeler) || [];
+  const kat = {}; md.forEach((m) => { const k = m.kategori || "Genel"; (kat[k] = kat[k] || []).push(m); });
+  const tamam = md.filter((m) => m.tamamlandi).length, oran = md.length ? Math.round(tamam / md.length * 100) : 0;
+  const rows = Object.keys(kat).map((k) => `<tr><td colspan="3" style="padding:5px 8px;border:1px solid #e5e8e5;background:#eef2f0;font-weight:700;color:#0b5548;font-size:10px">${esc(k)}</td></tr>` +
+    kat[k].map((m) => `<tr><td style="padding:4px 8px;border:1px solid #e5e8e5;font-size:10px">${esc(m.baslik || m.ad || "")}</td><td style="padding:4px 8px;border:1px solid #e5e8e5;text-align:center;width:46px;font-weight:700;color:${m.tamamlandi ? '#2f6b45' : '#95541a'}">${m.tamamlandi ? '✓' : '—'}</td><td style="padding:4px 8px;border:1px solid #e5e8e5;text-align:center;width:70px;font-size:9.5px;color:#56676f">${(m.tamamlanmaTarihi || m.tarih) ? fmtTarih(m.tamamlanmaTarihi || m.tarih) : ""}</td></tr>`).join("")).join("");
+  return `<div style="font-size:11px;margin:0 0 6px">Tamamlanma: <b>%${oran}</b> (${tamam}/${md.length})</div><table style="width:100%;border-collapse:collapse">${rows}</table>`;
+}
+function _denemeKompakt(a) {
+  const ds = a.denemeSuresi || {}, deg = ds.degerlendirme || {};
+  const rows = DENEME_KRITERLERI.map((k) => { const lbl = (DENEME_PUAN_OPT.find((o) => o.key === deg[k.key]) || {}).label || "—"; return `<tr><td style="padding:4px 8px;border:1px solid #e5e8e5;font-size:10.5px">${esc(k.kategori)} — ${esc(k.ad)}</td><td style="padding:4px 8px;border:1px solid #e5e8e5;text-align:center;width:90px;font-weight:700">${esc(lbl)}</td></tr>`; }).join("");
+  return `<table style="width:100%;border-collapse:collapse;margin-bottom:8px"><tbody>${rows}</tbody></table>
+    ${deg.yorum ? `<div class="yorum-blok">${esc(deg.yorum)}</div>` : ""}
+    <div style="font-weight:700;color:#0b5548;font-size:11px;margin-top:6px">Sonuç: ${esc(deg.sonuc || "— (henüz kesinleşmedi)")}</div>`;
+}
+// (1) Kişi Bilgi Formu — tek sayfa özet
+function adayBilgiFormuHtml(a) {
+  const ort = puanOrtalama(a);
+  const asAll = (a.assessmentler || []).filter((x) => x.durum === "tamamlandi").sort((x, y) => (y.tamamlanmaTarihi || "").localeCompare(x.tamamlanmaTarihi || ""));
+  const son = asAll[0]; const asKr = son ? uygunlukKarar(son.uygunluk) : null;
+  const t = a.teklif || {}; const tEt = { hazirlandi: "Hazırlandı", iletildi: "İletildi", kabul: "Kabul Edildi", red: "Reddedildi" };
+  const kpi = (n, l) => `<div class="kpi"><div class="n" style="font-size:16px">${n}</div><div class="l">${l}</div></div>`;
+  return `${formLetterhead("Aday Bilgi Formu")}
+    <h2 style="font-family:'Source Serif 4',Georgia,serif;font-size:18px;margin:0 0 12px;color:#0b5548">Aday Bilgi Formu</h2>
+    ${adayKisiselTabloHtml(a)}
+    <div class="kpi-row">
+      ${kpi(ort != null ? ort.toFixed(1) + " / 5" : "—", "Ekip Puanı")}
+      ${kpi(son && son.uygunluk != null ? "%" + son.uygunluk : "—", "Assessment Uyum")}
+      ${kpi(son ? esc(asKr.t) : "—", "Assessment Kararı")}
+      ${kpi(t.durum ? (tEt[t.durum] || t.durum) : "—", "Teklif")}
+    </div>
+    <h3 class="bolum">Süreç Durumu</h3>
+    ${_surecTablo(a)}
+    ${a.gorusmeNotu ? `<h3 class="bolum">Görüşme Notu</h3><div class="yorum-blok">${esc(a.gorusmeNotu)}</div>` : ""}
+    ${a.notlar ? `<h3 class="bolum">Not</h3><div class="yorum-blok">${esc(a.notlar)}</div>` : ""}`;
+}
+// (2) Tam Aday Dosyası — her şey tek belgede
+function adayDosyaHtml(a) {
+  const b = [];
+  b.push(formLetterhead("Aday Dosyası"));
+  b.push(`<h2 style="font-family:'Source Serif 4',Georgia,serif;font-size:18px;margin:0 0 6px;color:#0b5548">Aday Dosyası — ${esc(a.ad)} ${esc(a.soyad)}</h2>`);
+  b.push(`<div class="filtre-ozet">Adayın işe alım sürecindeki tüm kayıtları. Gizli belge · yalnızca yetkili İK/üst yönetim.</div>`);
+  b.push(`<h3 class="bolum">Kişisel & İletişim Bilgileri</h3>${adayKisiselTabloHtml(a)}`);
+  b.push(`<h3 class="bolum">Süreç Durumu</h3>${_surecTablo(a)}`);
+  const mul = a.mulakatlar || [];
+  b.push(`<h3 class="bolum">Planlı Mülakatlar</h3>` + (mul.length ? `<table style="width:100%;border-collapse:collapse"><thead><tr><th>Tarih</th><th>Saat</th><th>Tür</th><th>Görüşmeciler</th><th>Notlar</th></tr></thead><tbody>${mul.map((m) => `<tr><td>${fmtTarih(m.tarih)}</td><td>${esc(m.saat || "")}</td><td>${esc(m.tur || "")}</td><td>${esc(m.gorusmeciler || "")}</td><td>${esc(m.notlar || "")}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">Mülakat kaydı yok.</div>`));
+  if (a.gorusmeNotu) b.push(`<h3 class="bolum">Görüşme Notu</h3><div class="yorum-blok">${esc(a.gorusmeNotu)}</div>`);
+  const deg = a.degerlendirmeler || [], ort = puanOrtalama(a);
+  b.push(`<h3 class="bolum">Ekip Değerlendirmeleri${ort != null ? " · Ort. " + ort.toFixed(1) + "/5" : ""}</h3>` + (deg.length ? deg.slice().reverse().map((d) => `<div class="kriter-satir"><b>${esc(d.kullanici || "—")}${d.rol ? " (" + esc(d.rol) + ")" : ""}</b><span class="kriter-puan">${Number(d.puan) || 0}/5 · ${fmtTarih(d.tarih)}</span></div>${d.yorum ? `<div class="yorum-blok">${esc(d.yorum)}</div>` : ""}`).join("") : `<div class="empty">Değerlendirme yok.</div>`));
+  const asAll = (a.assessmentler || []).filter((x) => x.durum === "tamamlandi");
+  b.push(`<h3 class="bolum">Assessment (Değerlendirme Sınavı)</h3>` + (asAll.length ? asAll.map(_dossierAssess).join("") : `<div class="empty">Tamamlanmış sınav yok.</div>`));
+  const t = a.teklif || {};
+  b.push(`<h3 class="bolum">Teklif</h3>` + (Object.keys(t).length ? `<table style="width:100%;border-collapse:collapse"><tbody>${_tr("Pozisyon", esc(t.pozisyon || ""))}${_tr("Aylık Ücret", esc(t.maas || ""))}${_tr("Bağlı Yönetici", esc(t.yonetici || ""))}${_tr("Başlama Tarihi", t.baslamaTarihi ? fmtTarih(t.baslamaTarihi) : "")}${_tr("Durum", esc(t.durum || ""))}${t.not ? _tr("Not", esc(t.not)) : ""}</tbody></table>` : `<div class="empty">Teklif kaydı yok.</div>`));
+  const ev = a.evraklar || [];
+  b.push(`<h3 class="bolum">İşe Giriş Evrakları · %${evrakOrani(a)}</h3>` + (ev.length ? `<table style="width:100%;border-collapse:collapse"><tbody>${ev.map((e) => `<tr><td style="padding:5px 8px;border:1px solid #e5e8e5">${esc(e.ad)}</td><td style="padding:5px 8px;border:1px solid #e5e8e5;text-align:center;width:70px;font-weight:700;color:${e.teslimAlindi ? '#2f6b45' : '#95541a'}">${e.teslimAlindi ? '✓ Teslim' : '—'}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">—</div>`));
+  if (a.oryantasyon) b.push(`<h3 class="bolum">Oryantasyon · ${esc(a.oryantasyon.sablonAdi || "")}</h3>${_oryKompakt(a)}`);
+  if (a.denemeSuresi && a.denemeSuresi.degerlendirmeYapildiMi) b.push(`<h3 class="bolum">Deneme Süresi Değerlendirmesi</h3>${_denemeKompakt(a)}`);
+  const g = a.gecmis || [];
+  b.push(`<h3 class="bolum">Süreç Geçmişi</h3>` + (g.length ? `<table style="width:100%;border-collapse:collapse"><thead><tr><th>Tarih</th><th>Olay</th><th>Kullanıcı</th><th>Not</th></tr></thead><tbody>${g.map((x) => `<tr><td>${fmtTarih(x.tarih)}</td><td>${esc(x.olay || ((x.eskiDurum || "") + " → " + (x.yeniDurum || "")))}</td><td>${esc(x.kullanici || "")}</td><td>${esc(x.not || "")}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">—</div>`));
+  const il = a.iletisim || [];
+  if (il.length) b.push(`<h3 class="bolum">İletişim Geçmişi</h3><table style="width:100%;border-collapse:collapse"><tbody>${il.slice().reverse().map((x) => `<tr><td style="width:96px">${fmtTarih(x.tarih)}</td><td style="width:96px">${esc(x.tur || "")}</td><td>${esc(x.ozet || "")}</td></tr>`).join("")}</tbody></table>`);
+  if (a.notlar) b.push(`<h3 class="bolum">Not</h3><div class="yorum-blok">${esc(a.notlar)}</div>`);
+  return b.join("\n");
+}
 function raporAcVeYazdir(html, title) {
   const win = window.open("", "_blank");
   if (!win) { toast("⚠ Açılır pencere engellendi. Tarayıcı ayarlarından izin verin."); return; }
@@ -3247,6 +3342,12 @@ function openAdayDetay(aday, isAdmin) {
     ${kaynakEtiketHtml(a)}
     ${a.basvurulanPozisyonlar && a.basvurulanPozisyonlar.length > 1 ? `<div class="field"><label>Başvurulan Pozisyonlar</label><div style="font-size:13px;line-height:1.9">${a.basvurulanPozisyonlar.map((p) => `<span style="display:inline-block;margin:0 5px 4px 0;padding:3px 10px;background:var(--teal-soft,#dcefe9);color:var(--teal-deep,#0b5548);border-radius:12px;font-size:12px;font-weight:600">${esc(p)}</span>`).join("")}</div></div>` : ""}
 
+    ${isAdmin ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--panel-alt,#fafcfb);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:6px 0 4px">
+      <span style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em;margin-right:2px">📄 Yazdır / İndir</span>
+      <button type="button" class="btn btn-ghost btn-sm" id="adayBilgiPdf">Kişi Bilgi Formu (PDF)</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="adayDosyaPdf">📁 Tam Aday Dosyası (PDF)</button>
+    </div>` : ""}
+
     <!-- ===== SÜREÇ SIRASI: CV → Mülakat → Görüşme Sonucu → Değerlendirme → Assessment → Teklif → İşe Giriş → Oryantasyon → Deneme ===== -->
     ${cvHtml(a)}
 
@@ -3721,6 +3822,10 @@ function openAdayDetay(aday, isAdmin) {
     if (oryPdf) oryPdf.addEventListener("click", () => raporAcVeYazdir(oryantasyonFormuHtml(aday), "Oryantasyon Formu — " + aday.ad + " " + aday.soyad));
     const denPdf = document.getElementById("denPdfBtn");
     if (denPdf) denPdf.addEventListener("click", () => raporAcVeYazdir(denemeFormuHtml(aday), "Deneme Suresi Formu — " + aday.ad + " " + aday.soyad));
+    const abPdf = document.getElementById("adayBilgiPdf");
+    if (abPdf) abPdf.addEventListener("click", () => raporAcVeYazdir(adayBilgiFormuHtml(aday), "Aday Bilgi Formu — " + aday.ad + " " + aday.soyad));
+    const adPdf = document.getElementById("adayDosyaPdf");
+    if (adPdf) adPdf.addEventListener("click", () => raporAcVeYazdir(adayDosyaHtml(aday), "Aday Dosyasi — " + aday.ad + " " + aday.soyad));
     document.querySelectorAll("[data-evrak-check]").forEach((cb) => {
       cb.addEventListener("change", () => {
         const i = +cb.dataset.evrakCheck;
