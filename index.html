@@ -452,6 +452,38 @@
   .aday-card .main{min-width:0;}
   .aday-card .main b{font-size:14.5px;font-weight:650;color:var(--ink);letter-spacing:-.011em;}
   .aday-card .main .meta{font-size:12.2px;color:var(--ink-soft);margin-top:4px;line-height:1.45;}
+
+  /* =============================================================
+     ADAY SÜREÇ ŞERİDİ — kart altında görsel aşama ilerlemesi
+     ============================================================= */
+  .surec-serit{flex-basis:100%;width:100%;display:flex;align-items:flex-start;margin-top:13px;padding-top:12px;border-top:1px dashed var(--line);}
+  .ss-seg{flex:1 1 0;display:flex;flex-direction:column;align-items:center;gap:7px;position:relative;text-align:center;min-width:0;}
+  .ss-seg::before{content:"";position:absolute;top:6px;left:calc(-50% + 7px);width:calc(100% - 14px);height:2px;background:#e4e9e6;}
+  .ss-seg:first-child::before{display:none;}
+  .ss-seg.done::before,.ss-seg.cur::before{background:var(--teal);}
+  .ss-dot{width:13px;height:13px;border-radius:50%;background:#d7dedb;border:2px solid #d7dedb;position:relative;z-index:1;box-sizing:border-box;transition:all .2s var(--ease);}
+  .ss-seg.done .ss-dot{background:var(--teal);border-color:var(--teal);}
+  .ss-seg.cur .ss-dot{background:#fff;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft,#dcefe9);}
+  .ss-seg.cur .ss-dot::after{content:"";position:absolute;inset:2px;border-radius:50%;background:var(--teal);}
+  .ss-lbl{font-size:9px;font-weight:700;color:var(--ink-mute);letter-spacing:.03em;line-height:1.2;text-transform:uppercase;}
+  .ss-seg.done .ss-lbl{color:var(--teal);}
+  .ss-seg.cur .ss-lbl{color:var(--teal-deep);}
+  .surec-serit.son{justify-content:center;align-items:center;padding-top:11px;}
+  .surec-serit.son .ss-x{display:inline-flex;align-items:center;gap:7px;padding:4px 14px;border-radius:20px;background:#f2f5f4;color:#7a8a84;font-size:11px;font-weight:700;}
+  .surec-serit.son.neg .ss-x{background:#fdeceb;color:#b4433a;}
+
+  /* =============================================================
+     SKELETON (iskelet) YÜKLEME — veri gelene kadar placeholder
+     ============================================================= */
+  @keyframes skelShimmer{0%{background-position:-420px 0;}100%{background-position:420px 0;}}
+  .skel{background:linear-gradient(90deg,#e9edea 8%,#dfe5e2 22%,#eef2ef 40%,#dfe5e2 58%,#e9edea 92%);background-size:420px 100%;animation:skelShimmer 1.3s linear infinite;border-radius:6px;}
+  .skel-card{display:flex;align-items:center;gap:13px;padding:15px 17px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-1);margin-bottom:9px;}
+  .skel-av{width:38px;height:38px;border-radius:50%;flex:none;}
+  .skel-grow{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;}
+  .skel-line{height:11px;}
+  .skel-badge{width:118px;height:26px;border-radius:13px;flex:none;}
+  .skel-stat{height:92px;border-radius:var(--r);}
+  .skel-panel{height:230px;border-radius:var(--r-lg);}
   .avatar{
     display:inline-flex;align-items:center;justify-content:center;border-radius:50%;
     color:#fff;font-weight:700;flex:none;background:var(--teal);
@@ -926,6 +958,6 @@
       '</div>';
   }, 10000);
 </script>
-<script type="module" src="main.js?v=202609241130"></script>
+<script type="module" src="main.js?v=202609241330"></script>
 </body>
 </html>

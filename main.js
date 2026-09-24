@@ -87,6 +87,81 @@ const RED_NEDENLERI = [
 ];
 
 // ---------------------------------------------------------------
+// ADAY SÜREÇ ŞERİDİ — kartın altında görsel aşama ilerlemesi
+// (Görüşme → Evrak → SGK → Başladı → Tamam). Terminal durumlarda
+// (olumsuz/vazgeçti) sürecin sonlandığını gösteren sade bir rozet.
+// ---------------------------------------------------------------
+const SUREC_PIPE = [
+  { key: "gorusme_bekliyor", k: "Görüşme" },
+  { key: "evrak_bekliyor", k: "Evrak" },
+  { key: "sgk_bekliyor", k: "SGK" },
+  { key: "ise_basladi", k: "Başladı" },
+  { key: "tamamlandi", k: "Tamam" }
+];
+function surecSeridiHtml(a) {
+  if (a.durum === "olumsuz" || a.durum === "vazgecti") {
+    const neg = a.durum === "olumsuz";
+    const t = neg ? "Süreç sonlandı — Olumsuz" : "Aday vazgeçti";
+    return `<div class="surec-serit son ${neg ? "neg" : ""}"><span class="ss-x">${neg ? "✕" : "🚫"} ${esc(t)}</span></div>`;
+  }
+  let cur = SUREC_PIPE.findIndex((s) => s.key === a.durum);
+  if (cur < 0) cur = 0;
+  const segs = SUREC_PIPE.map((s, i) => {
+    const cls = i < cur ? "done" : (i === cur ? "cur" : "");
+    return `<div class="ss-seg ${cls}"><span class="ss-dot"></span><span class="ss-lbl">${esc(s.k)}</span></div>`;
+  }).join("");
+  return `<div class="surec-serit">${segs}</div>`;
+}
+
+// ---------------------------------------------------------------
+// SKELETON (iskelet) YÜKLEME — ilk veri gelene kadar placeholder kartlar
+// ---------------------------------------------------------------
+function skeletonKartlariHtml(n) {
+  let h = "";
+  for (let i = 0; i < (n || 5); i++) {
+    const w1 = 34 + Math.round(Math.random() * 26), w2 = 52 + Math.round(Math.random() * 24);
+    h += `<div class="skel-card">
+      <div class="skel skel-av"></div>
+      <div class="skel-grow"><div class="skel skel-line" style="width:${w1}%"></div><div class="skel skel-line" style="width:${w2}%"></div></div>
+      <div class="skel skel-badge"></div>
+    </div>`;
+  }
+  return `<div class="card-list">${h}</div>`;
+}
+function skeletonStatRowHtml(n) {
+  let h = "";
+  for (let i = 0; i < (n || 5); i++) h += `<div class="skel skel-stat"></div>`;
+  return `<div class="stat-row">${h}</div>`;
+}
+
+// ---------------------------------------------------------------
+// ANİMASYONLU SAYAÇLAR — KPI rakamları 0'dan (veya önceki değerden)
+// hedefe yumuşak sayarak çıkar. _sayacGecmis her anahtarın son gösterilen
+// değerini tutar; böylece veri değişmediğinde tekrar tekrar sıfırdan saymaz.
+// ---------------------------------------------------------------
+const _sayacGecmis = {};
+function animateCounters(scope, prefix) {
+  const kok = scope || document;
+  const els = kok.querySelectorAll("[data-sayac]");
+  els.forEach((el, i) => {
+    const hedef = parseInt(el.getAttribute("data-sayac"), 10);
+    if (!Number.isFinite(hedef)) { return; }
+    const key = (prefix || "") + (el.getAttribute("data-sayac-key") || i);
+    const bas = _sayacGecmis[key] != null ? _sayacGecmis[key] : 0;
+    _sayacGecmis[key] = hedef;
+    if (bas === hedef) { el.textContent = hedef; return; }
+    const sure = 700, t0 = (typeof performance !== "undefined" ? performance.now() : Date.now());
+    const ease = (t) => 1 - Math.pow(1 - t, 3);
+    function tick(now) {
+      const p = Math.min(1, (now - t0) / sure);
+      el.textContent = Math.round(bas + (hedef - bas) * ease(p));
+      if (p < 1) requestAnimationFrame(tick); else el.textContent = hedef;
+    }
+    requestAnimationFrame(tick);
+  });
+}
+
+// ---------------------------------------------------------------
 // Personel Talepleri — şirketin kağıt üzerindeki gerçek "Personel Talep
 // Formu"nun alanları birebir işlenmiştir (poziyon bilgileri, talep nedeni,
 // iç aday değerlendirmesi, sürdürülebilirlik analizi, riskler, ücret/bütçe,
@@ -981,6 +1056,9 @@ let adaylar = [];
 let talepler = [];
 let unsubAday = null;
 let unsubTalep = null;
+// İlk Firestore anlık görüntüsü gelene kadar false — skeleton (iskelet) yüklemeyi
+// tetikler. İlk onSnapshot'ta true olur ve gerçek kartlar çizilir.
+let adaylarYuklendi = false;
 
 // Pozisyon bazlı değerlendirme sınavı (SPICA/DYT modeli). Anahtarlar sinav.html POZ ile birebir.
 const ASSESS_POZ = [
@@ -996,8 +1074,56 @@ const BOYUT_AD = {
   musteri:"Müşteri Odaklılık", ikna:"İkna Yeteneği & İletişim", iletisim:"İletişim Becerisi",
   sonuc:"Sonuca Ulaşma Azmi", dayaniklilik:"Dayanıklılık & Stres Yönetimi", detay:"Detay & Doğruluk (Dikkat)",
   ekip:"Takım Çalışmasına Yatkınlık", liderlik:"Liderlik & Koçluk", analitik:"Analitik Muhakeme",
-  planlama:"Planlama & Organizasyon", hafiza:"Görsel Hafıza & Dikkat"
+  planlama:"Planlama & Organizasyon", hafiza:"Görsel Hafıza & Dikkat",
+  // Kişilik · Değerler · Bütünlük (betimleyici profil — Profil Uyum'a katılmaz)
+  sorumluluk:"Sorumluluk & Öz-Disiplin", duygu_denge:"Duygusal Denge", uyumluluk:"Uyumluluk & İşbirliği",
+  disadonuk:"Sosyallik & Dışadönüklük", aciklik:"Değişime Açıklık & Öğrenme",
+  butunluk:"Bütünlük & İş Etiği", deger_uyum:"Kurum Değerlerine Uyum"
 };
+// Kişilik/bütünlük boyutları — raporda AYRI bir profil bölümünde gösterilir,
+// yetkinlik tablosuna ve Profil Uyum skoruna KARIŞMAZ.
+const KISILIK_BOYUTLARI = ["sorumluluk","duygu_denge","uyumluluk","disadonuk","aciklik","butunluk","deger_uyum"];
+const KISILIK_ACIKLAMA = {
+  sorumluluk:"Planlılık, güvenilirlik ve işi zamanında/eksiksiz tamamlama eğilimi.",
+  duygu_denge:"Baskı ve eleştiri karşısında sakin, dengeli kalabilme.",
+  uyumluluk:"İşbirliği, yardımlaşma ve anlaşmazlıkları yapıcı yönetme.",
+  disadonuk:"Sosyal enerji; iletişim ve insan ilişkilerine yatkınlık.",
+  aciklik:"Yeniliğe, öğrenmeye ve değişime açıklık (öğrenme çevikliği).",
+  butunluk:"Dürüstlük, kurallara uyum ve iş etiği.",
+  deger_uyum:"İnciroğlu'nun müşteri odaklılık ve kalite değerleriyle örtüşme."
+};
+// Üç bant: 0=gelişime açık (sten≤4), 1=orta (5-6), 2=güçlü (≥7)
+const KISILIK_YORUM = {
+  sorumluluk:[
+    "Planlama ve takip alışkanlıkları gelişime açık görünüyor; net öncelikler, kontrol listeleri ve teslim takibiyle desteklenmesi verimini artırır.",
+    "İşlerini genelde düzenli yürütür; yoğun dönemlerde öncelik ve teslim yönetiminde tutarlılığı biraz daha güçlendirilebilir.",
+    "Yüksek güvenilirlik: işi planlı, düzenli ve söz verdiği sürede tamamlama eğilimi belirgin; takip gerektiren görevlerde güven verir."],
+  duygu_denge:[
+    "Baskı ve eleştiri karşısında zaman zaman gerginlik yaşayabilir; net beklenti, geri bildirim ve destekleyici bir ortam performansını korur.",
+    "Çoğu durumda dengeli kalır; yoğun stres anlarında ara sıra etkilenebilir, kısa toparlanma süreleri işine yarar.",
+    "Baskı altında sakin ve soğukkanlı; eleştiriyi kişisel almadan yapıcı biçimde değerlendirir, kriz anlarında istikrarlıdır."],
+  uyumluluk:[
+    "Bireysel çalışmayı önceleyebilir; ekip içi paylaşım ve ortak hedeflere katkıda cesaretlendirilmesi uyumu güçlendirir.",
+    "Ekiple uyumlu çalışır; gerektiğinde kendi görüşünü de net ortaya koyar, dengeli bir işbirliği sergiler.",
+    "Güçlü işbirliği ve yardımlaşma; anlaşmazlıkları büyütmeden uzlaşıyla çözer, ekip iklimine olumlu katkı yapar."],
+  disadonuk:[
+    "Daha sakin/çekingen bir sosyal stil; birebir ilişkilerde ve arka planda güçlü olabilir, geniş kitleye açık rollerde desteklenmesi iyi olur.",
+    "Dengeli sosyallik: hem ekip içinde hem müşteriyle rahat iletişim kurar, gerektiğinde öne çıkar.",
+    "Yüksek sosyal enerji; yeni insanlarla hızla ilişki kurar, topluluk önünde rahattır — müşteri temaslı rollere yatkın."],
+  aciklik:[
+    "Bilinen ve denenmiş yöntemleri tercih edebilir; değişimin gerekçesi net anlatıldığında uyumu kolaylaşır.",
+    "Yeniliğe makul ölçüde açık; hem denenmiş yöntemleri hem yeni fikirleri dengeli kullanır.",
+    "Öğrenmeye ve değişime yüksek açıklık; yeni yöntemleri hızla benimser, gelişim odaklıdır (öğrenme çevikliği güçlü)."],
+  butunluk:[
+    "Bu alandaki yanıtlar dikkatle ele alınmalı; iş etiği ve kurallara uyum konusunda mülakatta somut örneklerle derinleştirilmesi önerilir.",
+    "İş etiği ve kurallara uyum genel olarak olumlu; sınır durumlarda beklenti ve prosedürlerin net paylaşılması yeterlidir.",
+    "Güçlü bütünlük: dürüstlük, şeffaflık ve kurallara uyum belirgin; denetim ve güven gerektiren görevlerde güvenilir."],
+  deger_uyum:[
+    "Müşteri odaklılık ve kalite vurgusu gelişime açık; kurum değerlerinin oryantasyonda somut örneklerle pekiştirilmesi önerilir.",
+    "Kurum değerleriyle genel olarak uyumlu; müşteri memnuniyeti ve kaliteyi önemser.",
+    "Kurum değerleriyle güçlü örtüşme: müşteri memnuniyetini ve işi kaliteli yapmayı içselleştirmiş görünüyor."]
+};
+function kisilikBand(sten){ if(sten==null) return 1; return sten<=4?0:sten<=6?1:2; }
 function assessToken(){ return "as_" + Date.now().toString(36) + Math.random().toString(36).slice(2,10); }
 function assessLink(adayId, token){ return location.origin + location.pathname.replace(/[^/]*$/,"") + "sinav.html?a=" + adayId + "&t=" + token; }
 function stenOf(pct){ if(pct==null) return null; return Math.max(1, Math.min(10, Math.round(pct/10))); }
@@ -1100,9 +1226,11 @@ function subscribeAdaylar() {
   unsubAday = onSnapshot(ref, (qs) => {
     adaylar = [];
     qs.forEach((d) => adaylar.push({ id: d.id, ...d.data() }));
+    adaylarYuklendi = true;
     render();
   }, (err) => {
     console.error(err);
+    adaylarYuklendi = true;
     hideAppLoader();
     root().innerHTML = `<div class="center-screen"><div class="login-card"><h1>Veri okunamadı</h1><p class="hint">${esc(err.message)}</p></div></div>`;
   });
@@ -1467,14 +1595,14 @@ function renderAdaylarPage(list, isAdmin) {
       ${isAdmin ? `<button class="btn btn-teal" id="yeniAdayBtn">+ Yeni Aday Ekle</button>` : ""}
     </div>
     ${banner}
-    <div class="stat-row">
-      <div class="stat-card"><div class="n">${total}</div><div class="l">Görünen Toplam</div></div>
-      <div class="stat-card"><div class="n">${gorusmeBekleyen}</div><div class="l">Görüşme / Karar Bekliyor</div></div>
-      <div class="stat-card"><div class="n">${evrakBekleyen}</div><div class="l">Evrak Bekliyor</div></div>
-      <div class="stat-card"><div class="n">${sgkBekleyen}</div><div class="l">SGK Bekliyor</div></div>
-      <div class="stat-card"><div class="n">${denemeSuresinde}</div><div class="l">Deneme Süresinde</div></div>
-      <div class="stat-card"><div class="n">${tamamlandi}</div><div class="l">Tamamlandı</div></div>
-    </div>
+    ${!adaylarYuklendi ? skeletonStatRowHtml(6) : `<div class="stat-row">
+      <div class="stat-card"><div class="n" data-sayac="${total}" data-sayac-key="ad-total">0</div><div class="l">Görünen Toplam</div></div>
+      <div class="stat-card"><div class="n" data-sayac="${gorusmeBekleyen}" data-sayac-key="ad-gor">0</div><div class="l">Görüşme / Karar Bekliyor</div></div>
+      <div class="stat-card"><div class="n" data-sayac="${evrakBekleyen}" data-sayac-key="ad-evr">0</div><div class="l">Evrak Bekliyor</div></div>
+      <div class="stat-card"><div class="n" data-sayac="${sgkBekleyen}" data-sayac-key="ad-sgk">0</div><div class="l">SGK Bekliyor</div></div>
+      <div class="stat-card"><div class="n" data-sayac="${denemeSuresinde}" data-sayac-key="ad-den">0</div><div class="l">Deneme Süresinde</div></div>
+      <div class="stat-card"><div class="n" data-sayac="${tamamlandi}" data-sayac-key="ad-tam">0</div><div class="l">Tamamlandı</div></div>
+    </div>`}
     <div class="toolbar">
       <input type="text" id="searchBox" placeholder="İsim, unvan veya departmanla ara…" style="min-width:240px">
       <select id="rolFiltre" style="min-width:230px">
@@ -1505,6 +1633,8 @@ function renderAdaylarPage(list, isAdmin) {
   if (isAdmin) el("#yeniAdayBtn").addEventListener("click", () => openAdayForm());
 
   function draw() {
+    // Veri henüz gelmediyse boş ekran yerine iskelet kartlar göster.
+    if (!adaylarYuklendi) { const gl = el("#grupListesi"); if (gl) gl.innerHTML = skeletonKartlariHtml(6); return; }
     const term = el("#searchBox").value.trim().toLocaleLowerCase("tr");
     const eslesen = (a) => (a.ad + " " + a.soyad + " " + (a.unvan || "") + " " + (a.departman || "")).toLocaleLowerCase("tr").includes(term);
 
@@ -1637,6 +1767,7 @@ function renderAdaylarPage(list, isAdmin) {
         </div>` : ""}
         <span class="status-badge ${st.cls}">${st.label}</span>
       </div>
+      ${surecSeridiHtml(a)}
     </div>`;
   }
   function posKartHtml(a, p) {
@@ -1718,6 +1849,7 @@ function renderAdaylarPage(list, isAdmin) {
   }
   el("#searchBox").addEventListener("input", draw);
   const rf = el("#rolFiltre"); if (rf) rf.addEventListener("change", draw);
+  if (adaylarYuklendi) animateCounters(el("#pageWrap"), "adaylar:");
   draw();
 }
 
@@ -1772,7 +1904,7 @@ function renderGenelBakisPage(adaylarList, talepList, isAdmin) {
 
   const kart = (n, l, ic, hedefTab) => `
     <div class="stat-card" data-git="${hedefTab}" style="cursor:pointer">
-      <div class="n">${n}</div><div class="l">${ic ? ic + " " : ""}${l}</div>
+      <div class="n" data-sayac="${n}" data-sayac-key="g-${esc(l)}">0</div><div class="l">${ic ? ic + " " : ""}${l}</div>
     </div>`;
 
   const aktifAday = adaylarList.filter((a) => !["olumsuz", "vazgecti", "tamamlandi"].includes(a.durum)).length;
@@ -1811,6 +1943,7 @@ function renderGenelBakisPage(adaylarList, talepList, isAdmin) {
         <p>İşe alım sürecinin canlı komuta merkezi — dönüşüm hunisi, bekleyen aksiyonlar ve uyarılar.</p>
       </div>
     </div>
+    ${!adaylarYuklendi ? (skeletonStatRowHtml(5) + `<div class="cc-grid"><div class="skel skel-panel"></div><div class="skel skel-panel"></div></div>`) : `
     <div class="stat-row">
       ${kart(aktifAday, "Süreçteki Aktif Aday", "👥", "adaylar")}
       ${kart(kararBekleyen.length, "Karar Bekleyen Görüşme", "🗓️", "adaylar")}
@@ -1828,8 +1961,9 @@ function renderGenelBakisPage(adaylarList, talepList, isAdmin) {
         <h3>Bugün Dikkat</h3>
         ${aksiyonHtml}
       </div>
-    </div>`;
+    </div>`}`;
 
+  if (adaylarYuklendi) animateCounters(el("#pageWrap"), "genel:");
   document.querySelectorAll("[data-git]").forEach((c) => c.addEventListener("click", () => { TAB = c.dataset.git; render(); }));
   document.querySelectorAll("[data-gitaday]").forEach((c) => c.addEventListener("click", () => {
     TAB = "adaylar"; render();
@@ -2571,19 +2705,22 @@ function assessSonucKarti(a, detay) {
   const kr = uygunlukKarar(uygunluk);
   const kalibre = nrm.N >= NORM_MIN;
   const normRozet = `<span style="font-size:10px;font-weight:600;color:${kalibre ? 'var(--good)' : 'var(--ink-mute)'};background:${kalibre ? 'var(--good-bg)' : '#eef1f0'};border:1px solid ${kalibre ? 'var(--good-line)' : '#dde3e1'};border-radius:20px;padding:2px 9px;white-space:nowrap">${kalibre ? '📊 İnciroğlu normu' : '📋 Geçici norm'} · ${nrm.N} kişi</span>`;
-  const keys = Object.keys(stenler).sort((x, y) => stenler[y] - stenler[x]);
-  const bars = keys.map((k) => {
+  const barOf = (k) => {
     const on = stenler[k] || 1;
     const cells = [1,2,3,4,5,6,7,8,9,10].map((n) => `<span class="sc ${n===on?'on':(n<on?'fill':'')}">${n===on?on:''}</span>`).join("");
     return `<div class="sten-row"><span class="sten-name">${esc(BOYUT_AD[k]||k)}</span><div class="sten-scale">${cells}</div></div>`;
-  }).join("");
+  };
+  const keys = Object.keys(stenler).filter((k) => !KISILIK_BOYUTLARI.includes(k)).sort((x, y) => stenler[y] - stenler[x]);
+  const kisiK = Object.keys(stenler).filter((k) => KISILIK_BOYUTLARI.includes(k)).sort((x, y) => stenler[y] - stenler[x]);
+  const bars = keys.map(barOf).join("");
+  const kisiBars = kisiK.length ? `<div style="margin-top:14px;padding-top:11px;border-top:1px dashed var(--line);font-size:10.5px;font-weight:800;color:var(--teal-deep);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Kişilik & Bütünlük Profili</div>${kisiK.map(barOf).join("")}` : "";
   return `
     <div class="assess-head">
       <div><div class="ah-poz">${esc(a.pozisyonAd||ASSESS_POZ_AD[a.pozisyon]||a.pozisyon||"")}</div><div class="ah-sub">${esc(a.adayAd||"")}${a.tamamlanmaTarihi?" · "+fmtTarih(a.tamamlanmaTarihi):""} · ${normRozet}</div></div>
       <div class="ah-uyum"><div class="ah-pct">%${uygunluk!=null?uygunluk:"—"}</div><div class="ah-lbl">Profil Uyum</div></div>
       <span class="status-badge ${kr.c}" style="font-size:12px">${kr.t}</span>
     </div>
-    ${detay ? `<div class="sten-wrap">${bars||`<div style="color:var(--ink-mute);font-size:13px">Yetkinlik verisi bulunamadı.</div>`}</div>${!kalibre?`<div style="font-size:11px;color:var(--ink-mute);margin-top:10px;line-height:1.5">ℹ️ Şu an <b>geçici referans norma</b> göre puanlanıyor. Bu pozisyonda tamamlanan sınav sayısı <b>${NORM_MIN}</b>'e ulaşınca sten ve Profil Uyum, İnciroğlu'nun <b>kendi aday dağılımına</b> göre otomatik olarak yeniden hesaplanır.</div>`:''}` : ""}`;
+    ${detay ? `<div class="sten-wrap">${bars||`<div style="color:var(--ink-mute);font-size:13px">Yetkinlik verisi bulunamadı.</div>`}${kisiBars}</div>${!kalibre?`<div style="font-size:11px;color:var(--ink-mute);margin-top:10px;line-height:1.5">ℹ️ Şu an <b>geçici referans norma</b> göre puanlanıyor. Bu pozisyonda tamamlanan sınav sayısı <b>${NORM_MIN}</b>'e ulaşınca sten ve Profil Uyum, İnciroğlu'nun <b>kendi aday dağılımına</b> göre otomatik olarak yeniden hesaplanır.</div>`:''}` : ""}`;
 }
 // ==================== AYRINTILI (YORUMLU) DEĞERLENDİRME RAPORU ====================
 // Sten (1-10) -> bant (0-4): 1-2 / 3-4 / 5-6 / 7-8 / 9-10
@@ -2758,8 +2895,11 @@ function assessRaporHtml(a){
   const normEt = (kalibre ? "İnciroğlu normu" : "Geçici referans norm") + " · " + nrm.N + " kişi";
   const uretenAd = (typeof currentProfile !== "undefined" && currentProfile && currentProfile.adSoyad) ? currentProfile.adSoyad : "İK";
   const uretimTs = new Date().toLocaleString("tr-TR");
-  // ilgililik (ağırlık) sırası
-  const keys = Object.keys(stenler).sort((x, y) => (agirlik[y] || 0) - (agirlik[x] || 0) || stenler[y] - stenler[x]);
+  // ilgililik (ağırlık) sırası. Kişilik/bütünlük boyutları yetkinliklerden
+  // AYRILIR — kendi bölümünde gösterilir, uyum skoruna ve tablolara karışmaz.
+  const allK = Object.keys(stenler);
+  const keys = allK.filter((k) => !KISILIK_BOYUTLARI.includes(k)).sort((x, y) => (agirlik[y] || 0) - (agirlik[x] || 0) || stenler[y] - stenler[x]);
+  const kisilikKeys = allK.filter((k) => KISILIK_BOYUTLARI.includes(k)).sort((x, y) => stenler[y] - stenler[x]);
   const byScore = [...keys].sort((x, y) => stenler[y] - stenler[x]);
   const guclu = byScore.filter((k) => stenler[k] >= 7).slice(0, 4);
   const gelisim = byScore.slice().reverse().filter((k) => stenler[k] <= 4).slice(0, 4);
@@ -2800,7 +2940,7 @@ function assessRaporHtml(a){
       <span>İnciroğlu Otomotiv · İnsan Kaynakları — Gizli Belge</span><span>Rapor: ${esc(uretimTs)} · ${esc(uretenAd)}</span>
     </div>
   </div>`;
-  if (!keys.length) {
+  if (!keys.length && !kisilikKeys.length) {
     return kapak + `<div style="color:#8a9a94">Bu sınav için yetkinlik verisi bulunamadı.</div>`;
   }
   // YÖNETİCİ ÖZETİ
@@ -2838,6 +2978,12 @@ function assessRaporHtml(a){
     <div style="font-size:10.5px;color:#56676f;margin-bottom:8px">Aşağıdaki yetkinlikler beklenen düzeyin altında ya da sınırda çıkmıştır; mülakatta bu davranışsal sorularla derinleştirilmesi önerilir.</div>
     ${probeKeys.map((k) => `<div style="margin-bottom:9px"><div style="font-weight:700;color:#0b5548;font-size:11px">${esc(BOYUT_AD[k] || k)} <span style="font-weight:500;color:#8a9a94">(${stenler[k]}/10)</span></div><ul style="margin:3px 0 0;padding-left:18px;font-size:11px;line-height:1.5">${MULAKAT_SORU[k].map((q) => `<li style="margin-bottom:2px">${esc(q)}</li>`).join("")}</ul></div>`).join("")}` : "";
   const liste = (arr, bos) => arr.length ? `<ul style="margin:4px 0 0;padding-left:18px">${arr.map((k) => `<li style="margin-bottom:3px"><b>${esc(BOYUT_AD[k] || k)}</b> — ${stenler[k]}/10 (${BAND_LABEL[bandOf(stenler[k])]})</li>`).join("")}</ul>` : `<div style="color:#8a9a94;font-size:11px;margin-top:4px">${bos}</div>`;
+  // KİŞİLİK, DEĞERLER & BÜTÜNLÜK PROFİLİ (betimleyici — uyum skorundan ayrı)
+  const kisilikBlok = kisilikKeys.length ? `
+    <h3 class="bolum" style="margin-top:22px">Kişilik, Değerler &amp; Bütünlük Profili</h3>
+    <div style="font-size:10.5px;color:#56676f;margin-bottom:10px;line-height:1.55">Bu profil adayın çalışma stilini, kişilik eğilimlerini ve iş etiğini <b>betimler</b>; pozisyona özel Profil Uyum skorunu doğrudan etkilemez, mülakat ve yerleştirme kararına ek bağlam sağlar. Puanlar öz-bildirim envanterine dayanır ve mülakatta somut örneklerle doğrulanmalıdır.</div>
+    <table><thead><tr><th>Boyut</th><th style="width:250px">Puan (1-10 sten)</th><th style="width:80px;text-align:center">Yüzdelik</th><th style="width:150px">Düzey</th></tr></thead><tbody>${kisilikKeys.map((k) => { const st = stenler[k], b = bandOf(st), p = stenPct(st); return `<tr><td style="font-weight:600">${esc(BOYUT_AD[k] || k)}</td><td style="white-space:nowrap">${stenBarInline(st)}</td><td style="text-align:center;font-weight:700;color:#0b5548">${p != null ? "%" + p : "—"}</td><td><span class="rozet ${BAND_ROZET[b]}">${BAND_LABEL[b]}</span></td></tr>`; }).join("")}</tbody></table>
+    <div style="margin-top:12px">${kisilikKeys.map((k) => { const st = stenler[k], kb = kisilikBand(st); return `<div class="kisi-blok" style="page-break-inside:avoid;margin-bottom:10px"><h4 style="margin:0 0 2px">${esc(BOYUT_AD[k] || k)} <span style="font-weight:600;color:#8a9a94;font-size:11px">(${st}/10)</span></h4><div class="kisi-meta" style="margin-bottom:6px">${esc(KISILIK_ACIKLAMA[k] || "")}</div><div class="yorum-blok">${esc((KISILIK_YORUM[k] && KISILIK_YORUM[k][kb]) || "")}</div></div>`; }).join("")}</div>` : "";
   return kapak + `
     ${ozet}
     ${gecerlikBlok}
@@ -2857,6 +3003,7 @@ function assessRaporHtml(a){
       <div style="flex:1;min-width:220px;border:1px solid #cbe3d6;background:#f0f8f4;border-radius:9px;padding:11px 14px"><div style="font-weight:800;color:#2f6b45;font-size:11.5px">✓ Güçlü Yönler</div>${liste(guclu, "Bu pozisyon için 7 ve üzeri belirgin güçlü yön öne çıkmadı.")}</div>
       <div style="flex:1;min-width:220px;border:1px solid #ecd6c4;background:#fbf4ec;border-radius:9px;padding:11px 14px"><div style="font-weight:800;color:#a15c1f;font-size:11.5px">↑ Gelişim Alanları</div>${liste(gelisim, "Belirgin (4 ve altı) gelişim alanı öne çıkmadı.")}</div>
     </div>
+    ${kisilikBlok}
     ${!kalibre ? `<div style="font-size:10.5px;color:#8a9a94;margin-top:14px;line-height:1.5">ℹ️ Puanlar şu an <b>geçici referans norma</b> göre hesaplanmıştır. Bu pozisyonda tamamlanan sınav sayısı ${NORM_MIN}'e ulaşınca sten, yüzdelik ve Profil Uyum, İnciroğlu'nun kendi aday dağılımına göre yeniden hesaplanır.</div>` : ""}
     <h3 class="bolum" style="margin-top:22px">Kaynakça</h3>
     <ol style="margin:4px 0 0;padding-left:20px;font-size:9.8px;color:#56676f;line-height:1.55">${ASSESS_KAYNAKCA.map((r) => `<li style="margin-bottom:4px">${esc(r)}</li>`).join("")}</ol>

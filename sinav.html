@@ -176,6 +176,32 @@ const ENVANTER = [
   {t:"Eleştiri aldığımda savunmaya geçmeden değerlendiririm.",dim:"dayaniklilik"}
 ];
 
+/* ====== KİŞİLİK · DEĞERLER · BÜTÜNLÜK (Likert 1-5) ======
+   Big Five iş uyarlaması + iş etiği/dürüstlük + kurum değerlerine uyum.
+   Bu boyutlar Profil Uyum skoruna KATILMAZ; raporda ayrı bir "Kişilik &
+   Bütünlük Profili" bölümünde betimleyici olarak gösterilir. ters:true olan
+   ifadeler tersine puanlanır (dikkatsiz/istenen-yönde yanıtı da yakalar). */
+const KISILIK = [
+  {t:"Söz verdiğim işi zamanında ve eksiksiz teslim ederim.",dim:"sorumluluk"},
+  {t:"Görevlerimi çoğu zaman son dakikaya bırakırım.",dim:"sorumluluk",ters:true},
+  {t:"Çalışma alanımı ve kayıtlarımı düzenli tutarım.",dim:"sorumluluk"},
+  {t:"Yoğun baskı altında bile sakin ve dengeli kalabilirim.",dim:"duygu_denge"},
+  {t:"Küçük aksiliklerde bile kolayca gerilirim.",dim:"duygu_denge",ters:true},
+  {t:"Eleştiriyi kişisel almadan yapıcı biçimde değerlendiririm.",dim:"duygu_denge"},
+  {t:"Ekip arkadaşlarıma yardım için kendi işimden zaman ayırırım.",dim:"uyumluluk"},
+  {t:"Anlaşmazlıkları büyütmeden, uzlaşarak çözmeye çalışırım.",dim:"uyumluluk"},
+  {t:"Yeni insanlarla tanışmak ve iletişim kurmak bana enerji verir.",dim:"disadonuk"},
+  {t:"Topluluk önünde konuşmaktan çekinmem.",dim:"disadonuk"},
+  {t:"Yeni yöntem ve değişiklikleri öğrenmek beni heyecanlandırır.",dim:"aciklik"},
+  {t:"Alışılmışın dışında fikirleri denemekten hoşlanırım.",dim:"aciklik"},
+  {t:"Kimse görmese bile kurallara ve prosedürlere uyarım.",dim:"butunluk"},
+  {t:"Küçük bir menfaat için gerçeği çarpıtmak bazen kabul edilebilir.",dim:"butunluk",ters:true},
+  {t:"Bir hata yaptığımda saklamak yerine açıkça bildiririm.",dim:"butunluk"},
+  {t:"İş yerinden küçük malzemeler almak önemli bir sorun değildir.",dim:"butunluk",ters:true},
+  {t:"Müşteri memnuniyetini her zaman önceliğim sayarım.",dim:"deger_uyum"},
+  {t:"Bir işi kaliteli yapmak, sadece hızlı yapmaktan daha önemlidir.",dim:"deger_uyum"}
+];
+
 /* ============ POZİSYONLAR ============ */
 // agirlik: uygunluk skorunun boyut ağırlıkları. sjt: senaryolar. sim: simülasyon.
 const POZ = {
@@ -578,7 +604,7 @@ function startExam(){
   genelKalan = 45*60;
   $("timer").hidden = false; tickGenel();
   genelTimer = setInterval(tickGenel, 1000);
-  modUI.list = ["bilissel","hafiza","sjt","sim","envanter"];
+  modUI.list = ["bilissel","hafiza","sjt","sim","envanter","kisilik"];
   modUI.idx = 0;
   runMod();
 }
@@ -600,6 +626,7 @@ function runMod(){
   if(m==="sjt") return modSJT();
   if(m==="sim") return modSim();
   if(m==="envanter") return modEnvanter();
+  if(m==="kisilik") return modKisilik();
 }
 function nextMod(){ modUI.idx++; runMod(); }
 
@@ -724,7 +751,7 @@ function modSim(){
 function modEnvanter(){
   const list=shuffle(ENVANTER.slice()); cevaplar.envanter=[]; let i=0;
   function q(){
-    if(i>=list.length){ return finish(); }
+    if(i>=list.length){ return nextMod(); }
     const s=list[i]; let sel=null;
     app$.innerHTML = `<div class="card">${progHtml(4)}
       <span class="mod-tag">🗂️ Bölüm 5 · Çalışma Stili Envanteri</span>
@@ -734,6 +761,24 @@ function modEnvanter(){
       <div class="foot-row"><span class="qcount">İfade ${i+1} / ${list.length}</span><button class="btn" id="ileri" disabled>İleri →</button></div>`;
     document.querySelectorAll("#lik button").forEach(b=>b.onclick=()=>{ sel=+b.dataset.v; document.querySelectorAll("#lik button").forEach(x=>x.classList.toggle("sel",x===b)); $("ileri").disabled=false; });
     $("ileri").onclick=()=>{ const val=s.ters?(6-sel):sel; addPuan(s.dim,(val-1)/4*2,2); cevaplar.envanter.push({q:s.t,v:sel,val:val,ters:!!s.ters}); i++; q(); };
+  }
+  q();
+}
+
+/* ---- Modül 6: Kişilik, Değerler & Bütünlük (Likert) ---- */
+function modKisilik(){
+  const list=shuffle(KISILIK.slice()); cevaplar.kisilik=[]; let i=0;
+  function q(){
+    if(i>=list.length){ return nextMod(); }
+    const s=list[i]; let sel=null;
+    app$.innerHTML = `<div class="card">${progHtml(5)}
+      <span class="mod-tag">🧭 Bölüm 6 · Kişilik, Değerler & Bütünlük</span>
+      <div class="q" style="margin-bottom:6px">${esc(s.t)}</div>
+      <div class="lik" id="lik">${[1,2,3,4,5].map(v=>`<button data-v="${v}">${v}</button>`).join("")}</div>
+      <div class="lik-lbl"><span>Kesinlikle katılmıyorum</span><span>Kesinlikle katılıyorum</span></div>
+      <div class="foot-row"><span class="qcount">İfade ${i+1} / ${list.length}</span><button class="btn" id="ileri" disabled>İleri →</button></div>`;
+    document.querySelectorAll("#lik button").forEach(b=>b.onclick=()=>{ sel=+b.dataset.v; document.querySelectorAll("#lik button").forEach(x=>x.classList.toggle("sel",x===b)); $("ileri").disabled=false; });
+    $("ileri").onclick=()=>{ const val=s.ters?(6-sel):sel; addPuan(s.dim,(val-1)/4*2,2); cevaplar.kisilik.push({q:s.t,v:sel,val:val,ters:!!s.ters,dim:s.dim}); i++; q(); };
   }
   q();
 }
@@ -753,17 +798,18 @@ async function finish(){
   // ---- Yanıt Güvenilirliği (geçerlik) göstergeleri ----
   const sure_sn = 45*60 - Math.max(0, genelKalan);
   const sureDoldu = genelKalan <= 0;
-  const beklenenQ = 16 + 4 + (P.sjt?P.sjt.length:0) + (P.sim&&P.sim.adimlar?P.sim.adimlar.length:0) + (typeof ENVANTER!=="undefined"?ENVANTER.length:0);
-  const cevapQ = (cevaplar.bilissel||[]).length + (cevaplar.hafiza||[]).length + (cevaplar.sjt||[]).length + (cevaplar.sim||[]).length + (cevaplar.envanter||[]).length;
+  const beklenenQ = 16 + 4 + (P.sjt?P.sjt.length:0) + (P.sim&&P.sim.adimlar?P.sim.adimlar.length:0) + (typeof ENVANTER!=="undefined"?ENVANTER.length:0) + (typeof KISILIK!=="undefined"?KISILIK.length:0);
+  const cevapQ = (cevaplar.bilissel||[]).length + (cevaplar.hafiza||[]).length + (cevaplar.sjt||[]).length + (cevaplar.sim||[]).length + (cevaplar.envanter||[]).length + (cevaplar.kisilik||[]).length;
   const tamamlanmaOrani = beklenenQ>0 ? Math.round(Math.min(1, cevapQ/beklenenQ)*100) : 100;
   // sosyal istenirlik: en olumlu seçeneği / ucu seçme oranı (yüksek = "iyi görünme" eğilimi)
   let favSay=0, favTop=0;
   (P.sjt||[]).forEach((s,idx)=>{ const ans=(cevaplar.sjt||[])[idx]; if(!ans||ans.sel==null) return; favTop++; const sums=s.o.map(o=>Object.values(o.p||{}).reduce((a,b)=>a+b,0)); if(sums.length && sums[ans.sel]===Math.max.apply(null,sums)) favSay++; });
   ((P.sim&&P.sim.adimlar)||[]).forEach((a,idx)=>{ const sel=(cevaplar.sim||[])[idx]; if(sel==null) return; favTop++; const sums=a.o.map(o=>Object.values(o.p||{}).reduce((x,y)=>x+y,0)); if(sums.length && sums[sel]===Math.max.apply(null,sums)) favSay++; });
   (cevaplar.envanter||[]).forEach((e)=>{ if(e.val==null) return; favTop++; if(e.val>=5) favSay++; });
+  (cevaplar.kisilik||[]).forEach((e)=>{ if(e.val==null) return; favTop++; if(e.val>=5) favSay++; });
   const sosyalIstenirlik = favTop>0 ? Math.round(favSay/favTop*100) : null;
-  // tutarlılık: envanter ham yanıtlarının dağılımı (düşük SD = "düz çizgi" / dikkatsiz yanıt)
-  const vs=(cevaplar.envanter||[]).map(e=>e.v).filter(x=>x!=null);
+  // tutarlılık: envanter + kişilik ham yanıtlarının dağılımı (düşük SD = "düz çizgi" / dikkatsiz yanıt)
+  const vs=[...(cevaplar.envanter||[]),...(cevaplar.kisilik||[])].map(e=>e.v).filter(x=>x!=null);
   let tutarSd=null;
   if(vs.length>=3){ const mn=vs.reduce((a,b)=>a+b,0)/vs.length; tutarSd=Math.round(Math.sqrt(vs.reduce((a,b)=>a+(b-mn)*(b-mn),0)/vs.length)*100)/100; }
   const gecerlik = { sure_sn, sureDoldu, tamamlanmaOrani, sosyalIstenirlik, tutarSd, beklenenQ, cevapQ };
