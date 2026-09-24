@@ -136,7 +136,12 @@
       linear-gradient(155deg, #052a24 0%, var(--teal-deep) 52%, #12876d 100%);
     animation:fadeIn .3s var(--ease) both;
   }
-  .app-loader.hide{opacity:0;pointer-events:none;transition:opacity .45s var(--ease);}
+  /* KRİTİK: base .app-loader'daki "animation:fadeIn ... both" fill-mode'u, bitişte
+     opacity:1'i KORUYARAK .hide'ın opacity:0'ını EZİYORDU → loader hiç görünmez
+     olmuyor, altında çizilen uygulamayı perdeliyordu (2 gün süren "giriş takıldı"
+     hatasının gerçek sebebi buydu). Gizlerken animasyonu iptal ediyoruz ki
+     opacity:0 gerçekten uygulansın. */
+  .app-loader.hide{opacity:0;pointer-events:none;animation:none;transition:opacity .45s var(--ease);}
   .loader-rings{position:relative;width:128px;height:128px;filter:drop-shadow(0 8px 22px rgba(0,0,0,.32));}
   .loader-rings i{position:absolute;border-radius:50%;border:3px solid transparent;display:block;}
   .loader-rings i:nth-child(1){inset:0;border-top-color:#2fb094;border-right-color:#5fd8ba;animation:ldspin 1.15s linear infinite;}
@@ -921,6 +926,6 @@
       '</div>';
   }, 10000);
 </script>
-<script type="module" src="main.js?v=202609241030"></script>
+<script type="module" src="main.js?v=202609241130"></script>
 </body>
 </html>
