@@ -901,8 +901,26 @@
 </style>
 </head>
 <body>
-<div id="app"><div class="loader">Yükleniyor…</div></div>
+<div id="app"><div class="loader" id="bootLoader">Yükleniyor…</div></div>
 <div class="toast" id="toast"></div>
+<script>
+  // BOOT GÜVENCESİ: main.js modülü hiç çalışmazsa (ör. Firebase SDK gstatic'ten
+  // ağ/güvenlik yazılımı yüzünden yüklenemezse) ya da açılış aşırı uzarsa ekran
+  // sonsuza kadar "Yükleniyor…" da takılı kalmasın. 10 sn sonra hâlâ ilk boot
+  // metni duruyorsa (uygulama devralmadıysa) kullanıcıya anlaşılır bir mesaj ve
+  // "Yenile" düğmesi göster. Uygulama sonradan gelirse render() zaten #app'i
+  // baştan yazacağı için bu mesaj kendiliğinden gerçek arayüzle değişir (zararsız).
+  window.setTimeout(function () {
+    if (!document.getElementById("bootLoader")) return; // uygulama zaten devraldı
+    document.getElementById("app").innerHTML =
+      '<div style="max-width:440px;margin:13vh auto;text-align:center;font-family:Inter,system-ui,sans-serif;color:#0b3b33;padding:0 22px">' +
+      '<div style="font-size:40px;margin-bottom:10px">&#9888;&#65039;</div>' +
+      '<h2 style="font-family:\'Source Serif 4\',Georgia,serif;font-size:22px;margin:0 0 8px">Sayfa yüklenemedi</h2>' +
+      '<p style="font-size:14px;line-height:1.65;color:#475a56;margin:0 0 20px">Uygulama beklenenden uzun sürede yanıt vermedi. Bu genellikle internet bağlantısı ya da güvenlik yazılımı (Kaspersky vb.) kaynaklıdır. Lütfen sayfayı yenileyin; sorun sürerse İK departmanı ile iletişime geçin.</p>' +
+      '<button onclick="location.reload()" style="background:#0b5548;color:#fff;border:0;border-radius:10px;padding:11px 28px;font-size:14px;font-weight:600;cursor:pointer">Sayfayı Yenile</button>' +
+      '</div>';
+  }, 10000);
+</script>
 <script type="module" src="main.js?v=202609240915"></script>
 </body>
 </html>

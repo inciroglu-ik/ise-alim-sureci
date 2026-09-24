@@ -753,7 +753,7 @@ async function finish(){
   // ---- Yanıt Güvenilirliği (geçerlik) göstergeleri ----
   const sure_sn = 45*60 - Math.max(0, genelKalan);
   const sureDoldu = genelKalan <= 0;
-  const beklenenQ = 14 + 4 + (P.sjt?P.sjt.length:0) + (P.sim&&P.sim.adimlar?P.sim.adimlar.length:0) + (typeof ENVANTER!=="undefined"?ENVANTER.length:0);
+  const beklenenQ = 16 + 4 + (P.sjt?P.sjt.length:0) + (P.sim&&P.sim.adimlar?P.sim.adimlar.length:0) + (typeof ENVANTER!=="undefined"?ENVANTER.length:0);
   const cevapQ = (cevaplar.bilissel||[]).length + (cevaplar.hafiza||[]).length + (cevaplar.sjt||[]).length + (cevaplar.sim||[]).length + (cevaplar.envanter||[]).length;
   const tamamlanmaOrani = beklenenQ>0 ? Math.round(Math.min(1, cevapQ/beklenenQ)*100) : 100;
   // sosyal istenirlik: en olumlu seçeneği / ucu seçme oranı (yüksek = "iyi görünme" eğilimi)
