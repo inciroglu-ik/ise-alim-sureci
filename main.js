@@ -1041,6 +1041,7 @@ onAuthStateChanged(auth, async (user) => {
   let fbFlag = "1";
   try { fbFlag = sessionStorage.getItem("fbFormLogin"); } catch (e) {}
   if (user && inPortal && fbFlag !== "1") {
+    hideAppLoader();
     await signOut(auth);
     return;
   }
@@ -1059,6 +1060,11 @@ onAuthStateChanged(auth, async (user) => {
       return;
     }
     currentProfile = snap.data();
+    // Profil geldi: uygulama kabuğunu HEMEN göster. Firestore'dan aday/talep
+    // verisi dönene kadar BEKLEME — aksi halde veri yavaşsa/gecikirse yükleme
+    // ekranı kilitlenmiş gibi görünür. Veri geldiğinde onSnapshot render()'ı
+    // yeniden çağırır ve listeler kendiliğinden dolar.
+    render();
     subscribeAdaylar();
     subscribeTalepler();
   } catch (e) {
@@ -1184,7 +1190,7 @@ function showAppLoader(msg) {
   ensureLoaders();
   const t = document.getElementById("appLoaderMsg"); if (t && msg) t.textContent = msg;
   document.getElementById("appLoader").classList.remove("hide");
-  // GÜVENLİK: giriş/yükleme takılırsa ekran kalıcı kilitlenmesin — 15 sn sonra aç ve kullanıcıya tekrar dene de.
+  // GÜVENLİK: giriş/yükleme takılırsa ekran kalıcı kilitlenmesin — 6 sn sonra aç ve kullanıcıya tekrar dene de.
   clearTimeout(_loaderTimeout);
   _loaderTimeout = setTimeout(() => {
     hideAppLoader();
@@ -1194,7 +1200,7 @@ function showAppLoader(msg) {
       const box = document.getElementById("loginErr");
       if (box) { box.style.display = "block"; box.textContent = "Bağlantı beklenenden uzun sürdü. Lütfen tekrar giriş yapmayı deneyin."; }
     } catch (_) {}
-  }, 15000);
+  }, 6000);
 }
 function hideAppLoader() { clearTimeout(_loaderTimeout); const l = document.getElementById("appLoader"); if (l) l.classList.add("hide"); }
 let _flashT = null;
