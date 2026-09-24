@@ -465,11 +465,16 @@
   .ss-seg.done .ss-dot{background:var(--teal);border-color:var(--teal);}
   .ss-seg.cur .ss-dot{background:#fff;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft,#dcefe9);}
   .ss-seg.cur .ss-dot::after{content:"";position:absolute;inset:2px;border-radius:50%;background:var(--teal);}
-  .ss-lbl{font-size:9px;font-weight:700;color:var(--ink-mute);letter-spacing:.03em;line-height:1.2;text-transform:uppercase;}
+  .ss-lbl{font-size:9.5px;font-weight:700;color:#64737a;letter-spacing:.03em;line-height:1.2;text-transform:uppercase;}
   .ss-seg.done .ss-lbl{color:var(--teal);}
   .ss-seg.cur .ss-lbl{color:var(--teal-deep);}
+  /* "Tamamlandı" adayında son düğüm "aktif/halka" değil, KESİN BİTTİ görünmeli (dolu) */
+  .surec-serit.tamam .ss-seg:last-child .ss-dot{background:var(--teal);border-color:var(--teal);box-shadow:none;}
+  .surec-serit.tamam .ss-seg:last-child .ss-dot::after{inset:0;background:none;}
+  .surec-serit.tamam .ss-seg:last-child .ss-lbl{color:var(--teal-deep);}
   .surec-serit.son{justify-content:center;align-items:center;padding-top:11px;}
   .surec-serit.son .ss-x{display:inline-flex;align-items:center;gap:7px;padding:4px 14px;border-radius:20px;background:#f2f5f4;color:#7a8a84;font-size:11px;font-weight:700;}
+  .surec-serit.son .ss-x svg{flex:none;}
   .surec-serit.son.neg .ss-x{background:#fdeceb;color:#b4433a;}
 
   /* =============================================================
@@ -477,13 +482,17 @@
      ============================================================= */
   @keyframes skelShimmer{0%{background-position:-420px 0;}100%{background-position:420px 0;}}
   .skel{background:linear-gradient(90deg,#e9edea 8%,#dfe5e2 22%,#eef2ef 40%,#dfe5e2 58%,#e9edea 92%);background-size:420px 100%;animation:skelShimmer 1.3s linear infinite;border-radius:6px;}
-  .skel-card{display:flex;align-items:center;gap:13px;padding:15px 17px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-1);margin-bottom:9px;}
+  /* İskelet kart, gerçek kartla AYNI yüksekliğe otursun (süreç şeridi dâhil) — geçişte zıplama olmasın */
+  .skel-card{display:flex;flex-wrap:wrap;align-items:center;gap:13px;padding:15px 17px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-1);margin-bottom:9px;}
   .skel-av{width:38px;height:38px;border-radius:50%;flex:none;}
   .skel-grow{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;}
   .skel-line{height:11px;}
   .skel-badge{width:118px;height:26px;border-radius:13px;flex:none;}
+  .skel-strip{flex-basis:100%;width:100%;height:12px;border-radius:6px;margin-top:14px;opacity:.6;}
   .skel-stat{height:92px;border-radius:var(--r);}
   .skel-panel{height:230px;border-radius:var(--r-lg);}
+  /* Hareket duyarlılığı: shimmer'ı durdur (kurumsal/erişilebilirlik) */
+  @media (prefers-reduced-motion: reduce){ .skel{animation:none;background:#e7ece9;} }
   .avatar{
     display:inline-flex;align-items:center;justify-content:center;border-radius:50%;
     color:#fff;font-weight:700;flex:none;background:var(--teal);
@@ -958,6 +967,6 @@
       '</div>';
   }, 10000);
 </script>
-<script type="module" src="main.js?v=202609241330"></script>
+<script type="module" src="main.js?v=202609241500"></script>
 </body>
 </html>

@@ -102,15 +102,20 @@ function surecSeridiHtml(a) {
   if (a.durum === "olumsuz" || a.durum === "vazgecti") {
     const neg = a.durum === "olumsuz";
     const t = neg ? "Süreç sonlandı — Olumsuz" : "Aday vazgeçti";
-    return `<div class="surec-serit son ${neg ? "neg" : ""}"><span class="ss-x">${neg ? "✕" : "🚫"} ${esc(t)}</span></div>`;
+    // Emoji yerine vektörel (currentColor) ikon — palete uyumlu, keskin, platformdan bağımsız.
+    const ic = neg
+      ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`
+      : `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M6 6l12 12" stroke-linecap="round"/></svg>`;
+    return `<div class="surec-serit son ${neg ? "neg" : ""}"><span class="ss-x">${ic} ${esc(t)}</span></div>`;
   }
   let cur = SUREC_PIPE.findIndex((s) => s.key === a.durum);
   if (cur < 0) cur = 0;
+  const bitti = a.durum === "tamamlandi";
   const segs = SUREC_PIPE.map((s, i) => {
     const cls = i < cur ? "done" : (i === cur ? "cur" : "");
     return `<div class="ss-seg ${cls}"><span class="ss-dot"></span><span class="ss-lbl">${esc(s.k)}</span></div>`;
   }).join("");
-  return `<div class="surec-serit">${segs}</div>`;
+  return `<div class="surec-serit${bitti ? " tamam" : ""}">${segs}</div>`;
 }
 
 // ---------------------------------------------------------------
@@ -124,6 +129,7 @@ function skeletonKartlariHtml(n) {
       <div class="skel skel-av"></div>
       <div class="skel-grow"><div class="skel skel-line" style="width:${w1}%"></div><div class="skel skel-line" style="width:${w2}%"></div></div>
       <div class="skel skel-badge"></div>
+      <div class="skel skel-strip"></div>
     </div>`;
   }
   return `<div class="card-list">${h}</div>`;
@@ -143,6 +149,11 @@ const _sayacGecmis = {};
 function animateCounters(scope, prefix) {
   const kok = scope || document;
   const els = kok.querySelectorAll("[data-sayac]");
+  // Hareket duyarlılığı açıksa animasyon yapma, doğrudan hedef değeri yaz.
+  if (typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    els.forEach((el) => { const h = parseInt(el.getAttribute("data-sayac"), 10); if (Number.isFinite(h)) el.textContent = h; });
+    return;
+  }
   els.forEach((el, i) => {
     const hedef = parseInt(el.getAttribute("data-sayac"), 10);
     if (!Number.isFinite(hedef)) { return; }
@@ -2956,7 +2967,7 @@ function assessRaporHtml(a){
       </div>
       <table style="margin:0"><tbody>${gd.rows.map((r) => `<tr><td style="border:none;padding:3px 0;font-size:10.5px;color:#56676f;width:52%">${esc(r[0])}</td><td style="border:none;padding:3px 0;font-size:10.5px;font-weight:600">${esc(r[1])}</td></tr>`).join("")}</tbody></table>
       ${gd.flags.length ? `<div style="margin-top:8px;font-size:10.3px;color:#7a4a12;line-height:1.5">${gd.flags.map((f) => "• " + esc(f)).join("<br>")}</div>` : `<div style="margin-top:6px;font-size:10.3px;color:#3d7a52">Güvenilirlik göstergelerinde uyarı bulunmuyor; sonuçlar güvenle yorumlanabilir.</div>`}
-    </div>` : `<div style="border:1px dashed #dbe3df;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:10.5px;color:#8a9a94">ℹ️ Bu sınav güvenilirlik göstergeleri eklenmeden önce tamamlandığı için süre/tutarlılık verisi bulunmuyor. Yeni sınavlarda bu bölüm otomatik dolar.</div>`;
+    </div>` : `<div style="border:1px dashed #dbe3df;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:10.5px;color:#8a9a94"><b style="color:#6a7a74">Not:</b> Bu sınav güvenilirlik göstergeleri eklenmeden önce tamamlandığı için süre/tutarlılık verisi bulunmuyor. Yeni sınavlarda bu bölüm otomatik dolar.</div>`;
   // ÖZET TABLO (yüzdelik dâhil)
   const ozetRows = keys.map((k) => {
     const st = stenler[k], b = bandOf(st), p = stenPct(st);
@@ -3004,7 +3015,7 @@ function assessRaporHtml(a){
       <div style="flex:1;min-width:220px;border:1px solid #ecd6c4;background:#fbf4ec;border-radius:9px;padding:11px 14px"><div style="font-weight:800;color:#a15c1f;font-size:11.5px">↑ Gelişim Alanları</div>${liste(gelisim, "Belirgin (4 ve altı) gelişim alanı öne çıkmadı.")}</div>
     </div>
     ${kisilikBlok}
-    ${!kalibre ? `<div style="font-size:10.5px;color:#8a9a94;margin-top:14px;line-height:1.5">ℹ️ Puanlar şu an <b>geçici referans norma</b> göre hesaplanmıştır. Bu pozisyonda tamamlanan sınav sayısı ${NORM_MIN}'e ulaşınca sten, yüzdelik ve Profil Uyum, İnciroğlu'nun kendi aday dağılımına göre yeniden hesaplanır.</div>` : ""}
+    ${!kalibre ? `<div style="font-size:10.5px;color:#8a9a94;margin-top:14px;line-height:1.5"><b style="color:#6a7a74">Not:</b> Puanlar şu an <b>geçici referans norma</b> göre hesaplanmıştır. Bu pozisyonda tamamlanan sınav sayısı ${NORM_MIN}'e ulaşınca sten, yüzdelik ve Profil Uyum, İnciroğlu'nun kendi aday dağılımına göre yeniden hesaplanır.</div>` : ""}
     <h3 class="bolum" style="margin-top:22px">Kaynakça</h3>
     <ol style="margin:4px 0 0;padding-left:20px;font-size:9.8px;color:#56676f;line-height:1.55">${ASSESS_KAYNAKCA.map((r) => `<li style="margin-bottom:4px">${esc(r)}</li>`).join("")}</ol>
     <div style="margin-top:18px;border-top:1px solid #e2e8e5;padding-top:8px;font-size:9px;color:#aab6b1;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">

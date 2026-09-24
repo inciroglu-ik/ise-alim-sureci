@@ -584,15 +584,16 @@ function intro(){
     {ad:"Görsel Hafıza & Dikkat",d:"Kısa süre gösterilen deseni hatırlayın.",t:"~5 dk"},
     {ad:"Durumsal Muhakeme",d:"Gerçek iş senaryolarında en doğru tepkiyi seçin.",t:"~8 dk"},
     {ad:P.sim.baslik,d:"Adım adım ilerleyen bir simülasyon.",t:"~8 dk"},
-    {ad:"Çalışma Stili Envanteri",d:"Kendinizi en iyi yansıtan ifadeleri işaretleyin.",t:"~6 dk"}
+    {ad:"Çalışma Stili Envanteri",d:"Kendinizi en iyi yansıtan ifadeleri işaretleyin.",t:"~5 dk"},
+    {ad:"Kişilik, Değerler & Bütünlük",d:"Sizi en iyi yansıtan ifadeleri işaretleyin — doğru/yanlış yoktur.",t:"~5 dk"}
   ];
   app$.innerHTML = `<div class="card">
     <span class="badge">${esc(P.ad)} · Değerlendirme</span>
     <h1 style="margin-top:14px">Merhaba${AS.adayAd?", "+esc(AS.adayAd.split(" ")[0]):""} 👋</h1>
-    <p class="lead">İnciroğlu Otomotiv İnsan Kaynakları değerlendirme sınavına hoş geldiniz. Bu sınav <b>${esc(P.ad)}</b> pozisyonu için yetkinliklerinizi ölçer. Yaklaşık <b>35–45 dakika</b> sürer ve <b>5 bölümden</b> oluşur.</p>
+    <p class="lead">İnciroğlu Otomotiv İnsan Kaynakları değerlendirme sınavına hoş geldiniz. Bu sınav <b>${esc(P.ad)}</b> pozisyonu için yetkinliklerinizi ölçer. Yaklaşık <b>40–45 dakika</b> sürer ve <b>6 bölümden</b> oluşur.</p>
     <div class="info-box"><b>Başlamadan önce:</b> Sessiz bir ortamda, tek seferde tamamlayın. Bazı bölümler <b>süreyle yarışır</b> ve geri dönüş yoktur — her soruya odaklanın. İnternet bağlantınızın açık olduğundan emin olun.</div>
     <div class="mlist">${mods.map((m,i)=>`<div class="mrow"><span class="n">${i+1}</span><div><b>${esc(m.ad)}</b><div class="d">${esc(m.d)}</div></div><span class="t">${esc(m.t)}</span></div>`).join("")}</div>
-    <div class="foot-row"><span class="qcount">Toplam 5 bölüm</span><button class="btn" id="basla">Sınava Başla →</button></div>
+    <div class="foot-row"><span class="qcount">Toplam 6 bölüm</span><button class="btn" id="basla">Sınava Başla →</button></div>
   </div>`;
   $("basla").onclick = startExam;
 }
