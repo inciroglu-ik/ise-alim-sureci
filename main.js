@@ -4,7 +4,7 @@ import {
   EmailAuthProvider, reauthenticateWithCredential, updatePassword
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
-  getFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, collection, onSnapshot,
+  getFirestore, initializeFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, collection, onSnapshot,
   query, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 /* Not: Dosya yükleme (Firebase Storage) bilinçli olarak kullanılmıyor —
@@ -13,7 +13,13 @@ import {
    eklenip bu davranış genişletilebilir. */
 
 const auth = getAuth(app);
-const db = getFirestore(app);
+// Firestore'u LONG-POLLING ile başlat. Kaspersky / kurumsal güvenlik duvarları
+// Firestore'un varsayılan streaming (WebChannel) bağlantısını bozup, giriş
+// sonrası profil okuyan getDoc'u ASILI bırakabiliyor (ekran "Giriş yapılıyor…"
+// da takılı kalır). Long-polling düz HTTPS istekleri kullanır; AV/proxy arkasında
+// güvenilir çalışır. (Diğer panolar girişte bloke eden getDoc yapmadığı için bu
+// sorunu yaşamıyor; İşe Alım profili okumadan ekranı açmadığından etkileniyor.)
+const db = initializeFirestore(app, { experimentalForceLongPolling: true });
 const el = (sel) => document.querySelector(sel);
 
 // Portal iframe'i içinde miyiz? (aynı origin'de panolar Firebase oturumunu PAYLAŞIR.)
@@ -1053,6 +1059,7 @@ onAuthStateChanged(auth, async (user) => {
   }
   currentUid = user.uid;
   try {
+    setLoaderMsg("Profiliniz okunuyor…");
     const snap = await getDoc(doc(db, "managers", user.uid));
     if (!snap.exists()) {
       renderLogin("Bu hesap sisteme tanımlı değil. Lütfen İK ile iletişime geçin.");
@@ -1060,6 +1067,7 @@ onAuthStateChanged(auth, async (user) => {
       return;
     }
     currentProfile = snap.data();
+    setLoaderMsg("Uygulama hazırlanıyor…");
     // Profil geldi: uygulama kabuğunu HEMEN göster. Firestore'dan aday/talep
     // verisi dönene kadar BEKLEME — aksi halde veri yavaşsa/gecikirse yükleme
     // ekranı kilitlenmiş gibi görünür. Veri geldiğinde onSnapshot render()'ı
@@ -1148,7 +1156,7 @@ function renderLogin(errMsg) {
     const p = el("#password").value;
     const btn = e.target.querySelector("button");
     btn.disabled = true; btn.textContent = "Giriş yapılıyor…";
-    showAppLoader("Giriş yapılıyor…");
+    showAppLoader("Kimlik doğrulanıyor…");
     try {
       // Bu giriş kişinin KENDİ form girişi — oturumu güvenilir işaretle (portal devralma koruması).
       try { sessionStorage.setItem("fbFormLogin", "1"); } catch (e) {}
@@ -1203,6 +1211,9 @@ function showAppLoader(msg) {
   }, 6000);
 }
 function hideAppLoader() { clearTimeout(_loaderTimeout); const l = document.getElementById("appLoader"); if (l) l.classList.add("hide"); }
+// Yükleme ekranındaki mesajı, 6 sn'lik emniyet sayacını SIFIRLAMADAN güncelle
+// (giriş hangi aşamada takılıyor görülebilsin: doğrulama / profil / hazırlama).
+function setLoaderMsg(msg) { const t = document.getElementById("appLoaderMsg"); if (t && msg) t.textContent = msg; }
 let _flashT = null;
 function flashLoader() { ensureLoaders(); const m = document.getElementById("microLoader"); if (!m) return; m.classList.add("show"); clearTimeout(_flashT); _flashT = setTimeout(() => m.classList.remove("show"), 480); }
 const ICONS = {
