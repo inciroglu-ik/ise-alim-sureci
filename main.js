@@ -1570,7 +1570,7 @@ function renderAdaylarPage(list, isAdmin) {
         <h1>Aday Havuzu</h1>
         <p>Görüşmeden deneme süresi tamamlanana kadar tüm süreci buradan yönetin.</p>
       </div>
-      ${isAdmin ? `<button class="btn btn-teal" id="yeniAdayBtn">+ Yeni Aday Ekle</button>` : ""}
+      ${isAdmin ? `<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-ghost" id="topluAktarBtn" title="Haftalık rapordan hazırlanan işe alım paketini (JSON) yükler">⬆ Toplu Aktarım</button><button class="btn btn-teal" id="yeniAdayBtn">+ Yeni Aday Ekle</button></div>` : ""}
     </div>
     ${banner}
     ${!adaylarYuklendi ? skeletonStatRowHtml(6) : `<div class="stat-row">
@@ -1609,6 +1609,7 @@ function renderAdaylarPage(list, isAdmin) {
     syncToolbarWeb();
 
   if (isAdmin) el("#yeniAdayBtn").addEventListener("click", () => openAdayForm());
+  if (isAdmin) el("#topluAktarBtn").addEventListener("click", () => topluAktarimAc());
 
   function draw() {
     // Veri henüz gelmediyse boş ekran yerine iskelet kartlar göster.
@@ -1844,7 +1845,7 @@ function dropdownDigerHtml(id, secili, liste, placeholder, disabled) {
   return `
     <select id="${id}" ${dis}>
       <option value="">Seçiniz…</option>
-      ${liste.map((u) => `<option value="${esc(u)}" ${secili === u ? "selected" : ""}>${esc(u)}</option>`).join("")}
+      ${liste.map((u) => `<option value="${esc(u)}" ${u.toLocaleLowerCase("tr") === String(secili || "").trim().toLocaleLowerCase("tr") ? "selected" : ""}>${esc(u)}</option>`).join("")}
       <option value="__diger__" ${secili && !varMi ? "selected" : ""}>Diğer (elle yaz)</option>
     </select>
     <input type="text" id="${id}Diger" placeholder="${esc(placeholder || "Elle yazın")}" ${dis} style="margin-top:6px;${secili && !varMi ? "" : "display:none"}" value="${secili && !varMi ? esc(secili) : ""}">`;
@@ -1895,7 +1896,8 @@ function renderGenelBakisPage(adaylarList, talepList, isAdmin) {
     { key: "ise_basladi", ic: "⏳", label: "Deneme Süresi" },
     { key: "tamamlandi", ic: "✅", label: "İşe Alındı" }
   ];
-  const fnSay = pipe.map((s) => adaylarList.filter((a) => a.durum === s.key).length);
+  // Haftalık rapordan aktarılanlar görüşme aşamasından geçmediği için huniye katılmaz (oran %100'ü aşmasın)
+  const fnSay = pipe.map((s) => adaylarList.filter((a) => a.durum === s.key && !aktarilmis(a)).length);
   const fnMax = Math.max(...fnSay, 1);
   const fnTop = fnSay[0] || 0;
   const funnelRows = pipe.map((s, i) => {
@@ -3177,7 +3179,8 @@ function renderRaporlarPage(adaylarList, talepList, isAdmin) {
   const iseAlinan = adaylarList.filter((a) => a.durum === "tamamlandi").length;
   const aktif = adaylarList.filter((a) => !["olumsuz", "vazgecti", "tamamlandi"].includes(a.durum)).length;
   const red = adaylarList.filter((a) => a.durum === "olumsuz").length;
-  const kararlanan = iseAlinan + red;
+  // Red oranı yalnız panoda karar verilen adaylardan (aktarılan işe alımlar paydayı şişirmesin)
+  const kararlanan = adaylarList.filter((a) => a.durum === "tamamlandi" && !aktarilmis(a)).length + red;
   const redOrani = kararlanan ? Math.round((red / kararlanan) * 100) : 0;
   const puanli = adaylarList.filter((a) => puanOrtalama(a) != null);
   const ortPuan = puanli.length ? puanli.reduce((s, a) => s + puanOrtalama(a), 0) / puanli.length : null;
@@ -3185,7 +3188,8 @@ function renderRaporlarPage(adaylarList, talepList, isAdmin) {
   // Ortalama işe alım süresi (ilk kayıt → işe başlama), gün
   const sureler = [];
   adaylarList.forEach((a) => {
-    if ((a.durum === "tamamlandi" || a.durum === "ise_basladi") && a.gecmis && a.gecmis.length) {
+    // Haftalık rapordan aktarılan kayıtların görüşme tarihi bilinmez → süreye katılmaz
+    if ((a.durum === "tamamlandi" || a.durum === "ise_basladi") && a.gecmis && a.gecmis.length && a.gecmis[0].kullanici !== AKTARIM_KUL) {
       const ilk = a.gecmis[0].tarih, bas = a.iseBaslamaTarihi || a.gecmis[a.gecmis.length - 1].tarih;
       if (ilk && bas) { const d = Math.round((new Date(bas) - new Date(ilk)) / 864e5); if (isFinite(d) && d >= 0 && d < 400) sureler.push(d); }
     }
@@ -3194,7 +3198,7 @@ function renderRaporlarPage(adaylarList, talepList, isAdmin) {
 
   // Kaynak etkinliği
   const kaynakSay = {};
-  adaylarList.forEach((a) => { const k = a.kaynak || "Belirtilmemiş"; kaynakSay[k] = (kaynakSay[k] || 0) + 1; });
+  adaylarList.forEach((a) => { if (aktarilmis(a)) return; const k = a.kaynak || "Belirtilmemiş"; kaynakSay[k] = (kaynakSay[k] || 0) + 1; });
   const kaynakArr = Object.entries(kaynakSay).sort((a, b) => b[1] - a[1]);
   const kaynakMax = Math.max(...kaynakArr.map((x) => x[1]), 1);
   const kaynakBars = kaynakArr.length
@@ -3374,8 +3378,9 @@ function raporDenemeIcerik(list, filtreOzet) {
   const ozetRows = kisiler.map((a) => {
     const deg = a.denemeSuresi.degerlendirme || {};
     const yapildi = a.denemeSuresi.degerlendirmeYapildiMi;
-    const cls = !yapildi ? "r-bekle" : deg.sonuc === DENEME_SONUC_OPT[0] ? "r-basari" : "r-bad";
-    const durumEtiket = !yapildi ? "Değerlendirme Bekliyor" : (deg.sonuc === DENEME_SONUC_OPT[0] ? "Başarılı" : "Başarısız");
+    const kapali = !yapildi && a.denemeSuresi.kapali;
+    const cls = kapali ? "r-bad" : !yapildi ? "r-bekle" : deg.sonuc === DENEME_SONUC_OPT[0] ? "r-basari" : "r-bad";
+    const durumEtiket = kapali ? "Form Yok — Ayrıldı" : !yapildi ? "Değerlendirme Bekliyor" : (deg.sonuc === DENEME_SONUC_OPT[0] ? "Başarılı" : "Başarısız");
     return `<tr><td>${esc(a.ad)} ${esc(a.soyad)}</td><td>${esc(a.departman || "")}</td><td>${fmtTarih(a.iseBaslamaTarihi)}</td><td>${fmtTarih(a.denemeSuresi.bitisTarihi)}</td><td>${rozetSpan(cls, durumEtiket)}</td></tr>`;
   }).join("");
   const kpi = `
@@ -3383,7 +3388,8 @@ function raporDenemeIcerik(list, filtreOzet) {
       <div class="kpi"><div class="n">${kisiler.length}</div><div class="l">Deneme Süreci Kaydı</div></div>
       <div class="kpi"><div class="n">${kisiler.filter((a) => a.denemeSuresi.degerlendirmeYapildiMi && (a.denemeSuresi.degerlendirme || {}).sonuc === DENEME_SONUC_OPT[0]).length}</div><div class="l">Başarılı</div></div>
       <div class="kpi"><div class="n">${kisiler.filter((a) => a.denemeSuresi.degerlendirmeYapildiMi && (a.denemeSuresi.degerlendirme || {}).sonuc === DENEME_SONUC_OPT[1]).length}</div><div class="l">Başarısız</div></div>
-      <div class="kpi"><div class="n">${kisiler.filter((a) => !a.denemeSuresi.degerlendirmeYapildiMi).length}</div><div class="l">Değerlendirme Bekliyor</div></div>
+      <div class="kpi"><div class="n">${kisiler.filter((a) => !a.denemeSuresi.degerlendirmeYapildiMi && !a.denemeSuresi.kapali).length}</div><div class="l">Değerlendirme Bekliyor</div></div>
+      ${kisiler.some((a) => !a.denemeSuresi.degerlendirmeYapildiMi && a.denemeSuresi.kapali) ? `<div class="kpi"><div class="n">${kisiler.filter((a) => !a.denemeSuresi.degerlendirmeYapildiMi && a.denemeSuresi.kapali).length}</div><div class="l">Form Yok — Ayrıldı</div></div>` : ""}
     </div>`;
   const ozet = ozetRows ? `<h3 class="bolum">Özet</h3><table><thead><tr><th>Ad Soyad</th><th>Departman</th><th>Başlangıç</th><th>Bitiş</th><th>Sonuç</th></tr></thead><tbody>${ozetRows}</tbody></table>` : `<div class="empty">Bu filtrelerle deneme süresi kaydı bulunamadı.</div>`;
   const detaylar = kisiler.filter((a) => a.denemeSuresi.degerlendirmeYapildiMi).map((a, i) => {
@@ -3404,6 +3410,237 @@ function raporDenemeIcerik(list, filtreOzet) {
   }).join("");
   return raporLetterhead("Deneme Süresi Raporu", "Deneme süreci ve değerlendirme sonuçlarının ayrıntılı dökümü", filtreOzet) + kpi + ozet +
     (detaylar ? `<h3 class="bolum" style="page-break-before:always">Ayrıntılı Değerlendirme Formları</h3>${detaylar}` : "");
+}
+
+// ---------------------------------------------------------------
+// Toplu Aktarım (yalnız İK) — haftalık İK raporundaki işe alınanları ve
+// Deneme Süresi Formu (Google Form) cevaplarını aday kaydı olarak işler.
+// Paket masaüstünde hazırlanır (İK Pano Verisi\isealim_2026_aktarim.json).
+// • Belge kimliği ad+soyad+işe başlama tarihinden SABİT üretilir (kuraldaki
+//   20 harf/rakam biçiminde) → aynı paket iki kez yüklense de kayıt çiftlenmez.
+// • Panoda aynı adla bir aday varsa yalnız departmanı ya da işe başlama tarihi
+//   tutuyorsa "aynı kişi" sayılır; süreci yarımsa tamamlanır (unvan/departman
+//   yazımına dokunulmaz), deneme formu eksikse eklenir. Tutmuyorsa elle
+//   kontrol için atlanır. Önizlemede her eşleşme tek tek onaylanır.
+// ---------------------------------------------------------------
+const AKTARIM_KUL = "İK · 2026 aktarımı";
+const AKTARIM_ACIK = ["gorusme_bekliyor", "evrak_bekliyor", "sgk_bekliyor", "ise_basladi"];
+function aktarilmis(a) { return !!a && a.olusturanKullanici === AKTARIM_KUL; }
+function aktarimAdAnahtar(ad, soyad) {
+  const m = { "ç": "c", "ğ": "g", "ı": "i", "ö": "o", "ş": "s", "ü": "u" };
+  return String((ad || "") + " " + (soyad || "")).toLocaleLowerCase("tr").replace(/[çğıöşü]/g, (c) => m[c])
+    .normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+}
+async function aktarimBelgeKimligi(anahtar) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(anahtar));
+  return "AKT26" + [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 15);
+}
+function aktarimISO(s) { return /^\d{4}-\d{2}-\d{2}$/.test(String(s || "")) ? String(s) : null; }
+// Kolay İK yazımını (ör. "GARANTİ UZMANI") açılır listedeki yazıma çevirir; listede yoksa olduğu gibi kalır.
+function aktarimKanonik(v, liste) {
+  const s = String(v || "").trim(), k = s.toLocaleLowerCase("tr");
+  return liste.find((u) => u.toLocaleLowerCase("tr") === k) || s;
+}
+function aktarimDepEsit(a, b) { return String(a || "").trim().toLocaleLowerCase("tr") === String(b || "").trim().toLocaleLowerCase("tr"); }
+// Paketteki bir kişiden, panonun kendi açtığı kayıtla aynı yapıda aday belgesi kurar.
+function aktarimKaydiKur(k, kaynak, anahtar) {
+  const bas = aktarimISO(k.iseBaslamaTarihi);
+  const bitis = denemeSuresiBitisHesapla(bas);
+  const dn = k.deneme && aktarimISO(k.deneme.tarih) ? k.deneme : null;
+  const sn = dn ? Number(dn.sonuc) : NaN;
+  const sonuc = sn === 0 || sn === 1 ? DENEME_SONUC_OPT[sn] : "";
+  const cik = k.cikis && aktarimISO(k.cikis.tarih) ? { tarih: k.cikis.tarih, neden: String(k.cikis.neden || "") } : null;
+  // Form sonucu varsa durum ondan türetilir (uygulamanın Kesinleştir kuralıyla aynı)
+  const durum = sonuc ? (sn === 0 ? "tamamlandi" : "vazgecti") : (["ise_basladi", "tamamlandi", "vazgecti"].includes(k.durum) ? k.durum : "ise_basladi");
+  const g = [{ tarih: bas, eskiDurum: null, yeniDurum: "ise_basladi", kullanici: AKTARIM_KUL, not: "İşe başladı. Kayıt 2026 haftalık İK raporundan aktarıldı." }];
+  let denemeSuresi = { bitisTarihi: bitis, degerlendirmeYapildiMi: false, degerlendirme: {} };
+  if (dn) {
+    const deg = {};
+    DENEME_KRITERLERI.forEach((kr) => { const v = String((dn.puan || {})[kr.key] || ""); if (/^[1-4]$/.test(v)) deg[kr.key] = v; });
+    Object.assign(deg, { yorum: String(dn.yorum || ""), sonuc, degerlendirenKullanici: String(dn.degerlendiren || "Deneme Süresi Formu"), tarih: dn.tarih, _kvkkOnay: true, kaynak: "Deneme Süresi Formu (Google Form)" });
+    if (Array.isArray(dn.notlar) && dn.notlar.length) deg.aktarimNotu = dn.notlar.map(String).join(" ");
+    denemeSuresi = { bitisTarihi: bitis, degerlendirmeYapildiMi: !!sonuc, degerlendirme: deg };
+    if (sonuc) g.push({ tarih: dn.tarih, eskiDurum: "ise_basladi", yeniDurum: durum, kullanici: AKTARIM_KUL, not: "Deneme süresi değerlendirmesi (Google Form · değerlendiren: " + deg.degerlendirenKullanici + "): " + sonuc });
+  } else if (durum === "tamamlandi") {
+    g.push({ tarih: bitis, eskiDurum: "ise_basladi", yeniDurum: "tamamlandi", kullanici: AKTARIM_KUL, not: "Deneme süresi doldu; değerlendirme formu kayıtlı değil." });
+  }
+  // Ayrılmış ve formu doldurulmamış kişide deneme formu kapanır (sonradan "Kesinleştir" durumu değiştirmesin)
+  if (cik && !denemeSuresi.degerlendirmeYapildiMi) { denemeSuresi.kapali = true; denemeSuresi.kapanisNotu = "Çalışan " + fmtTarih(cik.tarih) + " tarihinde ayrıldı; deneme formu doldurulmamış."; }
+  if (cik) g.push({ tarih: cik.tarih, eskiDurum: durum, yeniDurum: durum, olay: cik.tarih < bitis ? "Deneme süresinde ayrıldı" : "İşten ayrıldı", kullanici: AKTARIM_KUL, not: "Ayrılış nedeni: " + (cik.neden || "—") });
+  g.sort((a, b) => String(a.tarih).localeCompare(String(b.tarih)));
+  for (let i = 1; i < g.length; i++) { if (!g[i].olay) g[i].eskiDurum = g[i - 1].yeniDurum; }
+  const d = {
+    ad: String(k.ad || "").trim(), soyad: String(k.soyad || "").trim(),
+    unvan: aktarimKanonik(k.unvan, UNVAN_LISTESI), departman: aktarimKanonik(k.departman, DEPARTMAN_LISTESI), bolum: aktarimKanonik(k.bolum, BOLUM_LISTESI),
+    telefon: "", email: "", yas: null, cinsiyet: "", yer: "", deneyimYil: null, deneyim: "",
+    hedefRoller: [], rolPuanlari: {}, aiYorum: "",
+    gorusmeDurumu: "gorusuldu", gorusmeTarihi: null, gorusmeNotu: "",
+    iseBaslamaTarihi: bas,
+    notlar: "2026 işe alımı — haftalık İK raporundan aktarıldı." + (cik ? " " + fmtTarih(cik.tarih) + " tarihinde ayrıldı (" + (cik.neden || "—") + ")." : ""),
+    durum, karar: "olumlu", kararTarihi: null, redNedeni: null, redAciklama: null,
+    sgkGirisYapildi: true, sgkGirisTarihi: bas, evraklar: [], baglıTalepId: null,
+    gecmis: g, denemeSuresi,
+    aktarim: { kaynak: String(kaynak || ""), tarih: bugunISO(), yapan: (currentProfile && currentProfile.adSoyad) || "", anahtar, cikisTarihi: cik ? cik.tarih : null, cikisNedeni: cik ? cik.neden : null },
+    olusturanKullanici: AKTARIM_KUL
+  };
+  if (durum === "ise_basladi") { const s = oryantasyonSablonSec(d.unvan); d.oryantasyon = { sablonAdi: s.sablonAdi, maddeler: s.maddeler }; }
+  return d;
+}
+function aktarimKisaBilgi(x) {
+  return [x.departman || "—", x.unvan || "—", (DURUM_ETIKET[x.durum] || {}).label || x.durum || "—", x.iseBaslamaTarihi ? "başlama " + fmtTarih(x.iseBaslamaTarihi) : "başlama —"].join(" · ");
+}
+// Paketi panodaki adaylarla karşılaştırıp ne yapılacağını çıkarır (hiçbir şey yazmaz).
+async function aktarimPlanla(paket) {
+  const plan = { yeni: [], tamamla: [], zaten: [], atla: [], hatali: [] };
+  const kaynak = String(paket.kaynak || "");
+  for (const k of paket.kayitlar) {
+    const adK = aktarimAdAnahtar(k && k.ad, k && k.soyad);
+    if (!k || !adK || !aktarimISO(k.iseBaslamaTarihi)) { plan.hatali.push(k); continue; }
+    const anahtar = adK + "|" + k.iseBaslamaTarihi;
+    const id = await aktarimBelgeKimligi(anahtar);
+    const d = aktarimKaydiKur(k, kaynak, anahtar);
+    if (adaylar.some((a) => a.id === id || (a.aktarim && a.aktarim.anahtar === anahtar))) { plan.zaten.push({ d }); continue; }
+    const ayniAd = adaylar.filter((a) => !aktarilmis(a) && aktarimAdAnahtar(a.ad, a.soyad) === adK);
+    // aynı kişi sayılması için departman ya da işe başlama tarihi de tutmalı
+    const es = ayniAd.filter((a) => aktarimDepEsit(a.departman, d.departman) || (a.iseBaslamaTarihi && a.iseBaslamaTarihi === d.iseBaslamaTarihi));
+    if (ayniAd.length && !es.length) { plan.atla.push({ d, neden: "Panoda aynı adla başka bir aday var (" + ayniAd.map(aktarimKisaBilgi).join(" | ") + ") — farklı kişi olabilir, elle kontrol edin" }); continue; }
+    if (es.length > 1) { plan.atla.push({ d, neden: "Panoda bu adla " + es.length + " aday var — elle kontrol edin" }); continue; }
+    if (es.length === 1) {
+      const e = es[0];
+      const eDeg = !!(e.denemeSuresi && e.denemeSuresi.degerlendirmeYapildiMi);
+      const formVar = !!d.denemeSuresi.degerlendirmeYapildiMi;
+      if (AKTARIM_ACIK.includes(e.durum)) {
+        if (e.durum === d.durum && !formVar && !d.aktarim.cikisTarihi && e.iseBaslamaTarihi === d.iseBaslamaTarihi) { plan.atla.push({ d, neden: "Panoda zaten güncel (" + aktarimKisaBilgi(e) + ")" }); continue; }
+        const yeniGecmis = d.gecmis.filter((x, i) => !(i === 0 && e.durum === "ise_basladi")).map((x, i) => (i === 0 && !x.olay ? { ...x, eskiDurum: e.durum } : x));
+        const patch = {
+          iseBaslamaTarihi: d.iseBaslamaTarihi, sgkGirisYapildi: true, sgkGirisTarihi: e.sgkGirisTarihi || d.sgkGirisTarihi,
+          karar: e.karar || "olumlu", kararTarihi: e.kararTarihi || null, durum: d.durum,
+          gecmis: [...(e.gecmis || []), ...yeniGecmis], aktarim: d.aktarim
+        };
+        // unvan/departman yazımına dokunulmaz (müdür görünürlüğü departmana bağlı); boşsa doldurulur
+        if (!e.unvan) patch.unvan = d.unvan;
+        if (!e.departman) patch.departman = d.departman;
+        if (!e.bolum) patch.bolum = d.bolum;
+        // müdürün taslak deneme puanları silinmesin: formsuzsa ve kayıtta deneme bölümü varsa gönderilmez
+        if (!eDeg && (formVar || !e.denemeSuresi)) patch.denemeSuresi = d.denemeSuresi;
+        if (d.durum === "ise_basladi" && !e.oryantasyon) patch.oryantasyon = d.oryantasyon;
+        plan.tamamla.push({ d, e, patch, ne: ((DURUM_ETIKET[e.durum] || {}).label || e.durum) + " → " + ((DURUM_ETIKET[d.durum] || {}).label || d.durum) + (formVar && !eDeg ? " · deneme formu eklenecek" : "") });
+      } else if (e.durum === "tamamlandi" && !eDeg && formVar) {
+        const dg = d.denemeSuresi.degerlendirme;
+        const patch = {
+          denemeSuresi: { ...d.denemeSuresi, bitisTarihi: (e.denemeSuresi && e.denemeSuresi.bitisTarihi) || d.denemeSuresi.bitisTarihi },
+          gecmis: [...(e.gecmis || []), { tarih: dg.tarih, eskiDurum: e.durum, yeniDurum: e.durum, olay: "Deneme süresi değerlendirmesi", kullanici: AKTARIM_KUL, not: "Google Form · değerlendiren: " + dg.degerlendirenKullanici + ": " + dg.sonuc }],
+          aktarim: d.aktarim
+        };
+        plan.tamamla.push({ d, e, patch, ne: "Deneme süresi formu eklenecek (durum değişmez)" });
+      } else {
+        plan.atla.push({ d, neden: "Panoda zaten var (" + aktarimKisaBilgi(e) + ")" });
+      }
+      continue;
+    }
+    plan.yeni.push({ id, d });
+  }
+  return plan;
+}
+function topluAktarimAc() {
+  if (!adaylarYuklendi) { toast("Aday listesi henüz yüklenmedi; birkaç saniye sonra tekrar deneyin."); return; }
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = ".json,application/json";
+  inp.addEventListener("change", async () => {
+    const f = inp.files && inp.files[0];
+    if (!f) return;
+    let paket;
+    try { paket = JSON.parse(await f.text()); } catch (e) { toast("Dosya okunamadı: geçerli bir JSON değil."); return; }
+    if (!paket || paket.tur !== "inciroglu-isealim-aktarim" || !Array.isArray(paket.kayitlar)) { toast("Bu dosya bir işe alım aktarım paketi değil."); return; }
+    flashLoader();
+    try { aktarimOnizle(await aktarimPlanla(paket), f.name, paket); } catch (e) { toast("Paket işlenemedi: " + e.message); }
+  });
+  inp.click();
+}
+function aktarimOnizle(plan, dosyaAdi, paket) {
+  const overlay = document.createElement("div");
+  overlay.className = "overlay";
+  const say = (arr, f) => arr.filter(f).length;
+  const hc = "padding:5px 8px;border-bottom:1px solid var(--line,#e2e8e5);vertical-align:top";
+  const satir = (x, ek) => `<tr><td style="${hc}">${esc(x.d.ad + " " + x.d.soyad)}</td><td style="${hc}">${esc(x.d.departman)}</td><td style="${hc}">${esc(ek)}</td></tr>`;
+  const tablo = (baslik, arr, ekF, acik) => arr.length ? `<details style="margin-top:12px" ${acik ? "open" : ""}><summary style="cursor:pointer;font-weight:700">${esc(baslik)} (${arr.length})</summary><table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px"><tbody>${arr.map((x) => satir(x, ekF(x))).join("")}</tbody></table></details>` : "";
+  const durumAd = (x) => (DURUM_ETIKET[x.d.durum] || {}).label || x.d.durum;
+  const tamamlaTablo = plan.tamamla.length ? `<details style="margin-top:12px" open><summary style="cursor:pointer;font-weight:700">Panodaki kaydı tamamlanacaklar (${plan.tamamla.length}) — işaretli olanlar yazılır</summary>
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px"><tbody>${plan.tamamla.map((x) => `<tr>
+      <td style="${hc};width:28px"><input type="checkbox" class="akTamSec" data-anahtar="${esc(x.d.aktarim.anahtar)}" checked></td>
+      <td style="${hc}"><b>${esc(x.d.ad + " " + x.d.soyad)}</b><div style="color:var(--ink-soft);margin-top:2px">${esc(x.ne)}</div></td>
+      <td style="${hc}"><div><span style="color:var(--ink-soft)">Panoda:</span> ${esc(aktarimKisaBilgi(x.e))}</div><div><span style="color:var(--ink-soft)">Raporda:</span> ${esc(aktarimKisaBilgi(x.d))}</div></td>
+    </tr>`).join("")}</tbody></table></details>` : "";
+  const formSay = say(plan.yeni, (x) => x.d.denemeSuresi.degerlendirmeYapildiMi) + say(plan.tamamla, (x) => !!(x.patch.denemeSuresi && x.patch.denemeSuresi.degerlendirmeYapildiMi));
+  overlay.innerHTML = `
+    <div class="drawer">
+      <div class="drawer-head">
+        <div><h2>Toplu Aktarım — Önizleme</h2><div class="meta">${esc(dosyaAdi)} · henüz hiçbir şey kaydedilmedi</div></div>
+        <button class="close-x" id="akKapat">✕</button>
+      </div>
+      <div class="drawer-body">
+        <div class="stat-row">
+          <div class="stat-card"><div class="n">${plan.yeni.length}</div><div class="l">Yeni aday kaydı</div></div>
+          <div class="stat-card"><div class="n">${plan.tamamla.length}</div><div class="l">Panodaki kaydı tamamlanacak</div></div>
+          <div class="stat-card"><div class="n">${plan.zaten.length}</div><div class="l">Zaten aktarılmış</div></div>
+          <div class="stat-card"><div class="n">${plan.atla.length + plan.hatali.length}</div><div class="l">Atlanacak</div></div>
+        </div>
+        <div style="font-size:13px;line-height:1.6;margin-top:6px">
+          Yeni kayıtların durumu: <b>${say(plan.yeni, (x) => x.d.durum === "ise_basladi")}</b> deneme süresinde ·
+          <b>${say(plan.yeni, (x) => x.d.durum === "tamamlandi")}</b> tamamlandı ·
+          <b>${say(plan.yeni, (x) => x.d.durum === "vazgecti")}</b> vazgeçildi (deneme süresinde ayrılan / başarısız)<br>
+          Deneme süresi formu işlenecek: <b>${formSay}</b> kişi
+        </div>
+        ${tablo("Yeni aday kayıtları", plan.yeni, (x) => durumAd(x) + (x.d.denemeSuresi.degerlendirmeYapildiMi ? " · deneme formu var" : "") + (x.d.aktarim.cikisTarihi ? " · ayrıldı " + fmtTarih(x.d.aktarim.cikisTarihi) : ""))}
+        ${tamamlaTablo}
+        ${tablo("Atlanacaklar (elle bakın)", plan.atla, (x) => x.neden, true)}
+        ${tablo("Zaten aktarılmış (dokunulmayacak)", plan.zaten, (x) => durumAd(x))}
+        ${plan.hatali.length ? `<div style="margin-top:12px;color:var(--bad,#c0392b);font-size:12.5px">${plan.hatali.length} satırda ad/soyad veya işe başlama tarihi eksik — atlanacak.</div>` : ""}
+        <div id="akSonuc" style="margin-top:14px;font-size:13px"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+          <button class="btn btn-ghost" id="akVazgec">Vazgeç</button>
+          <button class="btn btn-teal" id="akYaz" ${plan.yeni.length + plan.tamamla.length ? "" : "disabled"}>Aktar</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const kapat = () => overlay.remove();
+  overlay.querySelector("#akKapat").addEventListener("click", kapat);
+  overlay.querySelector("#akVazgec").addEventListener("click", kapat);
+  const btn = overlay.querySelector("#akYaz");
+  const secili = () => new Set([...overlay.querySelectorAll(".akTamSec")].filter((c) => c.checked).map((c) => c.dataset.anahtar));
+  const etiket = () => { btn.textContent = "Aktar (" + (plan.yeni.length + secili().size) + " kayıt)"; };
+  overlay.querySelectorAll(".akTamSec").forEach((c) => c.addEventListener("change", etiket));
+  etiket();
+  btn.addEventListener("click", async () => {
+    btn.disabled = true; btn.textContent = "Kaydediliyor…";
+    let yazilan = 0;
+    try {
+      // Önizleme açıkken panoda değişiklik olmuş olabilir → plan güncel veriyle yeniden kurulur
+      const sec = secili();
+      const p = await aktarimPlanla(paket);
+      const tamamla = p.tamamla.filter((x) => sec.has(x.d.aktarim.anahtar));
+      const islemler = [
+        ...p.yeni.map((x) => (b) => b.set(doc(db, "iseAlimAday", x.id), { ...x.d, olusturmaTarihi: serverTimestamp(), guncellemeTarihi: serverTimestamp() })),
+        ...tamamla.map((x) => (b) => b.set(doc(db, "iseAlimAday", x.e.id), { ...x.patch, guncellemeTarihi: serverTimestamp() }, { merge: true }))
+      ];
+      for (let i = 0; i < islemler.length; i += 400) {
+        const b = writeBatch(db);
+        islemler.slice(i, i + 400).forEach((f) => f(b));
+        await b.commit();
+        yazilan += Math.min(400, islemler.length - i);
+      }
+      const saat = new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+      overlay.querySelector("#akSonuc").innerHTML = `<div style="color:var(--good,#2f6b45);font-weight:700">✓ ${yazilan} kayıt kaydedildi (saat ${esc(saat)}). Aday Havuzu kendiliğinden yenilenir.</div>`;
+      btn.textContent = "Tamamlandı";
+      overlay.querySelector("#akVazgec").textContent = "Kapat";
+      overlay.querySelectorAll(".akTamSec").forEach((c) => { c.disabled = true; });
+      toast("✓ Toplu aktarım tamamlandı: " + yazilan + " kayıt.");
+    } catch (e) {
+      overlay.querySelector("#akSonuc").innerHTML = `<div style="color:var(--bad,#c0392b);font-weight:700">✗ Kaydedilemedi (${yazilan} kayıt yazılmıştı): ${esc(e.message)}. Tekrar deneyebilirsiniz; yazılmış kayıtlar çiftlenmez.</div>`;
+      btn.disabled = false; btn.textContent = "Tekrar Dene";
+    }
+  });
 }
 
 function openAdayForm(onDoldur) {
@@ -3858,15 +4095,18 @@ function openAdayDetay(aday, isAdmin) {
   function denemeSuresiHtml(a) {
     const ds = a.denemeSuresi;
     const deg = ds.degerlendirme || {};
-    const kilitli = !!ds.degerlendirmeYapildiMi;
+    // kapali: çalışan formu doldurulmadan ayrıldı (aktarım) → form salt okunur, Kesinleştir yok
+    const kapali = !ds.degerlendirmeYapildiMi && !!ds.kapali;
+    const kilitli = !!ds.degerlendirmeYapildiMi || kapali;
     const kalanGun = gunFarki(ds.bitisTarihi);
     const devreDisi = kilitli || !canEditSurec;
     return `
     <div class="section-title">Deneme Süresi Değerlendirmesi</div>
-    ${canEditSurec ? `<button type="button" class="btn btn-ghost btn-sm" id="denPdfBtn" style="margin-bottom:10px">🖨 Deneme Süresi Formu (İmzalı PDF)</button>` : ""}
+    ${canEditSurec && !kapali ? `<button type="button" class="btn btn-ghost btn-sm" id="denPdfBtn" style="margin-bottom:10px">🖨 Deneme Süresi Formu (İmzalı PDF)</button>` : ""}
     <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:10px">
       Başlangıç: ${fmtTarih(a.iseBaslamaTarihi)} · Bitiş: ${fmtTarih(ds.bitisTarihi)}
-      ${kilitli ? ` · <span style="color:var(--good);font-weight:600">✓ Değerlendirme kesinleşti</span>` : (kalanGun !== null ? ` · ${kalanGun >= 0 ? kalanGun + " gün kaldı" : "süresi doldu"}` : "")}
+      ${kapali ? ` · <span style="color:var(--bad,#a13030);font-weight:600">Form kapalı</span><div style="margin-top:4px">${esc(ds.kapanisNotu || "Çalışan ayrıldı; deneme formu doldurulmamış.")}</div>` : kilitli ? ` · <span style="color:var(--good);font-weight:600">✓ Değerlendirme kesinleşti</span>` : (kalanGun !== null ? ` · ${kalanGun >= 0 ? kalanGun + " gün kaldı" : "süresi doldu"}` : "")}
+      ${deg.kaynak ? `<div style="margin-top:4px">Kaynak: ${esc(deg.kaynak)}${deg.tarih ? " · " + fmtTarih(deg.tarih) : ""}${deg.aktarimNotu ? " · " + esc(deg.aktarimNotu) : ""}</div>` : ""}
     </div>
     ${!kilitli ? `<div class="evrak-row" style="background:var(--paper);font-size:11px;color:var(--ink-soft);line-height:1.5;white-space:pre-wrap">${esc(DENEME_KVKK_METNI)}</div>
     <label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;font-weight:600;margin:10px 0;cursor:pointer">
