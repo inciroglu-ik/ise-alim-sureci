@@ -1,0 +1,32 @@
+name: E-posta Kuyruğu (Oryantasyon bildirimleri)
+
+on:
+  schedule:
+    # 10 dakikada bir (GitHub yoğunlukta birkaç dakika geciktirebilir)
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eposta-kuyrugu
+  cancel-in-progress: false
+
+jobs:
+  gonder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Bağımlılıkları kur
+        run: npm install --no-audit --no-fund firebase-admin@12.7.0 nodemailer@6.9.16
+      - name: Kuyruktaki e-postaları gönder
+        run: node scripts/eposta-kuyrugu.js
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
