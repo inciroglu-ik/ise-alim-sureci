@@ -1,0 +1,42 @@
+name: Ajan Ofisi (06:00 zamanlanmış işler)
+
+on:
+  schedule:
+    # 03:00 UTC = 06:00 Türkiye. GitHub yoğunlukta geciktirebilir; 08:30 yedek çalıştırma
+    # zaten yapılmış işi tekrar yapmaz (Firestore kilidi). Ofis sayfası da açıldığında eksikleri tamamlar.
+    - cron: "0 3 * * *"
+    - cron: "30 5 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ajan-ofisi
+  cancel-in-progress: false
+
+jobs:
+  calistir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      # Güvenlik: yönetici servis hesabı bu işte ortamda olduğu için kurallar SABİT bir sürümden alınır.
+      # ortak/ajan-ofisi/kadro.js güncellenince aşağıdaki ref de yeni commit numarasına çekilmelidir.
+      - name: Ajan Ofisi kurallarını al (IK-PLATFORM, sabit sürüm)
+        uses: actions/checkout@v4
+        with:
+          repository: inciroglu-ik/IK-PLATFORM
+          ref: c0d6ba59904bc29c4d123577c301f91ac67764f3
+          path: ikp
+          sparse-checkout: |
+            ortak/ajan-ofisi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Bağımlılıkları kur
+        run: npm install --no-audit --no-fund --ignore-scripts firebase-admin@12.7.0 @anthropic-ai/sdk@1.3.0
+      - name: Vadesi gelen işleri çalıştır
+        run: node scripts/ajan-ofisi.js
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
