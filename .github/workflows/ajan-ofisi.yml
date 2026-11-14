@@ -1,11 +1,11 @@
 name: Ajan Ofisi (06:00 zamanlanmış işler)
 
 on:
-  schedule:
-    # 03:00 UTC = 06:00 Türkiye. GitHub yoğunlukta geciktirebilir; 08:30 yedek çalıştırma
-    # zaten yapılmış işi tekrar yapmaz (Firestore kilidi). Ofis sayfası da açıldığında eksikleri tamamlar.
-    - cron: "0 3 * * *"
-    - cron: "30 5 * * *"
+  # Ofis şu an "Claude Code" beyniyle çalışıyor (API anahtarı yok): zamanlanmış işleri Claude Code yapar,
+  # bu yüzden otomatik çalıştırma KAPALI. Ofis "Claude API" moduna alınırsa aşağıdaki iki satırı açın:
+  # schedule:
+  #   - cron: "0 3 * * *"    # 06:00 Türkiye
+  #   - cron: "30 5 * * *"   # 08:30 yedek
   workflow_dispatch: {}
 
 permissions:
