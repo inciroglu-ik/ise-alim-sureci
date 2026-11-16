@@ -1,7 +1,10 @@
 /* E-posta kuyruğu gönderici — GitHub Actions üzerinden 10 dakikada bir çalışır
    (bkz. .github/workflows/eposta-kuyrugu.yml). İK Portalı'ndaki sayfaların Firestore "epostaKuyrugu"
    koleksiyonuna yazdığı "bekliyor" durumundaki e-postaları Gmail ile gönderir ve durumunu işaretler.
-   Kullanan: Oryantasyon Formları (sorumlu bildirimi, yeni başlayan bildirimi).
+   Kullanan: Oryantasyon Formları (sorumlu bildirimi, yeni başlayan bildirimi); Personel Talepleri (onay bildirimi).
+   Personel talebi (kaynak "personel-talebi"): konu ve gövde kayıttan ALINMAZ; personelTalepFormlari/{ilgili} kaydından
+   personel-talep-eposta.js şablonuyla üretilir ve alıcı, talepte kayıtlı sıradaki onaylayıcının adresiyle yeniden
+   karşılaştırılır (tutmazsa gönderilmez).
    Güvenlik:
    - Yalnız @inciroglu.com.tr adreslerine gönderilir (Firestore kuralıyla aynı). Teslim adresi (SMTP zarfı) yalnız
      "kime" alanıdır; görünen ad ("kimeAd") adres içeremez, alıcı ekleyemez.
@@ -12,6 +15,7 @@
    Gizli bilgiler hatırlatma göreviyle aynıdır. */
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
+const personelTalep = require("./personel-talep-eposta.js");
 
 const ALAN = /^[a-z0-9._%+-]+@inciroglu\.com\.tr$/i;
 const EN_FAZLA = 40;
@@ -54,7 +58,33 @@ async function main() {
     }
     if (!e) { atlanan++; continue; }
     const kime = String(e.kime || "").trim().toLowerCase();
-    if (!ALAN.test(kime) || !e.konu || !e.html) {
+    let konu = e.konu, govde = e.html, kimeAd = e.kimeAd;
+    /* personel talebi: içerik talep kaydından (istemcinin yazdığı konu/gövde kullanılmaz) */
+    if (e.kaynak === "personel-talebi") {
+      try {
+        const sablon = String(e.sablon || "");
+        const ilgili = String(e.ilgili || "");
+        const t = /^[A-Za-z0-9]{1,40}$/.test(ilgili) ? await db.collection("personelTalepFormlari").doc(ilgili).get() : null;
+        const td = t && t.exists ? t.data() : null;
+        const z = td && td.zincir && (sablon === "direktor" || sablon === "ik") ? td.zincir[sablon] : null;
+        if (!z || String(z.eposta || "").trim().toLowerCase() !== kime) throw new Error("Talep ya da alıcı tutmuyor");
+        /* bayat e-posta gönderilmez: bu arada karar verildiyse / iptal edildiyse kayıt iptal edilir */
+        if (td.durum !== sablon) {
+          await ref.update({ durum: "iptal", hata: "Talebin aşaması değişti, e-posta gereksiz", islem: zaman() });
+          atlanan++;
+          continue;
+        }
+        konu = personelTalep.konu(sablon, td);
+        govde = personelTalep.html(sablon, td, ilgili);
+        kimeAd = z.ad;
+      } catch (err) {
+        await ref.update({ durum: "hata", hata: String((err && err.message) || err).slice(0, 300), islem: zaman() });
+        hatali++;
+        console.error("Personel talebi e-postası hazırlanamadı:", d.id);
+        continue;
+      }
+    }
+    if (!ALAN.test(kime) || !konu || !govde) {
       await ref.update({ durum: "hata", hata: "Geçersiz alıcı ya da içerik", islem: zaman() });
       hatali++;
       continue;
@@ -63,10 +93,10 @@ async function main() {
     try {
       await transporter.sendMail({
         from: { name: "İnciroğlu Otomotiv İK", address: process.env.GMAIL_USER },
-        to: { name: gorunenAd(e.kimeAd), address: kime },
+        to: { name: gorunenAd(kimeAd), address: kime },
         envelope: { from: process.env.GMAIL_USER, to: [kime] },
-        subject: String(e.konu).replace(/[\r\n]+/g, " "),
-        html: e.html
+        subject: String(konu).replace(/[\r\n]+/g, " "),
+        html: govde
       });
     } catch (err) {
       const deneme = (e.deneme || 0) + 1;
