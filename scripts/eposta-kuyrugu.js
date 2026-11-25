@@ -16,6 +16,7 @@
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
 const personelTalep = require("./personel-talep-eposta.js");
+const savunma = require("./savunma-eposta.js");
 
 const ALAN = /^[a-z0-9._%+-]+@inciroglu\.com\.tr$/i;
 const EN_FAZLA = 40;
@@ -84,6 +85,45 @@ async function main() {
         continue;
       }
     }
+    /* savunma talebi (25.11.2026): içerik ve ekler talep kaydından; alıcı talepte kayıtlı adresle aynı olmalı
+       ('onay' → talebi açan müdür + 2 PDF ek · 'kapanis' → çalışanın direktörü). Aşama uymuyorsa kayıt iptal edilir. */
+    const ekler = [];
+    if (e.kaynak === "savunma") {
+      try {
+        const sablon = String(e.sablon || "");
+        const ilgili = String(e.ilgili || "");
+        const sref = /^[A-Za-z0-9]{20}$/.test(ilgili) ? db.collection("savunmalar").doc(ilgili) : null;
+        const s = sref ? await sref.get() : null;
+        const sd = s && s.exists ? s.data() : null;
+        if (!sd || (sablon !== "onay" && sablon !== "kapanis")) throw new Error("Talep ya da şablon tutmuyor");
+        const hedef = String((sablon === "onay" ? sd.mudurEposta : sd.direktorEposta) || "").trim().toLowerCase();
+        if (!hedef || hedef !== kime) throw new Error("Alıcı tutmuyor");
+        /* her durum geçişinde tek e-posta: kayıt talebin son bildirimi değilse (eski / mükerrer) gönderilmez */
+        if (sd.sonBildirim !== d.id) { await ref.update({ durum: "iptal", hata: "Talebin son bildirimi değil", islem: zaman() }); atlanan++; continue; }
+        const uygun = sablon === "onay" ? (sd.durum === "onaylandi" || sd.durum === "kapandi") : sd.durum === "kapandi";
+        if (!uygun) {
+          await ref.update({ durum: "iptal", hata: "Talebin aşaması uygun değil, e-posta gereksiz", islem: zaman() });
+          atlanan++;
+          continue;
+        }
+        konu = savunma.konu(sablon, sd);
+        govde = savunma.html(sablon, sd, ilgili);
+        kimeAd = sablon === "onay" ? (sd.mudur || {}).ad : (sd.calisan || {}).direktor;
+        if (sablon === "onay") {
+          for (const b of ["istem", "tutanak"]) {
+            const g = await sref.collection("ekler").doc(b).get();
+            const gd = g.exists ? g.data() : null;
+            if (!gd || !gd.veri) throw new Error("Ek bulunamadı: " + b);
+            ekler.push({ filename: String(gd.ad || (b + ".pdf")).replace(/[^A-Za-z0-9._-]/g, "_"), content: Buffer.from(String(gd.veri), "base64"), contentType: "application/pdf" });
+          }
+        }
+      } catch (err) {
+        await ref.update({ durum: "hata", hata: String((err && err.message) || err).slice(0, 300), islem: zaman() });
+        hatali++;
+        console.error("Savunma e-postası hazırlanamadı:", d.id);
+        continue;
+      }
+    }
     if (!ALAN.test(kime) || !konu || !govde) {
       await ref.update({ durum: "hata", hata: "Geçersiz alıcı ya da içerik", islem: zaman() });
       hatali++;
@@ -96,7 +136,8 @@ async function main() {
         to: { name: gorunenAd(kimeAd), address: kime },
         envelope: { from: process.env.GMAIL_USER, to: [kime] },
         subject: String(konu).replace(/[\r\n]+/g, " "),
-        html: govde
+        html: govde,
+        attachments: ekler.length ? ekler : undefined
       });
     } catch (err) {
       const deneme = (e.deneme || 0) + 1;
