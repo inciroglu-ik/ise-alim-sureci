@@ -86,8 +86,11 @@ async function main() {
       }
     }
     /* savunma talebi (25.11.2026): içerik ve ekler talep kaydından; alıcı talepte kayıtlı adresle aynı olmalı
-       ('onay' → talebi açan müdür + 2 PDF ek · 'kapanis' → çalışanın direktörü). Aşama uymuyorsa kayıt iptal edilir. */
+       ('onay' → talebi açan müdür + 2 PDF ek · 'revize' → müdür, eksik bilgi + İK görüşü · 'kapanis' → çalışanın direktörü).
+       27.11.2026: müdüre giden e-postalarda (onay, revize) çalışanın direktörü BİLGİDE (cc) — adres yine talep kaydından alınır,
+       istemciden gelmez. Aşama uymuyorsa kayıt iptal edilir. */
     const ekler = [];
+    let bilgi = "", ayriBilgi = null;
     if (e.kaynak === "savunma") {
       try {
         const sablon = String(e.sablon || "");
@@ -95,12 +98,12 @@ async function main() {
         const sref = /^[A-Za-z0-9]{20}$/.test(ilgili) ? db.collection("savunmalar").doc(ilgili) : null;
         const s = sref ? await sref.get() : null;
         const sd = s && s.exists ? s.data() : null;
-        if (!sd || (sablon !== "onay" && sablon !== "kapanis")) throw new Error("Talep ya da şablon tutmuyor");
-        const hedef = String((sablon === "onay" ? sd.mudurEposta : sd.direktorEposta) || "").trim().toLowerCase();
+        if (!sd || (sablon !== "onay" && sablon !== "kapanis" && sablon !== "revize")) throw new Error("Talep ya da şablon tutmuyor");
+        const hedef = String((sablon === "kapanis" ? sd.direktorEposta : sd.mudurEposta) || "").trim().toLowerCase();
         if (!hedef || hedef !== kime) throw new Error("Alıcı tutmuyor");
         /* her durum geçişinde tek e-posta: kayıt talebin son bildirimi değilse (eski / mükerrer) gönderilmez */
         if (sd.sonBildirim !== d.id) { await ref.update({ durum: "iptal", hata: "Talebin son bildirimi değil", islem: zaman() }); atlanan++; continue; }
-        const uygun = sablon === "onay" ? (sd.durum === "onaylandi" || sd.durum === "kapandi") : sd.durum === "kapandi";
+        const uygun = sablon === "onay" ? (sd.durum === "onaylandi" || sd.durum === "kapandi") : sablon === "revize" ? sd.durum === "revizyon" : sd.durum === "kapandi";
         if (!uygun) {
           await ref.update({ durum: "iptal", hata: "Talebin aşaması uygun değil, e-posta gereksiz", islem: zaman() });
           atlanan++;
@@ -108,7 +111,14 @@ async function main() {
         }
         konu = savunma.konu(sablon, sd);
         govde = savunma.html(sablon, sd, ilgili);
-        kimeAd = sablon === "onay" ? (sd.mudur || {}).ad : (sd.calisan || {}).direktor;
+        kimeAd = sablon === "kapanis" ? (sd.calisan || {}).direktor : (sd.mudur || {}).ad;
+        /* direktör: 'revize' e-postasında bilgide (cc; ek yok). 'onay' e-postası PDF ekli olduğundan (tanık beyanları, kişisel veri;
+           kural gereği direktör ekleri okuyamaz) direktöre AYRI, eksiz bilgi e-postası gider (aşağıda, gönderimden sonra). */
+        const dir = String(sd.direktorEposta || "").trim().toLowerCase();
+        if (ALAN.test(dir) && dir !== kime) {
+          if (sablon === "revize") bilgi = dir;
+          if (sablon === "onay") ayriBilgi = { kime: dir, ad: (sd.calisan || {}).direktor, konu: savunma.konu("onay-bilgi", sd), govde: savunma.html("onay-bilgi", sd, ilgili) };
+        }
         if (sablon === "onay") {
           for (const b of ["istem", "tutanak"]) {
             const g = await sref.collection("ekler").doc(b).get();
@@ -129,12 +139,13 @@ async function main() {
       hatali++;
       continue;
     }
-    /* 2) gönder: zarf alıcısı yalnız "kime" */
+    /* 2) gönder: zarf alıcısı "kime" (+ savunma e-postalarında talep kaydındaki direktör adresi, bilgi) */
     try {
       await transporter.sendMail({
         from: { name: "İnciroğlu Otomotiv İK", address: process.env.GMAIL_USER },
         to: { name: gorunenAd(kimeAd), address: kime },
-        envelope: { from: process.env.GMAIL_USER, to: [kime] },
+        cc: bilgi ? [{ address: bilgi }] : undefined,
+        envelope: { from: process.env.GMAIL_USER, to: bilgi ? [kime, bilgi] : [kime] },
         subject: String(konu).replace(/[\r\n]+/g, " "),
         html: govde,
         attachments: ekler.length ? ekler : undefined
@@ -145,6 +156,20 @@ async function main() {
       hatali++;
       console.error("Gönderilemedi:", d.id, err && err.message);
       continue;
+    }
+    /* 2b) onay: direktöre eksiz bilgi e-postası (hata olursa ana e-posta yeniden gönderilmez; yalnız günlüğe yazılır) */
+    if (ayriBilgi) {
+      try {
+        await transporter.sendMail({
+          from: { name: "İnciroğlu Otomotiv İK", address: process.env.GMAIL_USER },
+          to: { name: gorunenAd(ayriBilgi.ad), address: ayriBilgi.kime },
+          envelope: { from: process.env.GMAIL_USER, to: [ayriBilgi.kime] },
+          subject: String(ayriBilgi.konu).replace(/[\r\n]+/g, " "),
+          html: ayriBilgi.govde
+        });
+      } catch (err) {
+        console.error("Direktör bilgi e-postası gönderilemedi:", d.id, err && err.message);
+      }
     }
     /* 3) işaretle (gönderim başarılıysa bu adımın hatası e-postayı yeniden göndertmez; kayıt "gonderiliyor" kalır) */
     try {
