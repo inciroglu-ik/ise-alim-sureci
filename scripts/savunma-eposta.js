@@ -1,7 +1,7 @@
 /* Savunma talebi e-postaları (25.11.2026). eposta-kuyrugu.js kullanır: kuyruk kaydı kaynak "savunma" ise konu ve gövde
    istemciden ALINMAZ; savunmalar/{ilgili} kaydından burada üretilir ve alıcı talepte kayıtlı adresle karşılaştırılır.
    sablon:
-   - 'onay'    İK belgeleri onayladı → talebi açan müdüre (talep.mudurEposta). Ek: savunma istem yazısı + olay tespit tutanağı
+   - 'onay'    İK belgeleri onayladı → talebi açan müdüre (talep.mudurEposta). Ek: savunma talebi (m.109 tebliğ tutanağıyla) + olay tespit tutanağı
                (PDF; savunmalar/{id}/ekler/{istem|tutanak}). Müdürden: imzalatıp taranmış PDF'i portala yüklemesi istenir.
    - 'kapanis' Müdür taranmış belgeyi yükledi ya da "çalışan imtina etti" işaretledi → çalışanın direktörüne (talep.direktorEposta).
    Olayın serbest metin açıklaması e-postaya YAZILMAZ (yalnız konu başlığı; ayrıntı PDF'te ve portalda, girişle).
@@ -66,10 +66,10 @@
       const govde = '<tr><td style="padding:26px 28px 6px;font-size:14.5px;line-height:1.65">' +
         '<p style="margin:0 0 12px">Sayın ' + esc(b.mudur) + ',</p>' +
         '<p style="margin:0 0 12px"><b>' + esc(b.dep) + '</b> departmanında <b>' + esc(b.unvan) + '</b> unvanıyla görev yapan <b>' + esc(b.ad) + '</b> için açtığınız savunma talebi İnsan Kaynakları tarafından onaylanmıştır. Çalışandan yazılı savunma alınması gerekmektedir.</p>' +
-        '<p style="margin:0 0 4px">Hukuka uygun olarak hazırlanan <b>Savunma İstem Yazısı</b> ve <b>Olay Tespit Tutanağı</b> bu e-postanın ekindedir (PDF).</p></td></tr>' +
+        '<p style="margin:0 0 4px">Hukuka uygun olarak hazırlanan <b>Savunma Talebi</b> (tebliğ tutanağıyla) ve <b>Olay Tespit Tutanağı</b> bu e-postanın ekindedir (PDF).</p></td></tr>' +
         '<tr><td style="padding:10px 28px 4px">' + kutuBaslik('Yapmanız gerekenler') + '<table role="presentation" width="100%" cellspacing="0" cellpadding="0">' +
         adim(1, 'İki belgeyi yazdırın. <b>Olay tespit tutanağını</b> olaya tanık olanlarla birlikte imzalayın.') +
-        adim(2, '<b>Savunma istem yazısını</b> çalışana tebliğ edip imzalatın. Çalışan yazılı savunmasını <b>yazıda belirtilen süre içinde</b> yazının ikinci sayfasına ya da ayrı bir dilekçeye yazar.') +
+        adim(2, '<b>Savunma talebini</b> çalışana tebliğ edin: 1. sayfayı ve 2. sayfadaki <b>tebliğ tutanağını</b> (Tebliğ Alan / Tebliğ Eden / Şahit) imzalatın. Çalışan yazılı savunmasını <b>yazıda belirtilen süre içinde</b> ekteki savunma sayfasına ya da ayrı bir dilekçeye yazar.') +
         adim(3, 'İmzalı belgeleri ve çalışanın yazılı savunmasını <b>tarayıp tek PDF olarak</b> aşağıdaki bağlantıdan talebinize yükleyin.') +
         adim(4, 'Islak imzalı asılları İnsan Kaynakları Departmanına iletin.') + '</table></td></tr>' +
         '<tr><td style="padding:10px 28px 4px"><div style="background:' + RENK.uyariZemin + ';border-left:4px solid #c9831c;border-radius:8px;padding:10px 14px;font-size:13.5px;line-height:1.55;color:' + RENK.uyari + '">' +
