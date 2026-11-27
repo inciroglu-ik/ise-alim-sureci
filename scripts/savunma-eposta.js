@@ -3,6 +3,8 @@
    sablon:
    - 'onay'    İK belgeleri onayladı → talebi açan müdüre (talep.mudurEposta). Ek: savunma talebi (m.109 tebliğ tutanağıyla) + olay tespit tutanağı
                (PDF; savunmalar/{id}/ekler/{istem|tutanak}). Müdürden: imzalatıp taranmış PDF'i portala yüklemesi istenir.
+               (27.11.2026) İK onayda görüş yazdıysa (talep.ik.gorus: hukuki dayanak, Yargıtay yaklaşımı, emsal) "İK görüş ve
+               değerlendirmesi" kutusu eklenir; direktöre giden eksiz 'onay-bilgi' e-postasında da aynı kutu vardır.
    - 'revize'  (27.11.2026) İK müdürden eksik bilgi istedi → müdüre; eksikler ("… bilgisi eksiktir") + İK görüş ve değerlendirmesi
                (talep.revize) + "Formu düzelt" bağlantısı. Müdüre giden e-postalarda (onay, revize) direktör bilgidedir (cc, eposta-kuyrugu.js).
    - 'kapanis' Müdür taranmış belgeyi yükledi ya da "çalışan imtina etti" işaretledi → çalışanın direktörüne (talep.direktorEposta).
@@ -50,6 +52,10 @@
   }
   const tablo = (ic) => '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid ' + RENK.cizgi + ';border-radius:10px;border-collapse:separate;overflow:hidden">' + ic + '</table>';
   const kutuBaslik = (m) => '<div style="font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:' + RENK.metin3 + ';margin:6px 0 8px">' + m + '</div>';
+  /* İK görüş ve değerlendirmesi kutusu (revize: talep.revize.gorus · onay / onay-bilgi: talep.ik.gorus — 27.11.2026) */
+  const gorusKutu = (g) => (g ? '<tr><td style="padding:10px 28px 4px">' + kutuBaslik('İK görüş ve değerlendirmesi · bilgilendirme notu') +
+    '<div style="background:' + RENK.zemin + ';border:1px solid ' + RENK.cizgi + ';border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.6;color:' + RENK.metin + '">' + esc(g).replace(/\r?\n/g, '<br>') + '</div></td></tr>' : '');
+  const onayGorus = (t) => String((t.ik && t.ik.gorus) || '').trim().slice(0, 4000);
   function kabuk(ust, govde, alt) {
     return '<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>' +
       '<body style="margin:0;padding:0;background:' + RENK.zemin + ';font-family:Inter,Segoe UI,Arial,sans-serif;color:' + RENK.metin + '">' +
@@ -77,8 +83,7 @@
         '<ul style="margin:0 0 10px;padding-left:20px">' + liste + '</ul>' +
         '<p style="margin:0 0 4px">Lütfen formu portalda düzeltip yeniden gönderin. Bilgiler tamamlanmadan savunma talebi hazırlanmaz.</p></td></tr>' +
         '<tr><td align="center" style="padding:16px 28px 8px">' + btn + '</td></tr>' +
-        (gorus ? '<tr><td style="padding:10px 28px 4px">' + kutuBaslik('İK görüş ve değerlendirmesi · bilgilendirme notu') +
-          '<div style="background:' + RENK.zemin + ';border:1px solid ' + RENK.cizgi + ';border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.6;color:' + RENK.metin + '">' + esc(gorus).replace(/\r?\n/g, '<br>') + '</div></td></tr>' : '') +
+        gorusKutu(gorus) +
         '<tr><td style="padding:10px 28px 22px">' + kutuBaslik('Talep özeti') + ozet + '</td></tr>';
       const dirBilgi = /^[a-z0-9._%+-]+@inciroglu\.com\.tr$/i.test(String(t.direktorEposta || '').trim()) && String(t.direktorEposta).trim().toLowerCase() !== String(t.mudurEposta || '').trim().toLowerCase();
       return kabuk('Savunma Talebi · Eksik Bilgi', govde, 'Bu e-posta İK Portalı tarafından otomatik gönderilmiştir' + (dirBilgi ? '; bir kopyası bilgi için direktöre iletilmiştir' : '') + '. Bağlantı İK Portalı girişini ister. İK görüşü bilgilendirme amaçlıdır, hukuki görüş değildir.');
@@ -89,8 +94,9 @@
         '<p style="margin:0 0 12px">Sayın ' + esc(b.direktor || 'Direktör') + ',</p>' +
         '<p style="margin:0 0 12px"><b>' + esc(b.dep) + '</b> departmanında <b>' + esc(b.unvan) + '</b> unvanıyla görev yapan <b>' + esc(b.ad) + '</b> için <b>' + esc(b.konu) + '</b> nedeniyle <b>' + esc(b.mudur) + '</b> isimli müdürünüzün açtığı savunma talebi İnsan Kaynakları tarafından onaylanmıştır. Savunma talebi ve tutanaklar tebliğ edilmek üzere müdüre iletilmiştir.</p>' +
         '<p style="margin:0 0 6px">Bilgilerinize sunarız.</p></td></tr>' +
+        gorusKutu(onayGorus(t)) +
         '<tr><td style="padding:10px 28px 22px">' + kutuBaslik('Özet') + ozet + '</td></tr>';
-      return kabuk('Savunma Talebi · Bilgilendirme', govde, 'Bu e-posta İK Portalı tarafından otomatik gönderilmiştir. Belgeler kişisel veri içerdiğinden yalnız talebi açan müdüre gönderilmiştir.');
+      return kabuk('Savunma Talebi · Bilgilendirme', govde, 'Bu e-posta İK Portalı tarafından otomatik gönderilmiştir. Belgeler kişisel veri içerdiğinden yalnız talebi açan müdüre gönderilmiştir.' + (onayGorus(t) ? ' İK görüşü bilgilendirme amaçlıdır, hukuki görüş değildir.' : ''));
     }
     if (sablon === 'onay') {
       const btn = '<a href="' + escHam(link) + '" style="display:inline-block;background:' + RENK.laci + ';color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;padding:13px 26px;border-radius:10px">Taranmış belgeyi yükle</a>';
@@ -108,9 +114,10 @@
         '<b>Önemli:</b> İmzalı belgeler taranıp sisteme yüklenmedikçe savunma talebi tamamlanmış sayılmaz ve geçersizdir. Çalışan belgeleri imzalamaktan ya da savunma vermekten imtina ederse, yükleme ekranındaki <b>“Çalışan imzadan / savunma vermekten imtina etti”</b> kutucuğunu işaretleyin; imtina tutanağı İnsan Kaynakları tarafından hazırlanır.</div></td></tr>' +
         '<tr><td align="center" style="padding:20px 28px 8px">' + btn + '</td></tr>' +
         '<tr><td style="padding:2px 28px 18px;font-size:12px;color:' + RENK.metin3 + ';text-align:center">Bağlantı İK Portalı girişini ister (T.C. Kimlik No ve şifreniz). Belgeler portaldaki talebinizde de indirilebilir.</td></tr>' +
-        '<tr><td style="padding:0 28px 22px">' + kutuBaslik('Talep özeti') + ozet + '</td></tr>';
+        gorusKutu(onayGorus(t)) +
+        '<tr><td style="padding:10px 28px 22px">' + kutuBaslik('Talep özeti') + ozet + '</td></tr>';
       const dirAyri = /^[a-z0-9._%+-]+@inciroglu\.com\.tr$/i.test(String(t.direktorEposta || '').trim()) && String(t.direktorEposta).trim().toLowerCase() !== String(t.mudurEposta || '').trim().toLowerCase();
-      return kabuk('Savunma Talebi · Onaylandı', govde, 'Bu e-posta İK Portalı tarafından otomatik gönderilmiştir' + (dirAyri ? '; direktöre ayrıca eksiz bilgi e-postası gönderilmiştir' : '') + '. Ekteki belgeler kişisel veri içerir; yalnız savunma süreci için kullanınız, başkasıyla paylaşmayınız.');
+      return kabuk('Savunma Talebi · Onaylandı', govde, 'Bu e-posta İK Portalı tarafından otomatik gönderilmiştir' + (dirAyri ? '; direktöre ayrıca eksiz bilgi e-postası gönderilmiştir' : '') + '. Ekteki belgeler kişisel veri içerir; yalnız savunma süreci için kullanınız, başkasıyla paylaşmayınız.' + (onayGorus(t) ? ' İK görüşü bilgilendirme amaçlıdır, hukuki görüş değildir.' : ''));
     }
     const imtina = t.kapanis && t.kapanis.tur === 'imtina';
     const metin = imtina
